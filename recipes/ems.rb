@@ -14,7 +14,7 @@ service 'nivr-nfv' do
   restart_command "service nivr-nfv status && service nivr-nfv node-reload && service nivr-nfv start || echo Refresh unavailable: skipped"
 end
 
-log "Testing embedded descriptor: "+node['mse']['deploy']['descriptor']
+log "Building MSE descriptor "+MSEdescriptor+".erb template from attribute: node['mse']['deploy']['descriptor']"
 file MSEdescriptor+".erb" do
   content node['mse']['deploy']['descriptor']
   mode '0755'
@@ -22,7 +22,7 @@ file MSEdescriptor+".erb" do
 end
 log "Turn "+MSEdescriptor+".erb to an actual Chef template"
 execute 'makeErb' do
-  command 'sed -i "s/@/%/g" '+MSEdescriptor+".erb"
+  command 'sed -i "s/_%_/%/g" '+MSEdescriptor+".erb"
 end
 
 log "Build MSE descriptor from template; restart nivr-nfv in case of change for refreshing the instance"
