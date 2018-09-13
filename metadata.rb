@@ -32,27 +32,44 @@ CentOS/RedHat >= 6.3 on Azure infrastructure
 To keep the generated kitchen file generic, attributes are expected as environment variables for both the Infrastructure and Product:
 # Infrastructure
 # The ssh public key used by kitchen to reach the infrastructure
-$env:AZURE_SSH_KEY="C:\Users\domin\.ssh\id_rsa"
+export AZURE_SSH_KEY="~/.ssh/id_rsa"
 # The Azure subscription ID and location
-$env:AZURE_SUBSCRIPTION_ID="bfe94c07-338d-47cf-aded-e8015d247694"
-$env:AZURE_LOCATION="North Europe"
+export AZURE_SUBSCRIPTION_ID="bfe94c07-338d-47cf-aded-e8015d247694"
+export AZURE_LOCATION="North Europe"
 # The Azure distribution image
-$env:AZURE_DISTRO="centos"
-$env:AZURE_IMAGE="OpenLogic:CentOS:7.4:latest"
+export AZURE_DISTRO="centos"
 # The Azure image flavor
-$env:AZURE_FLAVOR="Standard_D3"
+export AZURE_FLAVOR="Standard_D3"
 
+# CentOS 7
+#############
+# MSE product
+export AZURE_IMAGE="OpenLogic:CentOS:7.4:latest"
+# URL providing MSE ISO images
+export MSE_ISO_URL='ftp://mse4nfv:Blues.07@ftp.ext.hpe.com/chef/TAS31/'
+# ISO image delivering the MSE automated deployer engine
+export MSE_ENGINE='ClusterManager-3.1.1-2.019646.snap.el7.iso'
+# List of ISO images delivering the MSE products
+export MSE_PRODUCT="['TAS-3.1.1-1.019615.snap.el7.iso','USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.0-1.019457.el7.iso']"
+# List of yum repositories to be used for MSE automated deployer installation
+export MSE_YUM_REPO='centos*,updates*,base*'
+# URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
+export MSE_SSH_KEYS_URL='ftp://mse4nfv:Blues.07@ftp.ext.hpe.com/chef/sshKeys/'
+
+# CentOS 6
+#############
+export AZURE_IMAGE="OpenLogic:CentOS:6.9:latest"
 # MSE product
 # URL providing MSE ISO images
-$env:MSE_ISO_URL='http://orgues.free.fr/tmp/mse/'
+export MSE_ISO_URL='ftp://mse4nfv:Blues.07@ftp.ext.hpe.com/chef/MSE30/'
 # ISO image delivering the MSE automated deployer engine
-$env:MSE_ENGINE='TAS-3.1.0-12.019538.el7.iso'
+export MSE_ENGINE='ClusterManager-3.1.1-2.019650.el6.iso'
 # List of ISO images delivering the MSE products
-$env:MSE_PRODUCT="['P8070015.JPG','P8120023.JPG','P8120024.JPG']"
+export MSE_PRODUCT="['MSE-3.0.5.1-3.019636.el6.iso','SEE-4.1.6-4.017107.el6.iso','OpenCall-OCMP-4.4.8.bg013842.el6.x86_64.iso','USPM4212_Linux_RHEL6_3931.iso']"
 # List of yum repositories to be used for MSE automated deployer installation
-$env:MSE_YUM_REPO='centos*,updates*,base*'
+export MSE_YUM_REPO='centos*,updates*,base*'
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
-$env:MSE_SSH_KEYS_URL='http://orgues.free.fr/tmp/mse/' 
+export MSE_SSH_KEYS_URL='ftp://mse4nfv:Blues.07@ftp.ext.hpe.com/chef/sshKeys/'
 
 EOH
 version '0.1.0'

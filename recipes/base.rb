@@ -27,8 +27,8 @@ mount isoMountPoint do
   options 'loop'
   action [:mount]
 end
-remote_file isoRepo+'install-tas.sh' do
-  source 'file://'+isoMountPoint+'utils/install-tas.sh'
+remote_file isoRepo+'install-cluster-manager.sh' do
+  source 'file://'+isoMountPoint+'utils/install-cluster-manager.sh'
   mode 0755
 end
 log "Install versionlock plugin for yum"
@@ -36,9 +36,9 @@ package 'yum-plugin-versionlock' do
   action :upgrade
 end
 execute 'getInstaller' do
-  command 'umount '+isoMountPoint+' ; '+isoRepo+'install-tas.sh'+' --yes --install hpe-install-tas --disableplugin=yum-plugin-versionlock --iso '+isoRepo+engineIso
+  command 'umount '+isoMountPoint+' ; '+isoRepo+'install-cluster-manager.sh'+' --yes --install hpe-install-cluster-manager --disableplugin=yum-plugin-versionlock --iso '+isoRepo+engineIso
 end
-execute "hpe-install-tas.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='"+yumRepo+"' --iso "+isoRepo+engineIso
+execute "install-cluster-manager.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='"+yumRepo+"' --iso "+isoRepo+engineIso
 log" Apply patches"
 remote_file '/opt/OC/sbin/nivr-nfv-util.sh' do
   source isoUrl+'nivr-nfv-util.sh'
@@ -119,7 +119,8 @@ log "Start all MSE engines services"
 ['nivr','ocmp','ocsnf','uspm'].each do |vnfc|
   service "#{vnfc}-nfv" do
     # mse nfv services needs to be started only if not already successfully completed
-    start_command "service #{vnfc}-nfv status || service #{vnfc}-nfv start"
+	# ignore start error, as this can mean that the service is already running
+    start_command "service #{vnfc}-nfv status || service #{vnfc}-nfv start || echo started"
     action :start
   end
 end
