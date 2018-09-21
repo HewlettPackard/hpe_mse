@@ -5,9 +5,20 @@ isoUrl=node['mse']['install']['isoUrl']
 yumRepo = node['mse']['install']['yumRepo']
 sshKeysUrl=node['mse']['install']['sshKeysUrl']
 
+theNode=node['name']
+theNodeHostname=node['cloud']['local_hostname']
+theNodeIpAddress=node['cloud']['local_ipv4']
+# if the local hostname is undefined, switch to the public interface (eg Azure)
+if !theNodeHostname
+  theNodeHostname="$(hostname)"
+  theNodeIpAddress=node['cloud']['public_ipv4']
+end
+
 # MSE constants
 isoRepo='/var/opt/OC/iso/'
 isoMountPoint='/media/cdrom/'
+
+log "MSE node:"+theNode+" at ipAddress:"+theNodeIpAddress+" is named:"+theNodeHostname
 
 log "Create the MSE directories"
 [isoRepo,isoMountPoint].each do |mseDir|
@@ -44,10 +55,14 @@ remote_file '/opt/OC/sbin/nivr-nfv-util.sh' do
   source isoUrl+'nivr-nfv-util.sh'
   mode 0755
 end
+remote_file '/opt/OC/sbin/nivr-nfv-setup.sh' do
+  source isoUrl+'nivr-nfv-setup.sh'
+  mode 0755
+end
 
 log "Make sure the host is in /etc/hosts"
 execute 'updateHosts' do 
-  command "grep "+node['cloud']['public_ipv4']+" /etc/hosts || echo "+node['cloud']['public_ipv4']+" $(hostname) $(hostname -s) >> /etc/hosts"
+  command "grep "+theNodeHostname+" /etc/hosts || echo "+theNodeIpAddress+" "+theNodeHostname+" >> /etc/hosts"
 end
 
 log "Enable ssh for root and ocadmin with fixed keys"

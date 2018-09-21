@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-09-12 Version 2.42</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-09-17 Version 2.43</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -46,7 +46,8 @@
 <td valign="top">Build the Chef's cookbook</td>
 <td valign="top"><input class="buildButton" type="button" value="Cook" onclick="buildChefCookbook()"> Infrastructure
 <select id="chefInfrastructure">
-<option name="Azure" selected>Azure</option>
+<option name="aws" selected>aws</option>
+<option name="azure">azure</option>
 </select>
 <input class="helpButton" type="button" value="Help" onclick="chefDeploymentHelp()">
 </td> 
@@ -877,7 +878,7 @@ Networks.build = function(target){
 	['APP', 'SIP', 'LBNAT', 'PUBLIC', 'HA', 'DATA', 'M3UA1', 'M3UA2'].forEach(function(name){
 		if(Networks.count('network', name) > 1)Networks.check += "\nNetworks: concurrent definitions of "+name+" detected";
 	});
-	if(Networks.count('network') > 1 && target == 'Azure')Networks.check += "\nNetworks: Azure target limitation to one single network, found "+Networks.count('network');
+	if(Networks.count('network') > 1 && target == 'azure')Networks.check += "\nNetworks: azure target limitation to one single network, found "+Networks.count('network');
 
 	result += '\n# ------------------------------- #';
 	result += '\n# Network interfaces definition   #';
@@ -1049,7 +1050,8 @@ Nodes.help = function(){
 	"\n\t- redisLazy: no persistency and active/spare (one node active at once and no write to disk)"+
 	"\nDB Port: port number used for this database (redis, mongo, oracle)"+
 	"\n\tFor Redis Sentinel mode, a second port may be defined for the Sentinel process, e.g. 6379,16379"+
-	"\n\tThe default value is the redis port number plus an offset defined as REDIS_SENTINEL_PORT_OFFSET in the Misc section (default 20000)"
+	"\n\tThe default value is the redis port number plus an offset defined as REDIS_SENTINEL_PORT_OFFSET in the Misc section (default 20000)"+
+	"\nNOTE: Redis active/active resources are *not* monitored by Sentinel."
 	;
 }
 
@@ -1204,6 +1206,8 @@ Nodes.build = function(target){
 		// Collect the short name of this node in the short names array for Heat template build
 		var shortName = nodeName.substr(0, nodeName.indexOf('.'));
 		var theCloudNode = new cloudNode(shortName, nodeName);
+		// Known limitation of Redis: use a truncated short name for redis instances, limited to 13 characters
+		var redisInstanceName = nodeName.substr(0,12).split('.')[0];
 		
 		switch(target){
 		  case 'Heat':
@@ -1220,7 +1224,10 @@ Nodes.build = function(target){
 			if(nodeM3ua1IpAddr == "?")	{nodeM3ua1IpAddr="~"+shortName+	"_m3ua1~";	theCloudNode.interfaces.push(Networks.heatNetworks['M3UA1']);}
 			if(nodeM3ua2IpAddr == "?")	{nodeM3ua2IpAddr="~"+shortName+	"_m3ua2~";	theCloudNode.interfaces.push(Networks.heatNetworks['M3UA2']);}
 			break;
-		  case 'Azure':
+		  case 'aws':
+		    // Node names will be known at instantiation time: 
+		  	nodeName="<_%_= node['mse']['map']['"+shortName+"']['hostname'] _%_>";
+		  case 'azure':
 			// IP addresses will be known at instantiation time: 
 			// Replace undefined values with place holders resolved later
 			// Push the network interface number in the interfaces list for this node
@@ -1534,8 +1541,7 @@ Nodes.build = function(target){
 			case 'redisLazy':
 			case 'redis':
 				// all redis instances are to be concatenated in one vector
-				// Known limitation on the instance Id, limited to 13 characters
-				REDIS_INSTANCE_ID.push(nodeName.substr(0,12).split('.')[0]);
+				REDIS_INSTANCE_ID.push(redisInstanceName);
 				// This node is a redis host; already recorded if playing a ServerSentinel role on Redis HA: do not duplicate
 				if(redisHaRole != 'ServerSentinel'){
 				REDIS_HOST['MGMT'].push(nodeName);
@@ -2357,7 +2363,8 @@ RedisInstance.help = function(){return "Redis Sentinel instances:"+
 	"\n- redisSpare: persistency and active/spare (one node active at once and write to disk)"+
 	"\n- redisLazy: no persistency and active/spare (one node active at once and no write to disk)"+
 	"\nInstance Port: port used on the servers for this instance. Default: 6379"+
-	"\nSentinel Port: port used on the servers/sentinels for this instance. Default value is the redis port number plus an offset defined as REDIS_SENTINEL_PORT_OFFSET in the Misc section (default 20000)"
+	"\nSentinel Port: port used on the servers/sentinels for this instance. Default value is the redis port number plus an offset defined as REDIS_SENTINEL_PORT_OFFSET in the Misc section (default 20000)"+
+	"\nNOTE: Redis active/active resources are *not* monitored by Sentinel."
 }
 RedisInstance.build = function(target){
 	var nameIndexes = RedisInstance.nameIndexes;
@@ -2389,16 +2396,16 @@ RedisInstance.build = function(target){
 			continue;
 		}
 		
-		var name=RedisInstance.getAndSetValue(table.rows[i], nameIndexes, 'Name');
+		var name=RedisInstance.getAndSetValue(table.rows[i], nameIndexes, 'Name', 'redis-'+i);
 		var mode=RedisInstance.getAndSetSelection(table.rows[i], nameIndexes, 'Mode');
 		var persistence = (mode == 'redis' || mode == 'redisSpare' ? 'enabled' : 'disabled');
 		var spare = (mode == 'redisSpare' || mode == 'redisLazy' ? 'true' : 'false');
 		var instancePort=RedisInstance.getAndSetValue(table.rows[i], nameIndexes, 'Instance Port');
 		var sentinelPort=RedisInstance.getAndSetValue(table.rows[i], nameIndexes, 'Sentinel Port');
 		
-		if(name == ""){RedisInstance.check += 'RedisInstance section: instance name cannot be blank'; continue; }
+		if(name == ""){RedisInstance.check += '\nRedisInstance section: instance name cannot be blank'; continue; }
 		if(names[VNFCindex] == undefined)names[VNFCindex] = new Array();
-		if(names[VNFCindex].indexOf(name) >=0){RedisInstance.check += 'RedisInstance: instance name '+name+' in '+VNFdisplayName+' is duplicated'; continue; }
+		if(names[VNFCindex].indexOf(name) >=0){RedisInstance.check += '\nRedisInstance: instance name '+name+' in '+VNFdisplayName+' is duplicated'; continue; }
 		var nameIndex=names[VNFCindex].length;
 		names[VNFCindex].push(name);
 		if(persistences[VNFCindex] == undefined)persistences[VNFCindex] = new Array(); 
@@ -2586,9 +2593,8 @@ SEEliteService.help = function(){
 	"\n\tIf only Type is defined, the service is started using this type, which must be present on the platform as the file /etc/opt/OC/imsc/ctrl/imscapp-<type>.properties" +
 	"\n\tIf both Base and Type are defined, an new application type is created using the Messaging Framework application type builder msgpf-imsapp, and used to start this service." +
 	"\nJson config: name of the Json section in the APP_CONFIG_DATA_FILE applying to this application" +
-	"\n\tif this application is a Messaging Framework application as defined in the APPLICATION property of Messaging Framework section, it will be automatically provisioned to Messaging Framework Redis."+
-	"\n\tif this application is *not* Messaging Framework Application, then it will create JSON file content on Local File System if content is provided in APP_CONFIG_DATA_FILE."+
-	"\n\tNote that File will be created on Local file system if SEE_LITE_DATA_SECTION index value matches <tag> present inside APP_CONFIG_DATA_FILE."
+	"\n\tIf this section is defined in the APP_CONFIG_DATA_FILE at the first level, a subset file restricted to this section is made available to the application on the local file system as /etc/opt/OC/hpoc-nivr-nfv/<section>.json."+
+	"\n\tIf this application is a Messaging Framework application as defined in the APPLICATION property of Messaging Framework section, this file content is automatically provisioned to Messaging Framework"
 }
 	
 SEEliteService.build = function(target){
@@ -2791,10 +2797,6 @@ MessagingFramework.build = function(){
 		var propertyName=MessagingFramework.getAndSetSelection(table.rows[i], nameIndexes, 'Property');
 		var propertyValue=MessagingFramework.getAndSetValue(table.rows[i], nameIndexes, 'Value', MessagingFrameworkDefault[propertyName], propertyName);
 		if(propertyName == 'INSTANCE_ID')MessagingFramework.check+=checkSeeInstanceId(propertyValue, "Messaging Framework");
-		if(propertyName == 'APPLICATION_DIAMETER_PROVIDER'){
-			var diameterName=propertyValue.split('_')[0] ;
-			if(! Diameter.search('Name', diameterName))MessagingFramework.check+='Messaging Framework vs Diameter: missing the Diameter provider '+diameterName;
-		}
 		if(propertyName == 'APPLICATION'){
 			MessagingFramework.check+=checkDependency(propertyValue.indexOf('SMSC') != -1, [MessagingFramework.search('Property','APPLICATION_DIAMETER_PROVIDER')], 'Messaging Framework application SMSC', ' is missing a Diameter provider definition: APPLICATION_DIAMETER_PROVIDER');
 			// If this application is defined as an SEE lite application with a base ear and/or type, use them as MESSAGING_FRAMEWORK_APPLICATION_BASE/TYPE
@@ -3774,8 +3776,7 @@ Diameter.build = function(){
 		// MrfAdapter for Diameter: required name for the provider
 		if(type == 'RF')defaultName='MrfAdDRFOCC';
 		var name=Diameter.getAndSetValue(row, nameIndexes, 'Name', defaultName);
-		Diameter.check += checkGroupConsistency([type == 'RF', name == 'MrfAdDRFOCC' ], 'Diameter RF type requires to be named', ' MrfAdDRFOCC; this name should not be used out of Diameter RF');
-		Diameter.check += checkDependency(type == 'RF', [ MrfAdapter.search('Name', 'MrfAdDRFOCC') ], 'Diameter RF type requires', ' an MrfAdapter named MrfAdDRFOCC');
+		Diameter.check += checkDependency(type == 'RF', [ MrfAdapter.search('Name', 'MrfAdDRFOCC'), MessagingFramework.search('Property', 'APPLICATION_DIAMETER_PROVIDER') ], 'Diameter RF type requires', ' an MrfAdapter named MrfAdDRFOCC or a Messaging Framework application defining APPLICATION_DIAMETER_PROVIDER');
 		var instanceId=Diameter.getAndSetValue(row, nameIndexes, 'Instance Id');
 		var transport=Diameter.getAndSetSelection(row, nameIndexes, 'Transp.');
 		var addressServer=Diameter.getAndSetValue(row, nameIndexes, 'Servers addresses');
@@ -6841,7 +6842,7 @@ function buildHeatTemplate(){
 		     "            ");	// fix the descriptor indentation as expected by Heat
 	heat+=n0+"            EOFILE";
     }
-	if(Misc.heatAppAuxDescPath != undefined){
+	if(Misc.heatAppAuxDescPath != undefined && Misc.heatAppAuxDesc != undefined){
    	heat+=n0+"            cat > "+Misc.heatAppAuxDescPath+" << 'EOFILE'";
     heat+=n0+"            "+Misc.heatAppAuxDesc.replace(/\n/g, "\n"+  
 		     "            ");	// fix the descriptor indentation as expected by Heat
@@ -6886,11 +6887,25 @@ function buildHeatTemplate(){
 }
 
 function chefDeploymentHelp(){userOutput(
-"Chef cookbook limitations: Azure only, single network interface" 
+"Chef cookbook limitations: single network interface"+
+"\nThe cookbook built by this assistant is a .kitchen.yml file. Before launching 'kitchen converge' on a work station:"+
+"\n\t- install the Chef Development Kit"+
+"\n\t- install the pre requisite gem: chef gem install kitchen-nodes"+
+"\n\t- download the hpe_mse recipes from github: git clone https://github.com/dometdemont/hpe_mse.git"+
+"\n\t- read the metadata.rb file for instructions, and set the environment variables used by the cookbook for getting ISO images and reaching the infrastructure."+ 
+"\nFor azure target:"+
+"\n\t- install the azure CLI from https://docs.microsoft.com/fr-fr/cli/azure/install-azure-cli-windows?view=azure-cli-latest"+
+"\n\t- install pre requisite gem: chef gem install kitchen-azurerm"+
+"\n\t- set azure credentials in ~/.azure/credentials"+
+"\n\t- login to the azure subscription: az login"+
+"\nFor aws target:"+
+"\n\t- install the aws CLI"+
+"\n\t- set aws credentials in ~/.aws/credentials"+
+"\n\t- prepare a key pair file"
 );}
 
 // ===========================
-// MSE Azure Chef cookbook
+// MSE Chef cookbook
 // ===========================
 function buildChefCookbook(){
 	var infrastructure = document.getElementById("chefInfrastructure").value;
@@ -6904,13 +6919,32 @@ function buildChefCookbook(){
 	var cook="---"
 	cook+=n0+"# '"+quickDescription.value+"'";
 	cook+=n0+"driver:";
-	cook+=n0+"  name: azurerm";
-	cook+=n0+"  subscription_id: <%= ENV['AZURE_SUBSCRIPTION_ID'] %>";
-	cook+=n0+"  location: <%= ENV['AZURE_LOCATION'] %>";
-	cook+=n0+"  machine_size: <%= ENV['AZURE_FLAVOR'] %>";
+	switch(infrastructure){
+	  case 'azure':
+		cook+=n0+"  name: azurerm";
+		cook+=n0+"  subscription_id: <%= ENV['AZURE_SUBSCRIPTION_ID'] %>";
+		cook+=n0+"  location: <%= ENV['CLOUD_LOCATION'] %>";
+		cook+=n0+"  machine_size: <%= ENV['CLOUD_FLAVOR'] %>";
+		cook+=n0+"  image_urn: <%= ENV['CLOUD_IMAGE'] %>";
+		cook+=n0+"  vm_tags:";
+		cook+=n0+"    ostype: linux";
+		cook+=n0+"    distro: <%= ENV['CLOUD_DISTRO'] %>";
+		break;
+	  case 'aws':
+		cook+=n0+"  name: ec2";
+		cook+=n0+"  aws_ssh_key_id: <%= ENV['CLOUD_SSH_KEY_PAIR'] %>";
+		cook+=n0+"  region: <%= ENV['CLOUD_LOCATION'] %>";
+		cook+=n0+"  availability_zone: <%= ENV['CLOUD_AVAILABILITY_ZONE'] %>";
+		cook+=n0+"  subnet_id: <%= ENV['CLOUD_SUBNET'] %>";
+		cook+=n0+"  instance_type: <%= ENV['CLOUD_FLAVOR'] %>";
+		cook+=n0+"  image_id: <%= ENV['CLOUD_IMAGE'] %>";
+		cook+=n0+"  security_group_ids: <%= ENV['CLOUD_SECURITY_GROUPS'] %>";
+		cook+=n0+"  retryable_tries: 120";
+		break;
+	}	
 	cook+=n0;
 	cook+=n0+"transport:";
-	cook+=n0+"  ssh_key: <%= ENV['AZURE_SSH_KEY'] %>";
+	cook+=n0+"  ssh_key: <%= ENV['CLOUD_SSH_KEY'] %>";
 	cook+=n0;
 	cook+=n0+"provisioner:";
 	cook+=n0+"  name: nodes";
@@ -6929,29 +6963,21 @@ function buildChefCookbook(){
     // For each non EMS node: create the instance
     nonEmsNodesNames.forEach(function(name, indexNode){
 	cook+=n0+"  - name: "+name;
-	cook+=n0+"    machine_size: <%= ENV['AZURE_FLAVOR'] %>";
 	cook+=n0+"    run_list:";
 	cook+=n0+"      - recipe[hpe_mse::base]";
 	cook+=n0+"    driver_config:";
-	cook+=n0+"      image_urn: <%= ENV['AZURE_IMAGE'] %>";
 	cook+=n0+"      vm_name: "+Nodes.cloudNodes[indexNode].fqdn;
-	cook+=n0+"      vm_tags:";
-	cook+=n0+"        ostype: linux";
-	cook+=n0+"        distro: <%= ENV['AZURE_DISTRO'] %>";
 	});
 	// Create the EMS node afterwards to make sure that it will be able to collect all other nodes information
 	cook+=n0+"  - name: "+emsNode.name;
-	cook+=n0+"    machine_size: <%= ENV['AZURE_FLAVOR'] %>";
+	cook+=n0+"    machine_size: <%= ENV['CLOUD_FLAVOR'] %>";
 	cook+=n0+"    run_list:";
 	cook+=n0+"      - recipe[hpe_mse::ems]";
 	cook+=n0+"    driver_config:";
-	cook+=n0+"      image_urn: <%= ENV['AZURE_IMAGE'] %>";
 	cook+=n0+"      vm_name: "+emsNode.fqdn;
-	cook+=n0+"      vm_tags:";
-	cook+=n0+"        ostype: linux";
-	cook+=n0+"        distro: <%= ENV['AZURE_DISTRO'] %>";
 	
 	// Define the MSE attributes from the environment and push the descriptor
+	cook+=n0+"";
 	cook+=n0+"suites:";
 	cook+=n0+"  - name: mse";
 	cook+=n0+"    verifier:";

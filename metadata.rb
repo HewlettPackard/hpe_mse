@@ -19,32 +19,59 @@ Two recipes:
 - base used for all nodes part of the MSE instance, 
 - ems used for the node playing the MSE EMS role, in charge of receiving the MSE Descriptor, and collect the consolidated status of this MSE instance.
 
-The MSE Descriptor Assistant nivr-cluster-nfv.html must be used to depict the MSE instance topology and build 
+The MSE Descriptor Assistant nivr-cluster-nfv.properties.html must be used to depict the MSE instance topology and build 
 the .kitchen.yml file used to deploy the MSE instance. This file embedds the MSE descriptor template,
 dynamically turned to the actual MSE Descriptor at run time based on the instantiated nodes IP addresses and names.
 
 = REQUIREMENTS:
 
-CentOS/RedHat >= 6.3 on Azure infrastructure
+CentOS/RedHat >= 6.3 on Azure or Amazon infrastructure
 
 = ATTRIBUTES:
 
 To keep the generated kitchen file generic, attributes are expected as environment variables for both the Infrastructure and Product:
-# Infrastructure
+
+# Azure Infrastructure
+######################
 # The ssh public key used by kitchen to reach the infrastructure
-export AZURE_SSH_KEY="~/.ssh/id_rsa"
+export CLOUD_SSH_KEY="~/.ssh/id_rsa"
 # The Azure subscription ID and location
 export AZURE_SUBSCRIPTION_ID="bfe94c07-338d-47cf-aded-e8015d247694"
-export AZURE_LOCATION="North Europe"
+export CLOUD_LOCATION="North Europe"
 # The Azure distribution image
-export AZURE_DISTRO="centos"
+export CLOUD_DISTRO="centos"
 # The Azure image flavor
-export AZURE_FLAVOR="Standard_D3"
+export CLOUD_FLAVOR="Standard_D3"
+# The Azure image name
+# Cent OS 7
+export CLOUD_IMAGE="OpenLogic:CentOS:7.4:latest"
+# Cent OS 6
+export CLOUD_IMAGE="OpenLogic:CentOS:6.9:latest"
 
-# CentOS 7
-#############
-# MSE product
-export AZURE_IMAGE="OpenLogic:CentOS:7.4:latest"
+# Amazon Infrastructure
+#######################
+# The ssh public key used by kitchen to reach the infrastructure
+export CLOUD_SSH_KEY=~/.aws/mse.pem
+# The ssh key pair used by resources in the infrastructure
+export CLOUD_SSH_KEY_PAIR="mse"
+# The Amazon security groups
+export CLOUD_SECURITY_GROUPS=["sg-03527e0d7d4232a2f"]
+# The Amazon availability zone
+export CLOUD_AVAILABILITY_ZONE="b"
+# The Amazon subnet
+export CLOUD_SUBNET="subnet-bc1878f4"
+# The Amazon location
+export CLOUD_LOCATION="eu-west-1"
+# The Amazon image flavor
+export CLOUD_FLAVOR="t2.micro"
+# The Amazon image name
+# Cent OS 7
+export CLOUD_IMAGE="ami-3548444c"
+# Cent OS 6
+export CLOUD_IMAGE="ami-404f4339"
+
+# TAS product on CentOS 7
+#########################
 # URL providing MSE ISO images
 export MSE_ISO_URL='ftp://mse4nfv:Blues.07@ftp.ext.hpe.com/chef/TAS31/'
 # ISO image delivering the MSE automated deployer engine
@@ -56,10 +83,8 @@ export MSE_YUM_REPO='centos*,updates*,base*'
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:Blues.07@ftp.ext.hpe.com/chef/sshKeys/'
 
-# CentOS 6
-#############
-export AZURE_IMAGE="OpenLogic:CentOS:6.9:latest"
-# MSE product
+# MSE product on CentOS 6
+#########################
 # URL providing MSE ISO images
 export MSE_ISO_URL='ftp://mse4nfv:Blues.07@ftp.ext.hpe.com/chef/MSE30/'
 # ISO image delivering the MSE automated deployer engine
@@ -72,7 +97,7 @@ export MSE_YUM_REPO='centos*,updates*,base*'
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:Blues.07@ftp.ext.hpe.com/chef/sshKeys/'
 
 EOH
-version '0.1.0'
+version '0.2.0'
 chef_version '>= 12.14' if respond_to?(:chef_version)
 
 # The `issues_url` points to the location where issues for this cookbook are
