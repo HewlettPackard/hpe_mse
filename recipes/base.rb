@@ -5,6 +5,10 @@ isoUrl=node['mse']['install']['isoUrl']
 yumRepo = node['mse']['install']['yumRepo']
 sshKeysUrl=node['mse']['install']['sshKeysUrl']
 
+# MSE constants
+isoRepo='/var/opt/OC/iso/'
+isoMountPoint='/media/cdrom/'
+
 theNode=node['name']
 theNodeHostname=node['cloud']['local_hostname']
 theNodeIpAddress=node['cloud']['local_ipv4']
@@ -13,11 +17,6 @@ if !theNodeHostname
   theNodeHostname="$(hostname)"
   theNodeIpAddress=node['cloud']['public_ipv4']
 end
-
-# MSE constants
-isoRepo='/var/opt/OC/iso/'
-isoMountPoint='/media/cdrom/'
-
 log "MSE node:"+theNode+" at ipAddress:"+theNodeIpAddress+" is named:"+theNodeHostname
 
 log "Create the MSE directories"
@@ -26,12 +25,23 @@ log "Create the MSE directories"
     recursive true
   end
 end
-log "Get the MSE ISO images"
+
+# Resource used to trigger a refresh on the EMS node, in case of ISO image(s) change
+# Defined to no-operation on a base node, overridden on ems node, see ems.rb
+log 'RefreshOnIsoChange' do
+  action :nothing
+end
+
+log "Get/refresh the MSE ISO images"
 isoImages.each do |isoImage| 
   remote_file isoRepo+"#{isoImage}" do
     source isoUrl+"#{isoImage}"
+    notifies :write,'log[RefreshOnIsoChange]',:immediately  
   end
 end
+log "Remove unused ISO images"
+execute "ls "+isoRepo+"*.iso | grep -v -e "+isoImages.join(" -e ")+" | xargs rm -f "
+
 log "Install MSE engine"
 mount isoMountPoint do
   device isoRepo+engineIso
@@ -134,7 +144,7 @@ log "Start all MSE engines services"
 ['nivr','ocmp','ocsnf','uspm'].each do |vnfc|
   service "#{vnfc}-nfv" do
     # mse nfv services needs to be started only if not already successfully completed
-	# ignore start error, as this can mean that the service is already running
+    # ignore start error, as this can mean that the service is already running
     start_command "service #{vnfc}-nfv status || service #{vnfc}-nfv start || echo started"
     action :start
   end

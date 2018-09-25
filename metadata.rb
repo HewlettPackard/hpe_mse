@@ -77,7 +77,7 @@ export MSE_ISO_URL='ftp://mse4nfv:Blues.07@ftp.ext.hpe.com/chef/TAS31/'
 # ISO image delivering the MSE automated deployer engine
 export MSE_ENGINE='ClusterManager-3.1.1-2.019646.snap.el7.iso'
 # List of ISO images delivering the MSE products
-export MSE_PRODUCT="['TAS-3.1.1-1.019615.snap.el7.iso','USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.0-1.019457.el7.iso']"
+export MSE_PRODUCT="['TAS-3.1.1-1.019681.el7.iso','USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.0-1.019457.el7.iso']"
 # List of yum repositories to be used for MSE automated deployer installation
 export MSE_YUM_REPO='centos*,updates*,base*'
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
@@ -88,7 +88,7 @@ export MSE_SSH_KEYS_URL='ftp://mse4nfv:Blues.07@ftp.ext.hpe.com/chef/sshKeys/'
 # URL providing MSE ISO images
 export MSE_ISO_URL='ftp://mse4nfv:Blues.07@ftp.ext.hpe.com/chef/MSE30/'
 # ISO image delivering the MSE automated deployer engine
-export MSE_ENGINE='ClusterManager-3.1.1-2.019650.el6.iso'
+export MSE_ENGINE='ClusterManager-3.1.1-3.019687.el6.iso'
 # List of ISO images delivering the MSE products
 export MSE_PRODUCT="['MSE-3.0.5.1-3.019636.el6.iso','SEE-4.1.6-4.017107.el6.iso','OpenCall-OCMP-4.4.8.bg013842.el6.x86_64.iso','USPM4212_Linux_RHEL6_3931.iso']"
 # List of yum repositories to be used for MSE automated deployer installation
@@ -97,7 +97,7 @@ export MSE_YUM_REPO='centos*,updates*,base*'
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:Blues.07@ftp.ext.hpe.com/chef/sshKeys/'
 
 EOH
-version '0.2.0'
+version '0.2.1'
 chef_version '>= 12.14' if respond_to?(:chef_version)
 
 # The `issues_url` points to the location where issues for this cookbook are

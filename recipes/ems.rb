@@ -8,6 +8,12 @@ end
 
 include_recipe 'hpe_mse::base'
 
+# Resource used to trigger a refresh on the EMS node, in case of ISO image(s) change
+log 'RefreshOnIsoChange' do
+  notifies :restart,'service[nivr-nfv]',:immediately
+  action :nothing
+end
+
 log "Defining all MSE nodes names and IP addresses as attributes in mse.map"
 # Example on Amazon: ipaddress is a public name, fqdn a private name embedding the ip address
 #  "ipaddress": "ec2-18-202-81-148.eu-west-1.compute.amazonaws.com"
