@@ -1,0 +1,34 @@
+---
+
+- name: check for a refresh due to ISO image(s) change
+  file:
+    path: /var/opt/OC/iso/refresh_trigger.log
+    state: absent
+  notify: refresh MSE instance
+
+- name: Copy descriptor to template 
+  copy:
+    content: "{{ descriptor }}"
+    dest: /etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties.erb
+
+- name: resolve names and ip addresses in the template based on the inventory nick_name, hostname and ipaddress
+  raw: |
+    sed -i "s/_%_{{ hostvars[item].nick_name }}_hostname_%_/{{ hostvars[item].ansible_fqdn }}/g" /etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties.erb &&
+    sed -i "s/_%_{{ hostvars[item].nick_name }}_ipaddress_%_/{{ hostvars[item].ansible_default_ipv4.address }}/g" /etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties.erb
+  with_items: "{{ groups['base'] }}"
+
+- name: create the descriptor from the template and trigger a refresh in case of change
+  copy:
+    remote_src: yes
+    src: "/etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties.erb"
+    dest: "/etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties"
+  notify: refresh MSE instance
+
+- name: flush the handlers
+  meta: flush_handlers
+
+- name: create the descriptor and wait synchronously for the consolidated status
+  raw: |
+    sleep 20s && 
+    until service nivr-nfv consolidated-status || (( $? > 127 )) ; do sleep 20s ; done && 
+    service nivr-nfv consolidated-status

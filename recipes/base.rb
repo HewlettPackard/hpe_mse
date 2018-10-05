@@ -60,15 +60,6 @@ execute 'getInstaller' do
   command 'umount '+isoMountPoint+' ; '+isoRepo+'install-cluster-manager.sh'+' --yes --install hpe-install-cluster-manager --disableplugin=yum-plugin-versionlock --iso '+isoRepo+engineIso
 end
 execute "install-cluster-manager.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='"+yumRepo+"' --iso "+isoRepo+engineIso
-log" Apply patches"
-remote_file '/opt/OC/sbin/nivr-nfv-util.sh' do
-  source isoUrl+'nivr-nfv-util.sh'
-  mode 0755
-end
-remote_file '/opt/OC/sbin/nivr-nfv-setup.sh' do
-  source isoUrl+'nivr-nfv-setup.sh'
-  mode 0755
-end
 
 log "Make sure the host is in /etc/hosts"
 execute 'updateHosts' do 
@@ -87,6 +78,7 @@ directory '/root/.ssh' do
 end
 directory '/home/ocadmin/.ssh' do
     recursive true
+    owner 'ocadmin'
 end
 directory '/etc/ssh' do
     recursive true

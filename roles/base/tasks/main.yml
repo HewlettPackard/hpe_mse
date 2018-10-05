@@ -1,0 +1,146 @@
+---
+- name: deploy an MSE node
+  debug: 
+    var=theNode
+
+- name: Create MSE directories
+  with_items: ["{{isoRepo}}","{{isoMountPoint}}"]
+  loop_control:
+    loop_var:
+      _dir
+  file: 
+    path: "{{_dir}}" 
+    state: directory
+    recurse: yes
+
+- name: install wget as a workaround for get_url
+  yum:
+    name: wget
+
+- name: Get/refresh the MSE engine ISO image
+  get_url:
+    url: "{{isoUrl}}{{engineIso}}"
+    dest: "{{isoRepo}}{{engineIso}}"
+  notify: refresh MSE instance
+
+- name: Get/refresh the MSE product ISO images
+  with_items: "{{mseProduct}}"
+  loop_control:
+    loop_var:
+      _isoImage
+#  raw: wget --continue {{isoUrl}}{{_isoImage}} --directory-prefix={{isoRepo}}
+  get_url:
+    url: "{{isoUrl}}{{_isoImage}}"
+    dest: "{{isoRepo}}{{_isoImage}}"
+  notify: refresh MSE instance
+
+- name: Remove unused ISO images
+  raw: ls {{isoRepo}}*.iso | grep -v -e {{ engineIso }} -e {{' -e '.join((mseProduct )) }} | xargs rm -f
+
+- name: get MSE engine installer
+  iso_extract:
+    image: "{{isoRepo}}{{engineIso}}"
+    dest: "{{isoRepo}}"
+    files:
+    - utils/install-cluster-manager.sh
+
+- name: Install versionlock plugin for yum
+  yum: 
+    name: yum-plugin-versionlock
+
+- name: install MSE engine
+  raw: |
+    cd {{isoRepo}} &&
+    ./install-cluster-manager.sh --yes --install hpe-install-cluster-manager --disableplugin=yum-plugin-versionlock --iso {{engineIso}} && 
+    ./install-cluster-manager.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='{{yumRepo}}' --iso {{engineIso}}
+
+- name: Make sure the host is in /etc/hosts
+  raw: grep {{theNodeHostname}} /etc/hosts || echo {{theNodeIpAddress}} {{theNodeHostname}} >> /etc/hosts
+
+- name: Enable ssh for root and ocadmin with fixed keys
+  raw: |
+    sed -i "/^PasswordAuthentication.*no/d" /etc/ssh/sshd_config &&
+    sed -i "s/#PasswordAuthentication.*/PasswordAuthentication yes/" /etc/ssh/sshd_config &&
+    sed -i "/^PermitRootLogin.*no/d" /etc/ssh/sshd_config &&
+    sed -i "s/#PermitRootLogin.*/PermitRootLogin yes/" /etc/ssh/sshd_config
+- name: ocadmin ssh directory
+  file: 
+    path: '/home/ocadmin/.ssh'
+    state: directory
+    recurse: yes
+    owner: 'ocadmin'
+- name: root id_rsa.pub
+  get_url:
+    url: "{{sshKeysUrl}}id_rsa.pub"
+    dest: "/root/.ssh/"
+    mode: 0600
+- name: root id_rsa
+  get_url:
+    url: "{{sshKeysUrl}}id_rsa"
+    dest: "/root/.ssh/"
+    mode: 0600
+- name: root authorized_keys
+  copy:
+    remote_src: yes
+    src: "/root/.ssh/id_rsa.pub"
+    dest: "/root/.ssh/authorized_keys"
+    mode: 0600
+- name: ocadmin id_rsa.pub
+  get_url:
+    url: "{{sshKeysUrl}}id_rsa.pub"
+    dest: "/home/ocadmin/.ssh/"
+    owner: 'ocadmin'
+    mode: 0600
+- name: ocadmin id_rsa
+  get_url:
+    url: "{{sshKeysUrl}}id_rsa"
+    dest: "/home/ocadmin/.ssh/"
+    owner: 'ocadmin'
+    mode: 0600
+- name: ocadmin authorized_keys
+  copy:
+    remote_src: yes
+    src: "/home/ocadmin/.ssh/id_rsa.pub"
+    dest: "/home/ocadmin/.ssh/authorized_keys"
+    owner: 'ocadmin'
+    mode: 0600
+- name: ssh_host private keys ecdsa ed25519
+  with_items: ['ecdsa','ed25519']
+  loop_control:
+    loop_var:
+      _aKeyType
+  get_url:
+    url: "{{sshKeysUrl}}ssh_host_{{_aKeyType}}_key"
+    dest: "/etc/ssh/"
+    mode: 0640
+- name: ssh_host private keys rsa
+  with_items: ['rsa']
+  loop_control:
+    loop_var:
+      _aKeyType
+  get_url:
+    url: "{{sshKeysUrl}}ssh_host_{{_aKeyType}}_key"
+    dest: "/etc/ssh/"
+    mode: 0600
+- name: ssh_host public keys ecdsa ed25519 rsa
+  with_items: ['ecdsa','ed25519','rsa']
+  loop_control:
+    loop_var:
+      _aKeyType
+  get_url:
+    url: "{{sshKeysUrl}}ssh_host_{{_aKeyType}}_key.pub"
+    dest: "/etc/ssh/"
+    mode: 0644
+- name: Restart service sshd
+  service:
+    name: sshd
+    state: restarted
+
+# mse nfv services needs to be started only if not already successfully completed
+# ignore start error, as this can mean that the service is already running
+- name: Start all MSE engines services
+  with_items: ['nivr','ocmp','ocsnf','uspm']
+  loop_control:
+    loop_var:
+      vnfc
+  raw: service {{vnfc}}-nfv status || service {{vnfc}}-nfv start || echo started

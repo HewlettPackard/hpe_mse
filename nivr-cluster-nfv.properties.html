@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-09-17 Version 2.43</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-10-05 Version 3.0</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -43,9 +43,14 @@
 <td valign="top">Review USPM descriptor</td><td valign="top"><input class="helpButton" type="button" value="Review" onclick="viewUspmAuxDescInput()"></td>
 <td valign="top">Review APPs descriptor</td><td valign="top"><input class="helpButton" type="button" value="Review" onclick="viewAppAuxDescInput()"></td>
 </tr><tr>
-<td valign="top">Build the Chef's cookbook</td>
-<td valign="top"><input class="buildButton" type="button" value="Cook" onclick="buildChefCookbook()"> Infrastructure
-<select id="chefInfrastructure">
+<td valign="top">Build a DevOps book</td>
+<td valign="top"><input class="buildButton" type="button" value="DevOps" onclick="buildDevopsBook()"> 
+<select id="devopsRealm">
+<option name="chef" selected>chef</option>
+<option name="ansible">ansible</option>
+</select>
+on
+<select id="devopsInfrastructure">
 <option name="aws" selected>aws</option>
 <option name="azure">azure</option>
 </select>
@@ -99,7 +104,8 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
-	"\n2018-09-12 2.42	Messaging Framework: application base retrieved from the SEE lite service section if available"+
+	"\n2018-09-17 3.0	DevOps support: chef/ansible on azure/aws"+	
+	"\n2018-09-17 2.43	Messaging Framework: application base retrieved from the SEE lite service section if available; name the Diameter provider as per APPLICATION_DIAMETER_PROVIDER if defined"+
 	"\n2018-08-29 2.41	SEE lite services: support for Local File System based File creation for Non-messaging Framework Applications, providing Json config, e.g smscGui,smscApi"+
 	"\n2018-08-14 2.4	HTTP load balancer: support co-location with Pgsql static cluster on SEE simplex nodes; support additional pre-configured SEE nodes as back-ends"+
 	"\n\t\tMessaging Framework: support for hybrid execution mode; adding SEE lite services section for additional applications, including SMSC."+
@@ -264,7 +270,7 @@ function compatibilityMatrix(){
 	new compatibleFeature("SMPP",			['SEE4', 'SEE5']);
 	new compatibleFeature("Datasource",		['SEE4'], "Common to JDBC and LDAP");
 	new compatibleFeature("LDAP",			['SEE4']);
-	new compatibleFeature("SOAP",			['SEE4', 'SEE5'], "Fix for emscli operations pending on SEE5");
+	new compatibleFeature("SOAP",			['SEE4', 'SEE5']);
 	new compatibleFeature("XMLRPC",			['SEE4']);
 	
 
@@ -874,11 +880,11 @@ Networks.build = function(target){
 	Networks.heatWidth = undefined;
 	
 	if(Networks.count('network', 'MGMT') != 1)Networks.check += "\nNetworks: one and only one MGMT is required";
-	if(Networks.count('network', 'PUBLIC') < 1 && target == 'Heat')Networks.check += "\nNetworks: missing PUBLIC pseudo interface, required for OpenStack Heat target";
+	checkDependency(target == 'Heat', [Networks.count('network', 'PUBLIC') > 0 ],  "Networks: missing PUBLIC pseudo interface; ", "required for OpenStack Heat target");
 	['APP', 'SIP', 'LBNAT', 'PUBLIC', 'HA', 'DATA', 'M3UA1', 'M3UA2'].forEach(function(name){
 		if(Networks.count('network', name) > 1)Networks.check += "\nNetworks: concurrent definitions of "+name+" detected";
 	});
-	if(Networks.count('network') > 1 && target == 'azure')Networks.check += "\nNetworks: azure target limitation to one single network, found "+Networks.count('network');
+	Networks.check += checkDependency(target == 'azure' || target == 'aws', [Networks.count('network') <= 1], "Networks: azure and aws infrastructure are limited to one single network; found ", Networks.count('network'));
 
 	result += '\n# ------------------------------- #';
 	result += '\n# Network interfaces definition   #';
@@ -1055,7 +1061,12 @@ Nodes.help = function(){
 	;
 }
 
-Nodes.build = function(target){
+// Build the Nodes section of the descriptor
+// - target is the optional infrastructure: Heat, aws, azure
+// - engine is the optional underlying engine: chef, ansible
+// If the target is set, the unknown ip addresses defined as question marks are prepared as place holders for replacement at deployment time 
+// The place holder format depends on the type of engine:
+Nodes.build = function(target, engine){
 	// Consistency checks reset
 	consistency.initSingle();
 	Nodes.check = "";
@@ -1226,12 +1237,21 @@ Nodes.build = function(target){
 			break;
 		  case 'aws':
 		    // Node names will be known at instantiation time: 
-		  	nodeName="<_%_= node['mse']['map']['"+shortName+"']['hostname'] _%_>";
+		    switch(engine){
+		      case 'chef': nodeName="<_%_= node['mse']['map']['"+shortName+"']['hostname'] _%_>"; break;
+		      case 'ansible': nodeName="_%_"+shortName+"_hostname_%_"; break;
+		      } 
 		  case 'azure':
 			// IP addresses will be known at instantiation time: 
 			// Replace undefined values with place holders resolved later
 			// Push the network interface number in the interfaces list for this node
-			if(nodeIpAddr == "?")		{nodeIpAddr="<_%_= node['mse']['map']['"+shortName+"']['ipaddress'] _%_>";	theCloudNode.interfaces.push(Networks.heatNetworks['MGMT']);}
+			if(nodeIpAddr == "?"){
+			  switch(engine){
+			    case 'chef': nodeIpAddr="<_%_= node['mse']['map']['"+shortName+"']['ipaddress'] _%_>";	break;
+			    case 'ansible': nodeIpAddr="_%_"+shortName+"_ipaddress_%_";	break;
+			  }
+			  theCloudNode.interfaces.push(Networks.heatNetworks['MGMT']);
+			} 
 			break;
 		}
 		
@@ -6394,7 +6414,7 @@ vnfResources.forEach(function(e,i,t){e.display(!e.isEmpty())});
 // If no target is specified, publish the descriptor in the user output area (or errors)
 // Otherwise, just return the same to the caller
 var endOfDescriptor="# +++ EOF +++ # Do not delete this line";
-function buildVNFDescriptor(target){
+function buildVNFDescriptor(target, engine){
 	var quickDescription = document.getElementById("quickDescription");
 	quickDescription.setAttribute("value", quickDescription.value);
 	document.title = "MSE VNF "+ quickDescription.value;
@@ -6419,7 +6439,7 @@ function buildVNFDescriptor(target){
 	desc += "\n";
 
 	vnfResources.forEach(function(e,i,t){
-		desc += e.build(target);
+		desc += e.build(target, engine);
 		warnings += e.check;
 	});
 	warnings += consistency.check();
@@ -6905,12 +6925,23 @@ function chefDeploymentHelp(){userOutput(
 );}
 
 // ===========================
+// MSE bood for DevOps
+// ===========================
+function buildDevopsBook(){
+	var realm = document.getElementById("devopsRealm").value;
+	switch(realm){
+	  case 'chef': buildChefCookbook(); break;
+	  case 'ansible': buildAnsiblePlaybook(); break;
+	}
+}
+
+// ===========================
 // MSE Chef cookbook
 // ===========================
 function buildChefCookbook(){
-	var infrastructure = document.getElementById("chefInfrastructure").value;
+	var infrastructure = document.getElementById("devopsInfrastructure").value;
 	// Build the descriptor for the target infrastructure (or get the errors) and do not publish
-    var desc = buildVNFDescriptor(infrastructure);
+    var desc = buildVNFDescriptor(infrastructure, 'chef');
     // if the enf of descriptor is not found, show the error and quit
     if(desc.indexOf(endOfDescriptor) == -1)return; 
     
@@ -7011,6 +7042,123 @@ function buildChefCookbook(){
 	var a = document.createElement('a');
 	a.href = window.URL.createObjectURL(blobHeat);
     a.download = ".kitchen.yml";
+    document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+}
+
+// ===========================
+// MSE Ansible playbook
+// ===========================
+function buildAnsiblePlaybook(){
+	var infrastructure = document.getElementById("devopsInfrastructure").value;
+	// Build the descriptor for the target infrastructure (or get the errors) and do not publish
+    var desc = buildVNFDescriptor(infrastructure, 'ansible');
+    // if the enf of descriptor is not found, show the error and quit
+    if(desc.indexOf(endOfDescriptor) == -1)return; 
+    
+	var n0="\n";
+	var quickDescription = document.getElementById("quickDescription");
+	var cook="---"
+	cook+=n0+"# '"+quickDescription.value+"'";
+	switch(infrastructure){
+	  case 'aws':
+		cook+=n0+"- name: create the instance(s)";
+		cook+=n0+"  hosts: localhost";
+		cook+=n0+"  vars:";
+		cook+=n0+"    region: \"{{ lookup('env','CLOUD_LOCATION') }}\"";
+		cook+=n0+"    instance_type: \"{{ lookup('env','CLOUD_FLAVOR') }}\"";
+		cook+=n0+"    image: \"{{ lookup('env','CLOUD_IMAGE') }}\"";
+		cook+=n0+"    ssh_key: \"{{ lookup('env','CLOUD_SSH_KEY_PAIR') }}\"";
+		break;
+	  default: 
+	  	userOutput('DevOps Ansible is not supported on '+infrastructure); return;
+	  	break;
+	}	
+	
+    // build the list of non VIP nodes
+    var nonVipNodesNames = Nodes.cloudNodes.filter(function(e){return !e.isVIP;}).map(function(e){return e.name;});  
+    var emsNode = Nodes.cloudNodes[Nodes.cloudNodes.length - 1];
+        
+	cook+=n0+"";
+	cook+=n0+"  tasks:";
+	
+    // For each non VIP node: create the instance
+    // The EMS is the last node in Nodes.cloudNodes: it must be part of the ems group in addition to the base group
+    var nodeGroup='base';
+    nonVipNodesNames.forEach(function(name, indexNode){
+    if(Nodes.cloudNodes.length - indexNode == 1)nodeGroup+=',ems'
+	cook+=n0+"  - name: start the instance "+name;
+	cook+=n0+"    ec2:";
+	cook+=n0+"      image: '{{ image }}'";
+	cook+=n0+"      region: '{{ region }}'";
+	cook+=n0+"      instance_type: '{{ instance_type }}'";
+	cook+=n0+"      key_name: '{{ ssh_key }}'";
+	cook+=n0+"      group: [mse]";
+	cook+=n0+"      instance_tags: { Name: "+name+", type: base }";
+	cook+=n0+"      exact_count: 1";
+	cook+=n0+"      count_tag: { Name: "+name+" }";
+	cook+=n0+"      wait: yes";
+	cook+=n0+"    register: ec2";
+	cook+=n0+"  - name: add instance to the base group";
+	cook+=n0+"    add_host: hostname={{ item.public_dns_name }} groups="+nodeGroup+" nick_name="+name;
+	cook+=n0+"    with_items: '{{ ec2.tagged_instances }}'";
+	cook+=n0+"    when: item.public_dns_name is defined";
+	cook+=n0+"  - name: wait for ssh";
+	cook+=n0+"    wait_for: host={{ item.public_dns_name }} port=22 search_regex=OpenSSH";
+	cook+=n0+"    with_items: '{{ ec2.instances }}'";
+	cook+=n0+"    when: item.public_dns_name is defined";
+	cook+=n0+"";
+	});
+	
+	// Define the MSE attributes from the environment and push the descriptor
+	cook+=n0+"";
+	cook+=n0+"- name: configure the base instance(s)";
+	cook+=n0+"  hosts: base";
+	cook+=n0+"  become: True";
+	cook+=n0+"  gather_facts: True";
+	cook+=n0+"  handlers:";
+	cook+=n0+"  - name: refresh MSE instance";
+	cook+=n0+"    raw: echo $(date) Refresh deferred to the ems node > /var/opt/OC/iso/refresh_trigger.log";
+	cook+=n0+"  vars:";
+	cook+=n0+"    # From the environment";
+	cook+=n0+"    engineIso: \"{{ lookup('env','MSE_ENGINE') }}\"";
+	cook+=n0+"    mseProduct: \"{{ lookup('env','MSE_PRODUCT') }}\"";
+	cook+=n0+"    isoUrl: \"{{ lookup('env','MSE_ISO_URL') }}\"";
+	cook+=n0+"    yumRepo: 'centos*,updates*,base*'";
+	cook+=n0+"    sshKeysUrl: \"{{ lookup('env','MSE_SSH_KEYS_URL') }}\"";
+	cook+=n0+"    # From the inventory";
+	cook+=n0+"    theNode: \"{{hostvars[inventory_hostname]['nick_name']}}\"";
+	cook+=n0+"    theNodeHostname: \"{{hostvars[inventory_hostname]['ansible_fqdn']}}\"";
+	cook+=n0+"    theNodeIpAddress: \"{{hostvars[inventory_hostname]['ansible_default_ipv4']['address']}}\"";
+	cook+=n0+"    # MSE constants";
+	cook+=n0+"    isoRepo: '/var/opt/OC/iso/'";
+	cook+=n0+"    isoMountPoint: '/media/cdrom/'";
+	cook+=n0+"  roles:";
+	cook+=n0+"    - role: base";
+	cook+=n0+"";
+	cook+=n0+"- name: configure the ems instance";
+	cook+=n0+"  hosts: ems";
+	cook+=n0+"  become: True";
+	cook+=n0+"  gather_facts: True";
+	cook+=n0+"  roles:";
+	cook+=n0+"    - role: ems";
+	cook+=n0+"  handlers:";
+	cook+=n0+"  - name: refresh MSE instance";
+	cook+=n0+"    raw: service nivr-nfv status && service nivr-nfv node-reload && service nivr-nfv start || echo Refresh unavailable, skipped";
+	// Append the descriptor as a variable
+	cook+=n0+"  vars:";
+	cook+=n0+"    descriptor: |";
+	cook+=n0+"      "+desc.replace(/\n/g, "\n"+  
+		     "      ");	// fix the descriptor indentation as expected by Yaml
+	
+    // Show to the user and save to aws.ansible.yml
+    userOutput(cook);
+	
+	var blobHeat = new Blob([cook], {type: "text/plain;charset=utf-8"});
+	var a = document.createElement('a');
+	a.href = window.URL.createObjectURL(blobHeat);
+    a.download = "aws.ansible.yml";
     document.body.appendChild(a);
 	a.click();
 	document.body.removeChild(a);
