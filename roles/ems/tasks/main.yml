@@ -13,7 +13,7 @@
 
 - name: resolve names and ip addresses in the template based on the inventory nick_name, hostname and ipaddress
   raw: |
-    sed -i "s/_%_{{ hostvars[item].nick_name }}_hostname_%_/{{ hostvars[item].ansible_fqdn }}/g" /etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties.erb &&
+    sed -i "s/_%_{{ hostvars[item].nick_name }}_hostname_%_/{{ hostvars[item].fqdn }}/g" /etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties.erb &&
     sed -i "s/_%_{{ hostvars[item].nick_name }}_ipaddress_%_/{{ hostvars[item].ansible_default_ipv4.address }}/g" /etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties.erb
   with_items: "{{ groups['base'] }}"
 
@@ -27,8 +27,8 @@
 - name: flush the handlers
   meta: flush_handlers
 
-- name: create the descriptor and wait synchronously for the consolidated status
+- name: create the descriptor and wait for the consolidated status
   raw: |
-    sleep 20s && 
+    sleep 2m && 
     until service nivr-nfv consolidated-status || (( $? > 127 )) ; do sleep 20s ; done && 
     service nivr-nfv consolidated-status

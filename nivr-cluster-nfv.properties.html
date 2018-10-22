@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-10-05 Version 3.0</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-10-17 Version 3.01</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -45,13 +45,14 @@
 </tr><tr>
 <td valign="top">Build a DevOps book</td>
 <td valign="top"><input class="buildButton" type="button" value="DevOps" onclick="buildDevopsBook()"> 
-<select id="devopsRealm">
-<option name="chef" selected>chef</option>
-<option name="ansible">ansible</option>
+<select id="devOpsEngine">
+<option name="chef">chef</option>
+<option name="ansible" selected>ansible</option>
 </select>
 on
 <select id="devopsInfrastructure">
-<option name="aws" selected>aws</option>
+<option name="openstack" selected>openstack</option>
+<option name="aws">aws</option>
 <option name="azure">azure</option>
 </select>
 <input class="helpButton" type="button" value="Help" onclick="chefDeploymentHelp()">
@@ -104,6 +105,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2018-10-17 3.01	DevOps support for Ansible on OpenStack"+ 
 	"\n2018-09-17 3.0	DevOps support: chef/ansible on azure/aws"+	
 	"\n2018-09-17 2.43	Messaging Framework: application base retrieved from the SEE lite service section if available; name the Diameter provider as per APPLICATION_DIAMETER_PROVIDER if defined"+
 	"\n2018-08-29 2.41	SEE lite services: support for Local File System based File creation for Non-messaging Framework Applications, providing Json config, e.g smscGui,smscApi"+
@@ -897,7 +899,8 @@ Networks.build = function(target){
 			Networks.check += "\nNetworks: undefined network name for interface " + networkDevice;
 			continue;
 		}
-		networkMask.split('.').forEach(function(e,i,t){
+		// Check netmask consistency but allow the legacy placeholder
+		if(networkMask != "@netmask@")networkMask.split('.').forEach(function(e,i,t){
 			var aByte = Number(e);
 			if(Number.isNaN(aByte) || aByte < 0 || aByte > 255 )Networks.check += "\nNetworks: invalid netmask " + networkMask + " for interface " + networkDevice + "; expecting positive integer <= 255, found "+e;
 		});
@@ -1235,7 +1238,7 @@ Nodes.build = function(target, engine){
 			if(nodeM3ua1IpAddr == "?")	{nodeM3ua1IpAddr="~"+shortName+	"_m3ua1~";	theCloudNode.interfaces.push(Networks.heatNetworks['M3UA1']);}
 			if(nodeM3ua2IpAddr == "?")	{nodeM3ua2IpAddr="~"+shortName+	"_m3ua2~";	theCloudNode.interfaces.push(Networks.heatNetworks['M3UA2']);}
 			break;
-		  case 'aws':
+		  case 'aws': case 'openstack':
 		    // Node names will be known at instantiation time: 
 		    switch(engine){
 		      case 'chef': nodeName="<_%_= node['mse']['map']['"+shortName+"']['hostname'] _%_>"; break;
@@ -6907,12 +6910,25 @@ function buildHeatTemplate(){
 }
 
 function chefDeploymentHelp(){userOutput(
-"Chef cookbook limitations: single network interface"+
-"\nThe cookbook built by this assistant is a .kitchen.yml file. Before launching 'kitchen converge' on a work station:"+
+"DevOps limitations:"+
+"\n\t- single network interface"+
+"\n\t- Supported environments: chef and ansible engines on openstack, azure and aws infrastructures"+
+"\nPre requisites:"+
+"\n\t- download the hpe_mse Chef recipes and Ansible roles from github: 'git clone https://github.com/dometdemont/hpe_mse.git'"+
+"\n\t- read the metadata.rb file for instructions"+
+"\n\t- set the environment variables used by the DevOps books for getting ISO images and reaching the infrastructure."+ 
+"\nChef engine:"+
+"\n\t- the cookbook built is a .kitchen.yml file. It relies on two provided recipes: ems.rb and base.rb. Before launching 'kitchen converge' on a work station:"+
 "\n\t- install the Chef Development Kit"+
 "\n\t- install the pre requisite gem: chef gem install kitchen-nodes"+
-"\n\t- download the hpe_mse recipes from github: git clone https://github.com/dometdemont/hpe_mse.git"+
-"\n\t- read the metadata.rb file for instructions, and set the environment variables used by the cookbook for getting ISO images and reaching the infrastructure."+ 
+"\nAnsible engine:"+
+"\n\t- the playbook built is a ansible.yml file. It relies on two provided roles: ems and base. Before launching 'ansible-playbook ansible.yml' on a work station:"+
+"\n\t- install an ansible engine from epel repository: 'yum install epel-release; yum install ansible'"+
+"\n\t- in ansible.cfg, configure the remote user, and private key to use, typically:"+
+"\n\t\t[defaults]"+
+"\n\t\tremote_user = centos"+
+"\n\t\tprivate_key_file =  ./d3m.pem"+
+"\n\t\thost_key_checking = False"+
 "\nFor azure target:"+
 "\n\t- install the azure CLI from https://docs.microsoft.com/fr-fr/cli/azure/install-azure-cli-windows?view=azure-cli-latest"+
 "\n\t- install pre requisite gem: chef gem install kitchen-azurerm"+
@@ -6921,14 +6937,18 @@ function chefDeploymentHelp(){userOutput(
 "\nFor aws target:"+
 "\n\t- install the aws CLI"+
 "\n\t- set aws credentials in ~/.aws/credentials"+
-"\n\t- prepare a key pair file"
+"\n\t- prepare a key pair file"+
+"\nFor openstack target:"+
+"\n\t- install ansible, git and pip from epel repository: yum install epel-release ; yum install ansible git python-pip --enablerepo='epel'"+
+"\n\t- install shade: pip install shade"+
+"\n\t- define the infrastructure credentials environment variables as per the metadata.rb file"
 );}
 
 // ===========================
 // MSE bood for DevOps
 // ===========================
 function buildDevopsBook(){
-	var realm = document.getElementById("devopsRealm").value;
+	var realm = document.getElementById("devOpsEngine").value;
 	switch(realm){
 	  case 'chef': buildChefCookbook(); break;
 	  case 'ansible': buildAnsiblePlaybook(); break;
@@ -6972,6 +6992,9 @@ function buildChefCookbook(){
 		cook+=n0+"  security_group_ids: <%= ENV['CLOUD_SECURITY_GROUPS'] %>";
 		cook+=n0+"  retryable_tries: 120";
 		break;
+	  default: 
+	  	userOutput('DevOps Chef is not supported on '+infrastructure); return;
+	  	break;
 	}	
 	cook+=n0;
 	cook+=n0+"transport:";
@@ -7019,6 +7042,7 @@ function buildChefCookbook(){
 	cook+=n0+"        install:";
 	cook+=n0+"          # URL providing MSE ISO images";
 	cook+=n0+"          isoUrl: <%= ENV['MSE_ISO_URL'] %>";
+	cook+=n0+"          #cacheIso: \"<local directory available as a faster alternative to isoUrl>\"";
 	cook+=n0+"          iso:";
 	cook+=n0+"            # ISO image delivering the MSE automated deployer engine";
 	cook+=n0+"            engine: <%= ENV['MSE_ENGINE'] %>";
@@ -7071,6 +7095,11 @@ function buildAnsiblePlaybook(){
 		cook+=n0+"    image: \"{{ lookup('env','CLOUD_IMAGE') }}\"";
 		cook+=n0+"    ssh_key: \"{{ lookup('env','CLOUD_SSH_KEY_PAIR') }}\"";
 		break;
+	  case 'openstack':
+		cook+=n0+"- name: create the instance(s)";
+		cook+=n0+"  hosts: localhost";
+		cook+=n0+"  gather_facts: false";
+		break;
 	  default: 
 	  	userOutput('DevOps Ansible is not supported on '+infrastructure); return;
 	  	break;
@@ -7088,27 +7117,61 @@ function buildAnsiblePlaybook(){
     var nodeGroup='base';
     nonVipNodesNames.forEach(function(name, indexNode){
     if(Nodes.cloudNodes.length - indexNode == 1)nodeGroup+=',ems'
-	cook+=n0+"  - name: start the instance "+name;
-	cook+=n0+"    ec2:";
-	cook+=n0+"      image: '{{ image }}'";
-	cook+=n0+"      region: '{{ region }}'";
-	cook+=n0+"      instance_type: '{{ instance_type }}'";
-	cook+=n0+"      key_name: '{{ ssh_key }}'";
-	cook+=n0+"      group: [mse]";
-	cook+=n0+"      instance_tags: { Name: "+name+", type: base }";
-	cook+=n0+"      exact_count: 1";
-	cook+=n0+"      count_tag: { Name: "+name+" }";
-	cook+=n0+"      wait: yes";
-	cook+=n0+"    register: ec2";
-	cook+=n0+"  - name: add instance to the base group";
-	cook+=n0+"    add_host: hostname={{ item.public_dns_name }} groups="+nodeGroup+" nick_name="+name;
-	cook+=n0+"    with_items: '{{ ec2.tagged_instances }}'";
-	cook+=n0+"    when: item.public_dns_name is defined";
-	cook+=n0+"  - name: wait for ssh";
-	cook+=n0+"    wait_for: host={{ item.public_dns_name }} port=22 search_regex=OpenSSH";
-	cook+=n0+"    with_items: '{{ ec2.instances }}'";
-	cook+=n0+"    when: item.public_dns_name is defined";
-	cook+=n0+"";
+	switch(infrastructure){
+	  case 'aws':
+		cook+=n0+"  - name: start the instance "+name;
+		cook+=n0+"    ec2:";
+		cook+=n0+"      image: '{{ image }}'";
+		cook+=n0+"      region: '{{ region }}'";
+		cook+=n0+"      instance_type: '{{ instance_type }}'";
+		cook+=n0+"      key_name: '{{ ssh_key }}'";
+		cook+=n0+"      group: [mse]";
+		cook+=n0+"      instance_tags: { Name: "+name+", type: base }";
+		cook+=n0+"      exact_count: 1";
+		cook+=n0+"      count_tag: { Name: "+name+" }";
+		cook+=n0+"      wait: yes";
+		cook+=n0+"    register: ec2";
+		cook+=n0+"  - name: add instance to the "+nodeGroup+" group";
+		cook+=n0+"    add_host: hostname={{ item.public_dns_name }} groups="+nodeGroup+" nick_name="+name+" fqdn={{ item.private_dns_name }}";
+		cook+=n0+"    with_items: '{{ ec2.tagged_instances }}'";
+		cook+=n0+"    when: item.public_dns_name is defined";
+		cook+=n0+"  - name: wait for ssh";
+		cook+=n0+"    wait_for: host={{ item.public_dns_name }} port=22 search_regex=OpenSSH";
+		cook+=n0+"    with_items: '{{ ec2.instances }}'";
+		cook+=n0+"    when: item.public_dns_name is defined";
+		cook+=n0+"";
+		break;
+	  case 'openstack':
+		cook+=n0+"  - name: start the instance "+name;
+		cook+=n0+"    os_server:";
+		cook+=n0+"      state: present";
+		cook+=n0+"      name: "+name;
+		cook+=n0+"      image: \"{{ lookup('env','CLOUD_IMAGE') }}\"";
+		cook+=n0+"      key_name: \"{{ lookup('env','CLOUD_SSH_KEY_PAIR') }}\"";
+		cook+=n0+"      wait: yes";
+		cook+=n0+"      flavor: \"{{ lookup('env','CLOUD_FLAVOR') }}\"";
+		cook+=n0+"      security_groups: \"{{ lookup('env','CLOUD_SECURITY_GROUPS') }}\"";
+		cook+=n0+"      auto_floating_ip: yes";
+		cook+=n0+"      network: \"{{ lookup('env','CLOUD_SUBNET') }}\"";
+		cook+=n0+"      availability_zone: \"{{ lookup('env','CLOUD_AVAILABILITY_ZONE') }}\"";
+		cook+=n0+"      meta:";
+		cook+=n0+"        hostname: "+Nodes.cloudNodes[indexNode].fqdn;
+		cook+=n0+"    register: "+name;
+		cook+=n0+"";
+		cook+=n0+"  - name: Wait for SSH on "+name;
+		cook+=n0+"    command: >";
+		cook+=n0+"      ssh -oBatchMode=yes -oStrictHostKeyChecking=no -i {{ lookup('env','CLOUD_SSH_KEY') }}";
+		cook+=n0+"      {{ lookup('env',' CLOUD_DEFAULT_USER') }}@{{"+name+".server.public_v4}} true";
+		cook+=n0+"    register: result";
+		cook+=n0+"    until: result|success";
+		cook+=n0+"    retries: 30";
+		cook+=n0+"    delay: 10";
+		cook+=n0+"  - name: Add "+name+" Instance to "+nodeGroup+" group";
+		cook+=n0+"    add_host: name="+name+" groups="+nodeGroup+" nick_name="+name+" fqdn="+Nodes.cloudNodes[indexNode].fqdn;
+		cook+=n0+"              ansible_ssh_host={{ "+name+".server.public_v4 }}";
+		cook+=n0+"";
+		break;
+	  }
 	});
 	
 	// Define the MSE attributes from the environment and push the descriptor
@@ -7125,15 +7188,21 @@ function buildAnsiblePlaybook(){
 	cook+=n0+"    engineIso: \"{{ lookup('env','MSE_ENGINE') }}\"";
 	cook+=n0+"    mseProduct: \"{{ lookup('env','MSE_PRODUCT') }}\"";
 	cook+=n0+"    isoUrl: \"{{ lookup('env','MSE_ISO_URL') }}\"";
-	cook+=n0+"    yumRepo: 'centos*,updates*,base*'";
+	cook+=n0+"    #cacheIso: \"<local directory available as a faster alternative to isoUrl>\"";
+	cook+=n0+"    yumReposDefUrl: \"{{ lookup('env','CLOUD_REPOS_URL') }}\"";
+	cook+=n0+"    yumReposDef: \"{{ lookup('env','CLOUD_REPOS_LIST') }}\"";
+	cook+=n0+"    yumRepo: \"{{ lookup('env','MSE_YUM_REPO') }}\"";
 	cook+=n0+"    sshKeysUrl: \"{{ lookup('env','MSE_SSH_KEYS_URL') }}\"";
+	cook+=n0+"    nameserver: \"{{ lookup('env','CLOUD_NAMESERVER') }}\"";
+	cook+=n0+"    mseLabDrops: \"{{ lookup('env','MSE_LABDROPS') }}\"";
 	cook+=n0+"    # From the inventory";
 	cook+=n0+"    theNode: \"{{hostvars[inventory_hostname]['nick_name']}}\"";
-	cook+=n0+"    theNodeHostname: \"{{hostvars[inventory_hostname]['ansible_fqdn']}}\"";
+	cook+=n0+"    theNodeHostname: \"{{hostvars[inventory_hostname]['fqdn']}}\"";
 	cook+=n0+"    theNodeIpAddress: \"{{hostvars[inventory_hostname]['ansible_default_ipv4']['address']}}\"";
 	cook+=n0+"    # MSE constants";
 	cook+=n0+"    isoRepo: '/var/opt/OC/iso/'";
 	cook+=n0+"    isoMountPoint: '/media/cdrom/'";
+	cook+=n0+"  environment: \"{{ lookup('env','CLOUD_ENVIRONMENT') }}\"";
 	cook+=n0+"  roles:";
 	cook+=n0+"    - role: base";
 	cook+=n0+"";
@@ -7152,13 +7221,13 @@ function buildAnsiblePlaybook(){
 	cook+=n0+"      "+desc.replace(/\n/g, "\n"+  
 		     "      ");	// fix the descriptor indentation as expected by Yaml
 	
-    // Show to the user and save to aws.ansible.yml
+    // Show to the user and save to ansible.yml
     userOutput(cook);
 	
 	var blobHeat = new Blob([cook], {type: "text/plain;charset=utf-8"});
 	var a = document.createElement('a');
 	a.href = window.URL.createObjectURL(blobHeat);
-    a.download = "aws.ansible.yml";
+    a.download = "ansible.yml";
     document.body.appendChild(a);
 	a.click();
 	document.body.removeChild(a);

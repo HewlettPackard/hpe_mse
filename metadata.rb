@@ -6,7 +6,7 @@ description 'HPE CMS MSE instance Installation and Configuration'
 long_description <<-EOH
 
 = DESCRIPTION:
-This cookbook deploys an instance of HPE CMS Multimedia Services Environment (MSE).
+This book deploys an instance of HPE CMS Multimedia Services Environment (MSE) using Chef or Ansible scripts.
 Such an instance consists in one or several nodes using ssh/scp as internodes communication.
 
 Starting from a standard CentOS/RedHat distribution, this cookbook prepares the nodes 
@@ -20,20 +20,86 @@ Two recipes/roles:
 - ems used for the node playing the MSE EMS role, in charge of receiving the MSE Descriptor, and collect the consolidated status of this MSE instance.
 
 The MSE Descriptor Assistant nivr-cluster-nfv.properties.html must be used to depict the MSE instance topology and build 
-the .kitchen.yml/aws.ansible.yml file used to deploy the MSE instance. This file embedds the MSE descriptor template,
+the .kitchen.yml/ansible.yml file used to deploy the MSE instance. This file embedds the MSE descriptor template,
 dynamically turned to the actual MSE Descriptor at run time based on the instantiated nodes IP addresses and names.
 
 = REQUIREMENTS:
 
-CentOS/RedHat >= 6.3 on Azure or Amazon infrastructure
+CentOS/RedHat >= 6.3 on OpenStack, Azure or Amazon infrastructure
 
 = ATTRIBUTES:
 
-To keep the generated books generic, attributes are expected as environment variables for both the Infrastructure and Product:
+To keep the generated books generic, attributes are expected as environment variables for both the Infrastructure and Product definition:
+
+# TAS product on CentOS 7
+#########################
+# URL providing MSE ISO images
+export MSE_ISO_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/TAS31/'
+# ISO image delivering the MSE automated deployer engine
+export MSE_ENGINE='TAS-3.1.1-2.019722.snap.el7.iso'
+# List of ISO images delivering the MSE products
+export MSE_PRODUCT="['USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.0-1.019457.el7.iso']"
+# List of lab drops as an array of rpm packages
+export MSE_LABDROPS="['hpoc-nfv-base-1.1.3-3.019736.snap.1810151642.el7.x86_64.rpm','hpoc-nfv-base-selinux-1.1.3-3.019736.snap.1810151642.el7.x86_64.rpm','hpoc-nivr-nfv-3.1.1-5.019736.snap.1810120921.el7.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.1-5.019736.snap.1810120921.el7.noarch.rpm']"
+# URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
+export MSE_SSH_KEYS_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/sshKeys/'
+
+# MSE product on CentOS 6
+#########################
+# URL providing MSE ISO images
+export MSE_ISO_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/MSE30/'
+# ISO image delivering the MSE automated deployer engine
+export MSE_ENGINE='ClusterManager-3.1.1-4.019727.el6.iso'
+# List of ISO images delivering the MSE products
+export MSE_PRODUCT="['MSE-3.0.5.2-2.019730.el6.iso','SEE-4.1.6.2-1.017392.el6.iso','OpenCall-OCMP-4.4.8.bg013842.el6.x86_64.iso','USPM4212_Linux_RHEL6_3931.iso']"
+# List of lab drops as an array of rpm packages
+export MSE_LABDROPS="[]"
+# URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
+export MSE_SSH_KEYS_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/sshKeys/'
+
+# OpenStack Infrastructure
+##########################
+# Infrastructure credentials
+export OS_AUTH_URL="https://30.117.132.11:13000/v2.0"
+export OS_PASSWORD="d3m"
+export OS_PROJECT_ID="720fb530215e4113992367f2969d238f"
+export OS_PROJECT_NAME="d3m"
+export OS_USERNAME="d3m"
+export OS_CACERT="grenoble-infra-root-ca_qhPfkrH.crt"
+export NO_PROXY="127.0.0.1,30.114.132.5,gre.hpecorp.net"
+# The ssh public key used to reach the infrastructure
+export CLOUD_SSH_KEY="./d3m.pem"
+# The ssh key pair used by resources within the infrastructure
+export CLOUD_SSH_KEY_PAIR="d3m"
+# The OpenStack security group
+export CLOUD_SECURITY_GROUPS=default
+# The OpenStack availability zone
+export CLOUD_AVAILABILITY_ZONE="nova"
+# The name server used by OpenStack instances
+export CLOUD_NAMESERVER="16.110.135.52"
+# The OpenStack subnet connecting the instances
+export CLOUD_SUBNET="devOps"
+# Additional environment variables set in OpenStack isntances as a json hash
+export CLOUD_ENVIRONMENT='{"http_proxy": "http://16.46.16.11:8080", "https_proxy": "http://16.46.16.11:8080"}'
+# The OpenStack image flavor used to instantiate the nodes
+export CLOUD_FLAVOR="v4.m8"
+# The OpenStack image name and default user
+# Cent OS 7
+export CLOUD_IMAGE="Centos 7"
+export CLOUD_DEFAULT_USER="centos"
+# List of yum repositories definitions to add to the nodes retrieved from CLOUD_REPOS_URL
+export CLOUD_REPOS_LIST="['LinuxCOE-RedHat-7.4Server-x86_64.repo', 'core.repo']"
+export CLOUD_REPOS_URL="ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/repos/"
+# List of yum repositories to be used during MSE automated deployer installation
+# labOrchestrator is mandatory to enable the labdrops
+export MSE_YUM_REPO='labOrchestrator,core,*Server*'
+# RHEL 6
+export CLOUD_IMAGE="RHEL 6.8"
+export CLOUD_DEFAULT_USER="centos"
 
 # Azure Infrastructure
 ######################
-# The ssh public key used by kitchen to reach the infrastructure
+# The ssh public key used to reach the infrastructure
 export CLOUD_SSH_KEY="~/.ssh/id_rsa"
 # The Azure subscription ID and location
 export AZURE_SUBSCRIPTION_ID="bfe94c07-338d-47cf-aded-e8015d247694"
@@ -42,6 +108,8 @@ export CLOUD_LOCATION="North Europe"
 export CLOUD_DISTRO="centos"
 # The Azure image flavor
 export CLOUD_FLAVOR="Standard_D3"
+# List of yum repositories to be used during MSE automated deployer installation
+export MSE_YUM_REPO='centos*,updates*,base*'
 # The Azure image name
 # Cent OS 7
 export CLOUD_IMAGE="OpenLogic:CentOS:7.4:latest"
@@ -50,7 +118,7 @@ export CLOUD_IMAGE="OpenLogic:CentOS:6.9:latest"
 
 # Amazon Infrastructure
 #######################
-# The ssh public key used by kitchen to reach the infrastructure
+# The ssh public key used to reach the infrastructure
 export CLOUD_SSH_KEY=~/.aws/mse.pem
 # The ssh key pair used by resources in the infrastructure
 export CLOUD_SSH_KEY_PAIR="mse"
@@ -64,37 +132,15 @@ export CLOUD_SUBNET="subnet-bc1878f4"
 export CLOUD_LOCATION="eu-west-1"
 # The Amazon image flavor
 export CLOUD_FLAVOR="t2.micro"
+# List of yum repositories to be used during MSE automated deployer installation
+export MSE_YUM_REPO='centos*,updates*,base*'
+export CLOUD_ENVIRONMENT='{}'
+export CLOUD_REPOS_LIST="[]"
 # The Amazon image name
 # Cent OS 7
 export CLOUD_IMAGE="ami-3548444c"
 # Cent OS 6
 export CLOUD_IMAGE="ami-404f4339"
-
-# TAS product on CentOS 7
-#########################
-# URL providing MSE ISO images
-export MSE_ISO_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/TAS31/'
-# ISO image delivering the MSE automated deployer engine
-export MSE_ENGINE='ClusterManager-3.1.1-2.019646.snap.el7.iso'
-# List of ISO images delivering the MSE products
-export MSE_PRODUCT="['TAS-3.1.1-1.019681.el7.iso','USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.0-1.019457.el7.iso']"
-# List of yum repositories to be used for MSE automated deployer installation
-export MSE_YUM_REPO='centos*,updates*,base*'
-# URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
-export MSE_SSH_KEYS_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/sshKeys/'
-
-# MSE product on CentOS 6
-#########################
-# URL providing MSE ISO images
-export MSE_ISO_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/MSE30/'
-# ISO image delivering the MSE automated deployer engine
-export MSE_ENGINE='ClusterManager-3.1.1-4.019727.el6.iso'
-# List of ISO images delivering the MSE products
-export MSE_PRODUCT="['MSE-3.0.5.2-2.019730.el6.iso','SEE-4.1.6.2-1.017392.el6.iso','OpenCall-OCMP-4.4.8.bg013842.el6.x86_64.iso','USPM4212_Linux_RHEL6_3931.iso']"
-# List of yum repositories to be used for MSE automated deployer installation
-export MSE_YUM_REPO='centos*,updates*,base*'
-# URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
-export MSE_SSH_KEYS_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/sshKeys/'
 
 EOH
 version '0.3.0'

@@ -1,7 +1,18 @@
 ---
-- name: deploy an MSE node
+- name: 'deploy an MSE node: nick name'
   debug: 
     var=theNode
+
+- name: set dns names servers if defined
+  lineinfile: 
+    path: /etc/resolv.conf
+    insertbefore: '^search.*'
+    line: "nameserver  {{nameserver}}"
+  when: nameserver is defined
+
+- name: set hostname
+  hostname: 
+    name: "{{theNodeHostname}}"
 
 - name: Create MSE directories
   with_items: ["{{isoRepo}}","{{isoMountPoint}}"]
@@ -13,35 +24,85 @@
     state: directory
     recurse: yes
 
-- name: install wget as a workaround for get_url
+- name: install createrepo for labdrops management
   yum:
-    name: wget
+    name: createrepo
 
-- name: Get/refresh the MSE engine ISO image
+- name: Get the MSE engine ISO image {{engineIso}} from cache {{cacheIso}}
+  copy:
+    src: "{{cacheIso}}{{engineIso}}"
+    dest: "{{isoRepo}}{{engineIso}}"
+  when: cacheIso is defined
+
+- name: Get the MSE engine ISO image {{engineIso}} from remote {{isoUrl}}
   get_url:
     url: "{{isoUrl}}{{engineIso}}"
     dest: "{{isoRepo}}{{engineIso}}"
   notify: refresh MSE instance
+  when: cacheIso is not defined
 
-- name: Get/refresh the MSE product ISO images
+- name: Get additional YUM repositories definitions
+  with_items: "{{yumReposDef}}"
+  loop_control:
+    loop_var:
+      _repo
+  get_url:
+    url: "{{yumReposDefUrl}}{{_repo}}"
+    dest: "/etc/yum.repos.d"
+  when: yumReposDef is defined
+
+- name: Get the MSE product ISO images from cache {{cacheIso}}
   with_items: "{{mseProduct}}"
   loop_control:
     loop_var:
       _isoImage
-#  raw: wget --continue {{isoUrl}}{{_isoImage}} --directory-prefix={{isoRepo}}
+  copy:
+    src: "{{cacheIso}}{{_isoImage}}"
+    dest: "{{isoRepo}}{{_isoImage}}"
+  notify: refresh MSE instance
+  when: cacheIso is defined
+
+- name: Get the MSE product ISO images from remote {{isoUrl}}
+  with_items: "{{mseProduct}}"
+  loop_control:
+    loop_var:
+      _isoImage
   get_url:
     url: "{{isoUrl}}{{_isoImage}}"
     dest: "{{isoRepo}}{{_isoImage}}"
-  notify: refresh MSE instance
+  when: cacheIso is not defined
 
 - name: Remove unused ISO images
-  raw: ls {{isoRepo}}*.iso | grep -v -e {{ engineIso }} -e {{' -e '.join((mseProduct )) }} | xargs rm -f
+  shell: ls {{isoRepo}}*.iso | grep -v -e {{ engineIso }} -e {{' -e '.join((mseProduct )) }} | xargs rm -f
 
-- name: get MSE engine installer
+- name: Retrieve lab drops in {{isoRepo}} from cache {{cacheIso }}
+  with_items: "{{mseLabDrops}}"
+  loop_control:
+    loop_var:
+      _rpm
+  copy:
+    src: "{{cacheIso }}{{_rpm}}"
+    dest: "{{isoRepo}}{{_rpm}}"
+  notify: refresh MSE instance
+  when: cacheIso is defined
+
+- name: Retrieve lab drops in {{isoRepo}} from remote {{isoUrl}}
+  with_items: "{{mseLabDrops}}"
+  loop_control:
+    loop_var:
+      _rpm
+  get_url:
+    url: "{{isoUrl}}{{_rpm}}"
+    dest: "{{isoRepo}}{{_rpm}}"
+  notify: refresh MSE instance
+  when: cacheIso is not defined
+
+- name: get MSE engine installer install-cluster-manager.sh or install-tas.sh 
   iso_extract:
     image: "{{isoRepo}}{{engineIso}}"
     dest: "{{isoRepo}}"
     files:
+    - utils/install-tas.sh
     - utils/install-cluster-manager.sh
 
 - name: Install versionlock plugin for yum
@@ -49,16 +110,39 @@
     name: yum-plugin-versionlock
 
 - name: install MSE engine
-  raw: |
+  shell: |
     cd {{isoRepo}} &&
-    ./install-cluster-manager.sh --yes --install hpe-install-cluster-manager --disableplugin=yum-plugin-versionlock --iso {{engineIso}} && 
-    ./install-cluster-manager.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='{{yumRepo}}' --iso {{engineIso}}
+    test -f install-cluster-manager.sh && _theInstaller=cluster_manager || _theInstaller=tas &&
+    ./install-${_theInstaller}.sh --yes --install hpe-install-${_theInstaller} --disableplugin=yum-plugin-versionlock --iso {{engineIso}} && 
+    ./install-${_theInstaller}.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='{{yumRepo}}' --iso {{engineIso}}
 
-- name: Make sure the host is in /etc/hosts
-  raw: grep {{theNodeHostname}} /etc/hosts || echo {{theNodeIpAddress}} {{theNodeHostname}} >> /etc/hosts
+- stat: path=/etc/opt/OC/hpe-install-tas/versionlock.d
+- name: Create a yum repository labRepo for lab drops in {{isoRepo}} 
+  shell: |
+    find {{isoRepo}}*.rpm -exec rpm -qp {} --qf '%{epoch}:%{name}-%{version}-%{release}.*\n' \; > /etc/yum/pluginconf.d/versionlock.list ; /bin/cp -f /etc/yum/pluginconf.d/versionlock.list /etc/opt/OC/hpe-install-tas/versionlock.d/hpe-mse-nfv-999-versionlock.list 
+    > /etc/yum/pluginconf.d/versionlock.list
+    createrepo --database {{isoRepo}} ; 
+    cd /etc/yum.repos.d/
+    echo "[labOrchestrator]"  > labdrop.repo ; echo "name=lab repository for development packages" >> labdrop.repo ; echo "baseurl=file://{{isoRepo}}" >> labdrop.repo ; echo "enabled=1"  >> labdrop.repo ; echo "gpgcheck=0" >> labdrop.repo ;
+
+- name: install lab drops from {{isoRepo}}
+  yum:
+    disablerepo: '*'
+    enablerepo: labOrchestrator
+    name: '*'
+    state: latest
+
+- name: Make sure the host is in /etc/hosts 
+  shell: grep {{theNodeHostname}} /etc/hosts || echo {{theNodeIpAddress}} {{theNodeHostname}} >> /etc/hosts
+
+- name: enable sudo without tty since no password is required
+  lineinfile: 
+    path: /etc/sudoers
+    regexp: "^Defaults    requiretty"
+    line: "#Defaults    requiretty"
 
 - name: Enable ssh for root and ocadmin with fixed keys
-  raw: |
+  shell: |
     sed -i "/^PasswordAuthentication.*no/d" /etc/ssh/sshd_config &&
     sed -i "s/#PasswordAuthentication.*/PasswordAuthentication yes/" /etc/ssh/sshd_config &&
     sed -i "/^PermitRootLogin.*no/d" /etc/ssh/sshd_config &&
@@ -143,4 +227,4 @@
   loop_control:
     loop_var:
       vnfc
-  raw: service {{vnfc}}-nfv status || service {{vnfc}}-nfv start || echo started
+  shell: service {{vnfc}}-nfv status || service {{vnfc}}-nfv start || echo started
