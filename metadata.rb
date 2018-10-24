@@ -40,7 +40,7 @@ export MSE_ENGINE='TAS-3.1.1-2.019722.snap.el7.iso'
 # List of ISO images delivering the MSE products
 export MSE_PRODUCT="['USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.0-1.019457.el7.iso']"
 # List of lab drops as an array of rpm packages
-export MSE_LABDROPS="['hpoc-nfv-base-1.1.3-3.019736.snap.1810151642.el7.x86_64.rpm','hpoc-nfv-base-selinux-1.1.3-3.019736.snap.1810151642.el7.x86_64.rpm','hpoc-nivr-nfv-3.1.1-5.019736.snap.1810120921.el7.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.1-5.019736.snap.1810120921.el7.noarch.rpm']"
+export MSE_LABDROPS="['hpoc-nfv-base-1.1.3-3.019736.snap.1810151642.el7.x86_64.rpm','hpoc-nfv-base-selinux-1.1.3-3.019736.snap.1810151642.el7.x86_64.rpm','hpoc-nivr-nfv-3.1.1-5.019736.snap.1810231718.el7.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.1-5.019736.snap.1810231718.el7.noarch.rpm']"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/sshKeys/'
 
@@ -91,8 +91,8 @@ export CLOUD_DEFAULT_USER="centos"
 export CLOUD_REPOS_LIST="['LinuxCOE-RedHat-7.4Server-x86_64.repo', 'core.repo']"
 export CLOUD_REPOS_URL="ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/repos/"
 # List of yum repositories to be used during MSE automated deployer installation
-# labOrchestrator is mandatory to enable the labdrops
-export MSE_YUM_REPO='labOrchestrator,core,*Server*'
+# labdrops is mandatory to enable the labdrops
+export MSE_YUM_REPO='labdrops,core,*Server*'
 # RHEL 6
 export CLOUD_IMAGE="RHEL 6.8"
 export CLOUD_DEFAULT_USER="centos"

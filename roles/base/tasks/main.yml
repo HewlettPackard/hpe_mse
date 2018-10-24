@@ -1,16 +1,19 @@
 ---
-- name: 'deploy an MSE node: nick name'
+- name: Deploying MSE node(s)
   debug: 
     var=theNode
 
-- name: set dns names servers if defined
+- name: Enable root at the console prompt
+  shell: echo "root:hwroot" | chpasswd
+
+- name: Set dns names servers if defined
   lineinfile: 
     path: /etc/resolv.conf
     insertbefore: '^search.*'
     line: "nameserver  {{nameserver}}"
   when: nameserver is defined
 
-- name: set hostname
+- name: Set hostname
   hostname: 
     name: "{{theNodeHostname}}"
 
@@ -24,7 +27,7 @@
     state: directory
     recurse: yes
 
-- name: install createrepo for labdrops management
+- name: Install createrepo for labdrops management
   yum:
     name: createrepo
 
@@ -97,19 +100,26 @@
   notify: refresh MSE instance
   when: cacheIso is not defined
 
-- name: get MSE engine installer install-cluster-manager.sh or install-tas.sh 
-  iso_extract:
-    image: "{{isoRepo}}{{engineIso}}"
-    dest: "{{isoRepo}}"
-    files:
-    - utils/install-tas.sh
-    - utils/install-cluster-manager.sh
+- block:
+  - name: Get MSE engine installer install-tas.sh 
+    iso_extract:
+      image: "{{isoRepo}}{{engineIso}}"
+      dest: "{{isoRepo}}"
+      files:
+      - utils/install-tas.sh
+  rescue:
+  - name: get MSE engine installer install-cluster-manager.sh
+    iso_extract:
+      image: "{{isoRepo}}{{engineIso}}"
+      dest: "{{isoRepo}}"
+      files:
+      - utils/install-cluster-manager.sh
 
 - name: Install versionlock plugin for yum
   yum: 
     name: yum-plugin-versionlock
 
-- name: install MSE engine
+- name: Install the MSE Automated Deployment engine
   shell: |
     cd {{isoRepo}} &&
     test -f install-cluster-manager.sh && _theInstaller=cluster_manager || _theInstaller=tas &&
@@ -117,25 +127,24 @@
     ./install-${_theInstaller}.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='{{yumRepo}}' --iso {{engineIso}}
 
 - stat: path=/etc/opt/OC/hpe-install-tas/versionlock.d
-- name: Create a yum repository labRepo for lab drops in {{isoRepo}} 
+- name: Create a labdrops yum repository for rpm packages in {{isoRepo}} 
   shell: |
     find {{isoRepo}}*.rpm -exec rpm -qp {} --qf '%{epoch}:%{name}-%{version}-%{release}.*\n' \; > /etc/yum/pluginconf.d/versionlock.list ; /bin/cp -f /etc/yum/pluginconf.d/versionlock.list /etc/opt/OC/hpe-install-tas/versionlock.d/hpe-mse-nfv-999-versionlock.list 
     > /etc/yum/pluginconf.d/versionlock.list
     createrepo --database {{isoRepo}} ; 
     cd /etc/yum.repos.d/
-    echo "[labOrchestrator]"  > labdrop.repo ; echo "name=lab repository for development packages" >> labdrop.repo ; echo "baseurl=file://{{isoRepo}}" >> labdrop.repo ; echo "enabled=1"  >> labdrop.repo ; echo "gpgcheck=0" >> labdrop.repo ;
+    echo "[labdrops]"  > labdrop.repo ; echo "name=lab repository for development packages" >> labdrop.repo ; echo "baseurl=file://{{isoRepo}}" >> labdrop.repo ; echo "enabled=1"  >> labdrop.repo ; echo "gpgcheck=0" >> labdrop.repo ;
 
-- name: install lab drops from {{isoRepo}}
-  yum:
-    disablerepo: '*'
-    enablerepo: labOrchestrator
-    name: '*'
-    state: latest
+- name: Update with lab drops from {{isoRepo}}
+  shell: |
+    cd {{isoRepo}} &&
+    test -f install-cluster-manager.sh && _theInstaller=cluster_manager || _theInstaller=tas &&
+    ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='{{yumRepo}}' --iso {{engineIso}}
 
 - name: Make sure the host is in /etc/hosts 
   shell: grep {{theNodeHostname}} /etc/hosts || echo {{theNodeIpAddress}} {{theNodeHostname}} >> /etc/hosts
 
-- name: enable sudo without tty since no password is required
+- name: Enable sudo without tty since no password is required
   lineinfile: 
     path: /etc/sudoers
     regexp: "^Defaults    requiretty"
