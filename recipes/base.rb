@@ -1,6 +1,8 @@
 # Set convenient variables from attributes
 engineIso=node['mse']['install']['iso']['engine']
 isoImages=node['mse']['install']['iso']['product']+[engineIso]
+mseLabDrops=node['mse']['install']['iso']['labdrops']
+mseBinaries=isoImages+mseLabDrops
 isoUrl=node['mse']['install']['isoUrl']
 yumRepo = node['mse']['install']['yumRepo']
 sshKeysUrl=node['mse']['install']['sshKeysUrl']
@@ -19,6 +21,9 @@ if !theNodeHostname
 end
 log "MSE node:"+theNode+" at ipAddress:"+theNodeIpAddress+" is named:"+theNodeHostname
 
+log "Enforce name resolution to *not* use myhostname in /etc/nsswitch.conf for getent"
+execute "sed -i -e 's%myhostname%%' /etc/nsswitch.conf"
+
 log "Create the MSE directories"
 [isoRepo,isoMountPoint].each do |mseDir|
   directory "#{mseDir}" do
@@ -32,13 +37,23 @@ log 'RefreshOnIsoChange' do
   action :nothing
 end
 
-log "Get/refresh the MSE ISO images"
-isoImages.each do |isoImage| 
-  remote_file isoRepo+"#{isoImage}" do
-    source isoUrl+"#{isoImage}"
+log "(optional) Get the MSE ISO images and lab drops in #{isoRepo} from local cache"
+mseBinaries.each do |_binaryFile| 
+  cookbook_file isoRepo+"#{_binaryFile}" do
+    source _binaryFile
+    notifies :write,'log[RefreshOnIsoChange]',:immediately  
+    ignore_failure true
+  end
+end
+
+log "Get the MSE ISO images and lab drops in #{isoRepo} from remote #{isoUrl}"
+mseBinaries.each do |_binaryFile| 
+  remote_file isoRepo+"#{_binaryFile}" do
+    source isoUrl+"#{_binaryFile}"
     notifies :write,'log[RefreshOnIsoChange]',:immediately  
   end
 end
+
 log "Remove unused ISO images"
 execute "ls "+isoRepo+"*.iso | grep -v -e "+isoImages.join(" -e ")+" | xargs rm -f "
 
@@ -48,18 +63,59 @@ mount isoMountPoint do
   options 'loop'
   action [:mount]
 end
-remote_file isoRepo+'install-cluster-manager.sh' do
-  source 'file://'+isoMountPoint+'utils/install-cluster-manager.sh'
-  mode 0755
+
+['cluster-manager','tas'].each do |theInstaller|
+  remote_file isoRepo+"install-#{theInstaller}.sh" do
+    source "file://"+isoMountPoint+"utils/install-#{theInstaller}.sh"
+    mode 0755
+    ignore_failure true
+  end
 end
+
+mount isoMountPoint do
+  device isoRepo+engineIso
+  action [:unmount]
+end
+
 log "Install versionlock plugin for yum"
-package 'yum-plugin-versionlock' do
-  action :upgrade
+package 'yum-plugin-versionlock'
+
+log "Install createrepo for labdrops management"
+package 'createrepo'
+
+bash 'getInstaller' do 
+  user 'root'
+  cwd  isoRepo
+  code <<-EOH
+    test -f install-cluster-manager.sh && _theInstaller=cluster_manager || _theInstaller=tas 
+    ./install-${_theInstaller}.sh --yes --install hpe-install-${_theInstaller} --disableplugin=yum-plugin-versionlock --iso #{engineIso} && 
+    ./install-${_theInstaller}.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='#{yumRepo}' --iso #{engineIso}
+  EOH
 end
-execute 'getInstaller' do
-  command 'umount '+isoMountPoint+' ; '+isoRepo+'install-cluster-manager.sh'+' --yes --install hpe-install-cluster-manager --disableplugin=yum-plugin-versionlock --iso '+isoRepo+engineIso
+
+log "(optional) Create a yum version lock file for lab drops /etc/opt/OC/hpe-install-tas/versionlock.d/hpe-mse-nfv-999-versionlock.list"
+execute 'labdropsVersionlock' do
+  cwd  isoRepo
+  ignore_failure true
+  command 'find *.rpm -exec rpm -qp {} --qf "%{epoch}:%{name}-%{version}-%{release}.*\n" \; > /etc/opt/OC/hpe-install-tas/versionlock.d/hpe-mse-nfv-999-versionlock.list'
 end
-execute "install-cluster-manager.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='"+yumRepo+"' --iso "+isoRepo+engineIso
+
+log "Create a labdrops yum repository for rpm packages in #{isoRepo}"
+execute "createrepo --database #{isoRepo}"
+file '/etc/yum.repos.d/labdrop.repo' do
+  owner'root'
+  content "[labdrops]\nname=lab drops\nbaseurl=file://#{isoRepo}\nenabled=1"
+end
+
+log "Upgrade with lab drops from #{isoRepo}"
+bash 'upgradeLabDrops' do
+  user 'root'
+  cwd  isoRepo
+  code <<-EOH
+    test -f install-cluster-manager.sh && _theInstaller=cluster_manager || _theInstaller=tas &&
+    ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='#{yumRepo}' --iso #{engineIso}
+  EOH
+end
 
 log "Make sure the host is in /etc/hosts"
 execute 'updateHosts' do 
@@ -141,3 +197,5 @@ log "Start all MSE engines services"
     action :start
   end
 end
+
+# (C) Copyright 2018 Hewlett Packard Enterprise Development LP.

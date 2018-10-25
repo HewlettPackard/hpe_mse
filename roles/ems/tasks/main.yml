@@ -32,3 +32,5 @@
     sleep 2m && 
     until service nivr-nfv consolidated-status || (( $? > 127 )) ; do sleep 20s ; done && 
     service nivr-nfv consolidated-status
+
+# (C) Copyright 2018 Hewlett Packard Enterprise Development LP.

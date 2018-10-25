@@ -72,3 +72,5 @@ log "Wait synchronously for the consolidated status"
 execute 'waitForSuccessOfFailure' do 
   command 'sleep 20s && until service nivr-nfv consolidated-status || (( $? > 127 )) ; do sleep 20s ; done && service nivr-nfv consolidated-status'
 end
+
+# (C) Copyright 2018 Hewlett Packard Enterprise Development LP.

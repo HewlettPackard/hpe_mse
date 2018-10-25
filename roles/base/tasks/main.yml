@@ -17,6 +17,13 @@
   hostname: 
     name: "{{theNodeHostname}}"
 
+- name: Enforce name resolution to *not* use myhostname in /etc/nsswitch.conf for getent
+  replace:
+    dest=/etc/nsswitch.conf
+    regexp='myhostname'
+    replace=''
+    backup=yes
+
 - name: Create MSE directories
   with_items: ["{{isoRepo}}","{{isoMountPoint}}"]
   loop_control:
@@ -237,3 +244,5 @@
     loop_var:
       vnfc
   shell: service {{vnfc}}-nfv status || service {{vnfc}}-nfv start || echo started
+
+# (C) Copyright 2018 Hewlett Packard Enterprise Development LP.

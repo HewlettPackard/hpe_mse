@@ -109,7 +109,7 @@ export CLOUD_DISTRO="centos"
 # The Azure image flavor
 export CLOUD_FLAVOR="Standard_D3"
 # List of yum repositories to be used during MSE automated deployer installation
-export MSE_YUM_REPO='centos*,updates*,base*'
+export MSE_YUM_REPO='labdrops,centos*,updates*,base*'
 # The Azure image name
 # Cent OS 7
 export CLOUD_IMAGE="OpenLogic:CentOS:7.4:latest"
@@ -133,7 +133,7 @@ export CLOUD_LOCATION="eu-west-1"
 # The Amazon image flavor
 export CLOUD_FLAVOR="t2.micro"
 # List of yum repositories to be used during MSE automated deployer installation
-export MSE_YUM_REPO='centos*,updates*,base*'
+export MSE_YUM_REPO='labdrops,centos*,updates*,base*'
 export CLOUD_ENVIRONMENT='{}'
 export CLOUD_REPOS_LIST="[]"
 # The Amazon image name
@@ -142,6 +142,7 @@ export CLOUD_IMAGE="ami-3548444c"
 # Cent OS 6
 export CLOUD_IMAGE="ami-404f4339"
 
+# (C) Copyright 2018 Hewlett Packard Enterprise Development LP.
 EOH
 version '0.3.0'
 chef_version '>= 12.14' if respond_to?(:chef_version)
@@ -150,7 +151,7 @@ chef_version '>= 12.14' if respond_to?(:chef_version)
 # tracked.  A `View Issues` link will be displayed on this cookbook's page when
 # uploaded to a Supermarket.
 #
-# issues_url 'https://github.com/<insert_org_here>/hpe_mse/issues'
+# issues_url 'https://github.com/HewlettPackard/hpe_mse/issues'
 
 # The `source_url` points to the development repository for this cookbook.  A
 # `View Source` link will be displayed on this cookbook's page when uploaded to
