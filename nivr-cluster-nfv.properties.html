@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-10-17 Version 3.01</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-10-25 Version 3.02</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -105,7 +105,8 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
-	"\n2018-10-17 3.01	DevOps support for Ansible on OpenStack"+ 
+	"\n2018-10-25 3.02	DevOps with Chef: enable lab drops"+ 
+	"\n2018-10-24 3.01	DevOps support for Ansible on OpenStack"+ 
 	"\n2018-09-17 3.0	DevOps support: chef/ansible on azure/aws"+	
 	"\n2018-09-17 2.43	Messaging Framework: application base retrieved from the SEE lite service section if available; name the Diameter provider as per APPLICATION_DIAMETER_PROVIDER if defined"+
 	"\n2018-08-29 2.41	SEE lite services: support for Local File System based File creation for Non-messaging Framework Applications, providing Json config, e.g smscGui,smscApi"+
@@ -7048,6 +7049,8 @@ function buildChefCookbook(){
 	cook+=n0+"            engine: <%= ENV['MSE_ENGINE'] %>";
 	cook+=n0+"            # List of ISO images delivering the MSE products";
 	cook+=n0+"            product: <%= ENV['MSE_PRODUCT'] %>";
+	cook+=n0+"            # List of rpm lab drops patching the MSE products";
+	cook+=n0+"            labdrops: <%= ENV['MSE_LABDROPS'] %>";
 	cook+=n0+"          # List of yum repositories to be used for MSE automated deployer installation";
 	cook+=n0+"          yumRepo: <%= ENV['MSE_YUM_REPO'] %>";
 	cook+=n0+"          # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files";
