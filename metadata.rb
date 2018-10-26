@@ -34,7 +34,7 @@ To keep the generated books generic, attributes are expected as environment vari
 # TAS product on CentOS 7
 #########################
 # URL providing MSE ISO images
-export MSE_ISO_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/TAS31/'
+export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/TAS31/'
 # ISO image delivering the MSE automated deployer engine
 export MSE_ENGINE='TAS-3.1.1-2.019722.snap.el7.iso'
 # List of ISO images delivering the MSE products
@@ -42,12 +42,12 @@ export MSE_PRODUCT="['USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.0
 # List of lab drops as an array of rpm packages
 export MSE_LABDROPS="['hpoc-nfv-base-1.1.3-3.019736.snap.1810151642.el7.x86_64.rpm','hpoc-nfv-base-selinux-1.1.3-3.019736.snap.1810151642.el7.x86_64.rpm','hpoc-nivr-nfv-3.1.1-5.019736.snap.1810231718.el7.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.1-5.019736.snap.1810231718.el7.noarch.rpm']"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
-export MSE_SSH_KEYS_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/sshKeys/'
+export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 
 # MSE product on CentOS 6
 #########################
 # URL providing MSE ISO images
-export MSE_ISO_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/MSE30/'
+export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/MSE30/'
 # ISO image delivering the MSE automated deployer engine
 export MSE_ENGINE='ClusterManager-3.1.1-4.019727.el6.iso'
 # List of ISO images delivering the MSE products
@@ -55,7 +55,7 @@ export MSE_PRODUCT="['MSE-3.0.5.2-2.019730.el6.iso','SEE-4.1.6.2-1.017392.el6.is
 # List of lab drops as an array of rpm packages
 export MSE_LABDROPS="[]"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
-export MSE_SSH_KEYS_URL='ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/sshKeys/'
+export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 
 # OpenStack Infrastructure
 ##########################
@@ -89,7 +89,7 @@ export CLOUD_IMAGE="Centos 7"
 export CLOUD_DEFAULT_USER="centos"
 # List of yum repositories definitions to add to the nodes retrieved from CLOUD_REPOS_URL
 export CLOUD_REPOS_LIST="['LinuxCOE-RedHat-7.4Server-x86_64.repo', 'core.repo']"
-export CLOUD_REPOS_URL="ftp://mse4nfv:Green.77@ftp.ext.hpe.com/chef/repos/"
+export CLOUD_REPOS_URL="ftp://mse4nfv:password@ftp.ext.hpe.com/chef/repos/"
 # List of yum repositories to be used during MSE automated deployer installation
 # labdrops is mandatory to enable the labdrops
 export MSE_YUM_REPO='labdrops,core,*Server*'
