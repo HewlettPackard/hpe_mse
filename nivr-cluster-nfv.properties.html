@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-10-25 Version 3.02</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-10-25 Version 3.03</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -105,7 +105,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
-	"\n2018-10-25 3.02	DevOps with Chef: enable lab drops"+ 
+	"\n2018-10-26 3.03	DevOps support: enable lab drops with Chef; add DevOps compatibility matrix."+ 
 	"\n2018-10-24 3.01	DevOps support for Ansible on OpenStack"+ 
 	"\n2018-09-17 3.0	DevOps support: chef/ansible on azure/aws"+	
 	"\n2018-09-17 2.43	Messaging Framework: application base retrieved from the SEE lite service section if available; name the Diameter provider as per APPLICATION_DIAMETER_PROVIDER if defined"+
@@ -173,31 +173,33 @@ function versionHistory(){
 
 // Display the compatibility matrix in a distinct window
 function compatibilityMatrix(){
-	var w = window.open('', 'MSE compatibility matrix', 'width=800,height=900,status=no,menubar=no');
+	var w = window.open('', 'MSE compatibility matrix', 'width=800,height=1000,status=no,menubar=no');
 	w.document.head.innerHTML = "<title>MSE compatibility matrix</title>"
 	var localStyle = w.document.createElement('style');
 	localStyle.innerHTML = HPEStyle;
 	w.document.head.appendChild(localStyle);
 	
-	var matrix = w.document.createElement('table');
-	matrix.id = "compatibilityMatrix";
+	// First table for the features
+	var featureMatrix = new Object;
+	featureMatrix.matrix = w.document.createElement('table');
+	featureMatrix.matrix.id = "compatibilityMatrix";
 	var matrixCaption = w.document.createElement('CAPTION');
 	matrixCaption.appendChild(w.document.createTextNode('MSE compatibility matrix '+document.getElementById("vnfDescriptorWizardVersion").innerHTML));
-	matrix.appendChild(matrixCaption);
+	featureMatrix.matrix.appendChild(matrixCaption);
 	
 	// If the compatibility matrix is already displayed, stop
-	if(w.document.getElementById(matrix.id) != undefined)return;
+	if(w.document.getElementById(featureMatrix.matrix.id) != undefined)return;
 	
-	w.document.body.appendChild(matrix);
+	w.document.body.appendChild(featureMatrix.matrix);
 	
-	var targetSEE=['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5'];
+	featureMatrix.target=['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5'];
 
 	// insert a first row with a feature cell, one cell per target, then a note
 	var tr = w.document.createElement('tr');
 	var th = w.document.createElement('th');
 	th.appendChild(w.document.createTextNode('Feature'));
 	tr.appendChild(th);
-	targetSEE.forEach(function(e,i,t){
+	featureMatrix.target.forEach(function(e,i,t){
 		th = w.document.createElement('th');
 		th.appendChild(w.document.createTextNode(e));
 		tr.appendChild(th);
@@ -205,19 +207,19 @@ function compatibilityMatrix(){
 	th = w.document.createElement('th');
 	th.appendChild(w.document.createTextNode('Note'));
 	tr.appendChild(th);
-	matrix.appendChild(tr);
-	
+	featureMatrix.matrix.appendChild(tr);
+
 	// Feature prototype, candidate for compatibility matrix
 	// - a title for this feature
 	// - list of compatible versions, from targetSEE list
 	// - specific notice to display for this feature
-	var compatibleFeature = function(title, targets, notice){
+	var compatibleFeature = function(matrix, title, targets, notice){
 		var tr = w.document.createElement('tr');
 		var td = w.document.createElement('td');
 		var checkCell;
 		td.appendChild(w.document.createTextNode(title));
 		tr.appendChild(td);
-		targetSEE.forEach(function(e,i,t){
+		matrix.target.forEach(function(e,i,t){
 			td = w.document.createElement('td');
 			checkCell = w.document.createElement('INPUT');
 			checkCell.type = "checkbox";
@@ -234,49 +236,77 @@ function compatibilityMatrix(){
 			td.appendChild(w.document.createTextNode(notice));
 			tr.appendChild(td);
 		}
-		matrix.appendChild(tr);
+		matrix.matrix.appendChild(tr);
 	}
 	
 	// Supported features
-	new compatibleFeature("SEE simplex",	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature("SEE cluster",	['SEE3.6', 'SEE3.7', 'SEE4'], "Cluster not available on SEE5 yet");
-	new compatibleFeature("Linux HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature("USPM", 			['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature("HTTP LB", 		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature("SIP LB simplex", ['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature("SIP LB HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature("Simulap",		['SEE4']);
-	new compatibleFeature("OCMP",			['SEE3.6', 'SEE3.7', 'SEE4'], "OCMP not ready yet on RHEL7?");
-	new compatibleFeature("Databases");
-	new compatibleFeature("MySQL simplex",	['SEE3.6', 'SEE3.7', 'SEE4']);
-	new compatibleFeature("Oracle simplex",	['SEE3.6', 'SEE3.7', 'SEE4']);
-	new compatibleFeature("Pgsql Simplex",	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature("Pgsql HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature("Pgsql Static",	['SEE3.6', 'SEE3.7', 'SEE4'], "Cluster not available on SEE5 yet");
-	new compatibleFeature("Redis simplex",	['SEE4', 'SEE5']);
-	new compatibleFeature("Redis HA",		['SEE4', 'SEE5']);
-	new compatibleFeature("Mongo",			['SEE4', 'SEE5']);
-	new compatibleFeature("Applications");
-	new compatibleFeature("ACM/TenantMP",	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5'], "emscli reports LOCKED_ENABLED state on SEE5");
-	new compatibleFeature("WebRTC",			['SEE3.6', 'SEE3.7']);
-	new compatibleFeature("SMB apps",		['SEE3.6', 'SEE3.7']);
-	new compatibleFeature("Conferencing",	['SEE3.6'], "SIP stack discontinued with SEE 3.7");
-	new compatibleFeature("MessagingFramework",	['SEE4']);
-	new compatibleFeature("SMSC",			['SEE4']);
-	new compatibleFeature("MessagingGateway",['SEE4']);
-	new compatibleFeature("OCCP",			['SEE4', 'SEE5']);
-	new compatibleFeature("Connectivities");
-	new compatibleFeature("TCAP",			['SEE4', 'SEE5']);
-	new compatibleFeature("MrfAdapter/MMCC",['SEE4', 'SEE5']);
-	new compatibleFeature("Diameter/TASAPPs",['SEE4', 'SEE5'], "TASAPPs experimental implementation as specific Diameter types, on SEE4 only");
-	new compatibleFeature("UCP",			['SEE4']);
-	new compatibleFeature("SMPP",			['SEE4', 'SEE5']);
-	new compatibleFeature("Datasource",		['SEE4'], "Common to JDBC and LDAP");
-	new compatibleFeature("LDAP",			['SEE4']);
-	new compatibleFeature("SOAP",			['SEE4', 'SEE5']);
-	new compatibleFeature("XMLRPC",			['SEE4']);
+	new compatibleFeature(featureMatrix, "SEE simplex",	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "SEE cluster",	['SEE3.6', 'SEE3.7', 'SEE4'], "Cluster not available on SEE5 yet");
+	new compatibleFeature(featureMatrix, "Linux HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "USPM", 			['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "HTTP LB", 		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "SIP LB simplex", ['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "SIP LB HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "Simulap",		['SEE4']);
+	new compatibleFeature(featureMatrix, "OCMP",			['SEE3.6', 'SEE3.7', 'SEE4'], "OCMP not ready yet on RHEL7?");
+	new compatibleFeature(featureMatrix, "Databases");
+	new compatibleFeature(featureMatrix, "MySQL simplex",	['SEE3.6', 'SEE3.7', 'SEE4']);
+	new compatibleFeature(featureMatrix, "Oracle simplex",	['SEE3.6', 'SEE3.7', 'SEE4']);
+	new compatibleFeature(featureMatrix, "Pgsql Simplex",	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "Pgsql HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "Pgsql Static",	['SEE3.6', 'SEE3.7', 'SEE4'], "Cluster not available on SEE5 yet");
+	new compatibleFeature(featureMatrix, "Redis simplex",	['SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "Redis HA",		['SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "Mongo",			['SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "Applications");
+	new compatibleFeature(featureMatrix, "ACM/TenantMP",	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5'], "emscli reports LOCKED_ENABLED state on SEE5");
+	new compatibleFeature(featureMatrix, "WebRTC",			['SEE3.6', 'SEE3.7']);
+	new compatibleFeature(featureMatrix, "SMB apps",		['SEE3.6', 'SEE3.7']);
+	new compatibleFeature(featureMatrix, "Conferencing",	['SEE3.6'], "SIP stack discontinued with SEE 3.7");
+	new compatibleFeature(featureMatrix, "MessagingFramework",	['SEE4']);
+	new compatibleFeature(featureMatrix, "SMSC",			['SEE4']);
+	new compatibleFeature(featureMatrix, "MessagingGateway",['SEE4']);
+	new compatibleFeature(featureMatrix, "OCCP",			['SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "Connectivities");
+	new compatibleFeature(featureMatrix, "TCAP",			['SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "MrfAdapter/MMCC",['SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "Diameter/TASAPPs",['SEE4', 'SEE5'], "TASAPPs experimental implementation as specific Diameter types, on SEE4 only");
+	new compatibleFeature(featureMatrix, "UCP",			['SEE4']);
+	new compatibleFeature(featureMatrix, "SMPP",			['SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "Datasource",		['SEE4'], "Common to JDBC and LDAP");
+	new compatibleFeature(featureMatrix, "LDAP",			['SEE4']);
+	new compatibleFeature(featureMatrix, "SOAP",			['SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "XMLRPC",			['SEE4']);
 	
+	var devopsMatrix = new Object;
+	devopsMatrix.matrix = w.document.createElement('table');
+	devopsMatrix.matrix.id = "compatibilityDevopsMatrix";
+	var devopsMatrixCaption = w.document.createElement('CAPTION');
+	devopsMatrixCaption.appendChild(w.document.createTextNode('MSE DevOps compatibility Matrix'));
+	devopsMatrix.matrix.appendChild(devopsMatrixCaption);
+	w.document.body.appendChild(devopsMatrix.matrix);
+	
+	devopsMatrix.target=['Chef', 'Ansible'];
 
+	// insert a first row with a infrastructure cell, one cell per target, then a note
+	tr = w.document.createElement('tr');
+	th = w.document.createElement('th');
+	th.appendChild(w.document.createTextNode('Infrastructure'));
+	tr.appendChild(th);
+	devopsMatrix.target.forEach(function(e,i,t){
+		th = w.document.createElement('th');
+		th.appendChild(w.document.createTextNode(e));
+		tr.appendChild(th);
+	});
+	th = w.document.createElement('th');
+	th.appendChild(w.document.createTextNode('Note'));
+	tr.appendChild(th);
+	devopsMatrix.matrix.appendChild(tr);
+	
+	new compatibleFeature(devopsMatrix, "Openstack",['Ansible'], "Single network interface. Tested only on CentOS 7 image");
+	new compatibleFeature(devopsMatrix, "Azure",	['Chef'], "Single network interface. Tested on CentOS 6.10 and 7 images");
+	new compatibleFeature(devopsMatrix, "Aws",		['Chef', 'Ansible'], "Single network interface. Tested on CentOS 6 and 7 images");
+	new compatibleFeature(devopsMatrix, "VMWare");
 	
 	return false;
 }
@@ -6915,7 +6945,7 @@ function chefDeploymentHelp(){userOutput(
 "\n\t- single network interface"+
 "\n\t- Supported environments: chef and ansible engines on openstack, azure and aws infrastructures"+
 "\nPre requisites:"+
-"\n\t- download the hpe_mse Chef recipes and Ansible roles from github: 'git clone https://github.com/dometdemont/hpe_mse.git'"+
+"\n\t- download the hpe_mse Chef recipes and Ansible roles from github: 'git clone https://github.com/HewlettPackard/hpe_mse.git'"+
 "\n\t- read the metadata.rb file for instructions"+
 "\n\t- set the environment variables used by the DevOps books for getting ISO images and reaching the infrastructure."+ 
 "\nChef engine:"+

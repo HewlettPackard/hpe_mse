@@ -107,20 +107,20 @@
   notify: refresh MSE instance
   when: cacheIso is not defined
 
-- block:
-  - name: Get MSE engine installer install-tas.sh 
-    iso_extract:
-      image: "{{isoRepo}}{{engineIso}}"
-      dest: "{{isoRepo}}"
-      files:
-      - utils/install-tas.sh
-  rescue:
-  - name: get MSE engine installer install-cluster-manager.sh
-    iso_extract:
-      image: "{{isoRepo}}{{engineIso}}"
-      dest: "{{isoRepo}}"
-      files:
-      - utils/install-cluster-manager.sh
+- name: Get MSE engine installer install-tas.sh 
+  ignore_errors: yes
+  iso_extract:
+    image: "{{isoRepo}}{{engineIso}}"
+    dest: "{{isoRepo}}"
+    files:
+    - utils/install-tas.sh
+- name: get MSE engine installer install-cluster-manager.sh
+  ignore_errors: yes
+  iso_extract:
+    image: "{{isoRepo}}{{engineIso}}"
+    dest: "{{isoRepo}}"
+    files:
+    - utils/install-cluster-manager.sh
 
 - name: Install versionlock plugin for yum
   yum: 
@@ -129,7 +129,7 @@
 - name: Install the MSE Automated Deployment engine
   shell: |
     cd {{isoRepo}} &&
-    test -f install-cluster-manager.sh && _theInstaller=cluster_manager || _theInstaller=tas &&
+    test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas &&
     ./install-${_theInstaller}.sh --yes --install hpe-install-${_theInstaller} --disableplugin=yum-plugin-versionlock --iso {{engineIso}} && 
     ./install-${_theInstaller}.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='{{yumRepo}}' --iso {{engineIso}}
 
@@ -145,7 +145,7 @@
 - name: Update with lab drops from {{isoRepo}}
   shell: |
     cd {{isoRepo}} &&
-    test -f install-cluster-manager.sh && _theInstaller=cluster_manager || _theInstaller=tas &&
+    test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas &&
     ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='{{yumRepo}}' --iso {{engineIso}}
 
 - name: Make sure the host is in /etc/hosts 

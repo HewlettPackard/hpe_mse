@@ -87,7 +87,7 @@ bash 'getInstaller' do
   user 'root'
   cwd  isoRepo
   code <<-EOH
-    test -f install-cluster-manager.sh && _theInstaller=cluster_manager || _theInstaller=tas 
+    test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas 
     ./install-${_theInstaller}.sh --yes --install hpe-install-${_theInstaller} --disableplugin=yum-plugin-versionlock --iso #{engineIso} && 
     ./install-${_theInstaller}.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='#{yumRepo}' --iso #{engineIso}
   EOH
@@ -112,7 +112,7 @@ bash 'upgradeLabDrops' do
   user 'root'
   cwd  isoRepo
   code <<-EOH
-    test -f install-cluster-manager.sh && _theInstaller=cluster_manager || _theInstaller=tas &&
+    test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas &&
     ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='#{yumRepo}' --iso #{engineIso}
   EOH
 end
