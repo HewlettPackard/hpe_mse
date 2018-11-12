@@ -1,10 +1,19 @@
 ---
 - name: Deploying MSE node(s)
   debug: 
-    var=theNode
+    var=theNodeIpAddress
 
 - name: Enable root at the console prompt
   shell: echo "root:hwroot" | chpasswd
+
+- name: Apply CLOUD_ENVIRONMENT variables to /root/.bash_profile
+  with_dict: "{{ lookup('env','CLOUD_ENVIRONMENT') }}"
+  loop_control:
+    loop_var:
+      _env
+  lineinfile: 
+    path: /root/.bash_profile
+    line: "export {{ _env.key }}={{ _env.value }}"
 
 - name: Set dns names servers if defined
   lineinfile: 
@@ -34,6 +43,16 @@
     state: directory
     recurse: yes
 
+- name: Get additional YUM repositories definitions
+  with_items: "{{yumReposDef}}"
+  loop_control:
+    loop_var:
+      _repo
+  get_url:
+    url: "{{yumReposDefUrl}}{{_repo}}"
+    dest: "/etc/yum.repos.d"
+  when: yumReposDef is defined
+
 - name: Install createrepo for labdrops management
   yum:
     name: createrepo
@@ -50,16 +69,6 @@
     dest: "{{isoRepo}}{{engineIso}}"
   notify: refresh MSE instance
   when: cacheIso is not defined
-
-- name: Get additional YUM repositories definitions
-  with_items: "{{yumReposDef}}"
-  loop_control:
-    loop_var:
-      _repo
-  get_url:
-    url: "{{yumReposDefUrl}}{{_repo}}"
-    dest: "/etc/yum.repos.d"
-  when: yumReposDef is defined
 
 - name: Get the MSE product ISO images from cache {{cacheIso}}
   with_items: "{{mseProduct}}"
@@ -107,20 +116,16 @@
   notify: refresh MSE instance
   when: cacheIso is not defined
 
-- name: Get MSE engine installer install-tas.sh 
+- name: Get MSE engine installer install-tas.sh or install-cluster-manager.sh
+  with_items: ['cluster-manager','tas']
+  loop_control:
+    loop_var:
+      _theInstaller
   ignore_errors: yes
   iso_extract:
     image: "{{isoRepo}}{{engineIso}}"
     dest: "{{isoRepo}}"
-    files:
-    - utils/install-tas.sh
-- name: get MSE engine installer install-cluster-manager.sh
-  ignore_errors: yes
-  iso_extract:
-    image: "{{isoRepo}}{{engineIso}}"
-    dest: "{{isoRepo}}"
-    files:
-    - utils/install-cluster-manager.sh
+    files: "utils/install-{{_theInstaller}}.sh"
 
 - name: Install versionlock plugin for yum
   yum: 
@@ -133,20 +138,39 @@
     ./install-${_theInstaller}.sh --yes --install hpe-install-${_theInstaller} --disableplugin=yum-plugin-versionlock --iso {{engineIso}} && 
     ./install-${_theInstaller}.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='{{yumRepo}}' --iso {{engineIso}}
 
-- stat: path=/etc/opt/OC/hpe-install-tas/versionlock.d
 - name: Create a labdrops yum repository for rpm packages in {{isoRepo}} 
   shell: |
-    find {{isoRepo}}*.rpm -exec rpm -qp {} --qf '%{epoch}:%{name}-%{version}-%{release}.*\n' \; > /etc/yum/pluginconf.d/versionlock.list ; /bin/cp -f /etc/yum/pluginconf.d/versionlock.list /etc/opt/OC/hpe-install-tas/versionlock.d/hpe-mse-nfv-999-versionlock.list 
-    > /etc/yum/pluginconf.d/versionlock.list
-    createrepo --database {{isoRepo}} ; 
-    cd /etc/yum.repos.d/
-    echo "[labdrops]"  > labdrop.repo ; echo "name=lab repository for development packages" >> labdrop.repo ; echo "baseurl=file://{{isoRepo}}" >> labdrop.repo ; echo "enabled=1"  >> labdrop.repo ; echo "gpgcheck=0" >> labdrop.repo ;
+    cd {{isoRepo}} &&
+    test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas &&
+    find {{isoRepo}}*.rpm -exec rpm -qp {} --qf '%{epoch}:%{name}-%{version}-%{release}.*\n' \; > /etc/yum/pluginconf.d/versionlock.list && /bin/cp -f /etc/yum/pluginconf.d/versionlock.list /etc/opt/OC/hpe-install-${_theInstaller}/versionlock.d/hpe-mse-nfv-999-versionlock.list &&
+    > /etc/yum/pluginconf.d/versionlock.list &&
+    createrepo --database {{isoRepo}}
+
+- name: fill /etc/yum.repos.d/labdrops.repo file
+  copy:
+    dest: /etc/yum.repos.d/labdrops.repo
+    content: |
+      [labdrops]
+      name=lab repository for development packages
+      baseurl=file://{{isoRepo}}
+      enabled=1
+      gpgcheck=0
 
 - name: Update with lab drops from {{isoRepo}}
   shell: |
     cd {{isoRepo}} &&
     test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas &&
     ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='{{yumRepo}}' --iso {{engineIso}}
+
+- name: Install additional explicit packages, ignoring errors
+  with_items: "{{ lookup('env','YUM_EXPLICIT_PACKAGES') | default('') }}"
+  loop_control:
+    loop_var:
+      _package
+  yum:
+    name: "{{_package}}"
+    enablerepo: "{{yumRepo}}"
+  ignore_errors: yes
 
 - name: Make sure the host is in /etc/hosts 
   shell: grep {{theNodeHostname}} /etc/hosts || echo {{theNodeIpAddress}} {{theNodeHostname}} >> /etc/hosts
@@ -238,11 +262,12 @@
 
 # mse nfv services needs to be started only if not already successfully completed
 # ignore start error, as this can mean that the service is already running
+# Do not trust the status if the log file is missing (uspm status returns 0 even if the service has never run)
 - name: Start all MSE engines services
   with_items: ['nivr','ocmp','ocsnf','uspm']
   loop_control:
     loop_var:
       vnfc
-  shell: service {{vnfc}}-nfv status || service {{vnfc}}-nfv start || echo started
+  shell: service {{vnfc}}-nfv status && test -f /var/log/{{vnfc}}-setup.log || service {{vnfc}}-nfv start || echo started
 
 # (C) Copyright 2018 Hewlett Packard Enterprise Development LP.

@@ -6,6 +6,18 @@
     state: absent
   notify: refresh MSE instance
 
+- name: Copy uspm descriptor if any 
+  copy:
+    content: "{{ uspm_descriptor }}"
+    dest: "{{ uspm_descriptor_path }}"
+  when: "{{ uspm_descriptor_path != '' }}"
+
+- name: Copy app descriptor if any 
+  copy:
+    content: "{{ app_descriptor }}"
+    dest: "{{ app_descriptor_path }}"
+  when: "{{ app_descriptor_path != '' }}"
+
 - name: Copy descriptor to template 
   copy:
     content: "{{ descriptor }}"

@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-10-25 Version 3.03</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-11-12 Version 3.04</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -38,7 +38,7 @@
 <option name="volume">from master</option>
 <option name="none">none</option>
 </select>
-<input class="helpButton" type="button" value="Help" onclick="useHeatVolumesHelp()">
+<input class="helpButton" type="button" value="Help" onclick="HeatDeploymentHelp()">
 </td> 
 <td valign="top">Review USPM descriptor</td><td valign="top"><input class="helpButton" type="button" value="Review" onclick="viewUspmAuxDescInput()"></td>
 <td valign="top">Review APPs descriptor</td><td valign="top"><input class="helpButton" type="button" value="Review" onclick="viewAppAuxDescInput()"></td>
@@ -105,6 +105,8 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2018-11-12 3.04	UCP/SMPP/TCAP providers: enable service component name definition, to override the default Messaging Framework service component name."+
+	"\n\t\tHeat stack: enable Ansible deployment by adding a new parameter to set the ssh key and exporting as outputs: the public nodes and the main and auxiliary descriptors"+
 	"\n2018-10-26 3.03	DevOps support: enable lab drops with Chef; add DevOps compatibility matrix."+ 
 	"\n2018-10-24 3.01	DevOps support for Ansible on OpenStack"+ 
 	"\n2018-09-17 3.0	DevOps support: chef/ansible on azure/aws"+	
@@ -3385,9 +3387,7 @@ var TCAP = new vnfResource("TCAP", [
 	{name:'Flavor', type:'text'}, 
 	{name:'SCCP flavor', type:'text'}, 
 	{name:'SSN', type:'text'}, 
-	{name:'Point code', type:'text'}, 
-	{name:'App base',type:'text', width:'250px'}, 
-	{name:'App type',type:'text'}
+	{name:'Point code', type:'text'}
 	]
 	);
 
@@ -3426,8 +3426,6 @@ TCAP.build = function(){
 	var sccpFlavors = new Array(nbVNFC);
 	var flavors = new Array(nbVNFC);
 	var pointCodes = new Array(nbVNFC);
-	var appBases = new Array(nbVNFC);
-	var appTypes = new Array(nbVNFC);
 	var stacks = new Array(nbVNFC);
 	var SSNs = new Array(nbVNFC);
 	
@@ -3454,8 +3452,6 @@ TCAP.build = function(){
 		var flavor=TCAP.getAndSetValue(row, nameIndexes, 'Flavor', "ITU93", "Flavor");
 		var sccpFlavor=TCAP.getAndSetValue(row, nameIndexes, 'SCCP flavor');
 		var pointCode=TCAP.getAndSetValue(row, nameIndexes, 'Point code', isReservedMessagingGateway ? "$MSGGW_POINTCODE" : MessagingGatewayDefault.POINTCODE, "Point code");
-		var appBase=TCAP.getAndSetValue(row, nameIndexes, 'App base', isMessagingFrameworkDefined && ! isReservedMessagingGateway ? "$MESSAGING_FRAMEWORK_APPLICATION_BASE" : "", "Application base");
-		var appType=TCAP.getAndSetValue(row, nameIndexes, 'App type');
 		var stack=TCAP.getAndSetValue(row, nameIndexes, 'SS7 stack', "SS7_Stack_1", "Stack name");
 		var SSN=TCAP.getAndSetValue(row, nameIndexes, 'SSN', "149", "SSN");
 		
@@ -3501,14 +3497,6 @@ TCAP.build = function(){
 			if(pointCodes[VNFCindex] == undefined)pointCodes[VNFCindex] = new Array();
 			pointCodes[VNFCindex][nameIndex]=pointCode;
 		}
-		if(appBase != ""){
-			if(appBases[VNFCindex] == undefined)appBases[VNFCindex] = new Array();
-			appBases[VNFCindex][nameIndex]=appBase;
-		}
-		if(appType != ""){
-			if(appTypes[VNFCindex] == undefined)appTypes[VNFCindex] = new Array();
-			appTypes[VNFCindex][nameIndex]=appType;
-		}
 		if(stack != ""){
 			if(stacks[VNFCindex] == undefined)stacks[VNFCindex] = new Array();
 			stacks[VNFCindex][nameIndex]=stack;
@@ -3527,8 +3515,6 @@ TCAP.build = function(){
 		fillArrays(sccpFlavors[i]);
 		fillArrays(flavors[i]);
 		fillArrays(pointCodes[i]);
-		fillArrays(appBases[i]);
-		fillArrays(appTypes[i]);
 		fillArrays(stacks[i]);
 		fillArrays(SSNs[i]);
 		result += ifVNFCopen(e,i);
@@ -3539,8 +3525,6 @@ TCAP.build = function(){
 		if(flavors[i] != undefined)result += "\nTCAP_FLAVOR=( "+flavors[i].join(" ")+" )";
 		if(sccpFlavors[i] != undefined)result += "\nTCAP_SCCP_FLAVOR=( "+sccpFlavors[i].join(" ")+" )";
 		if(pointCodes[i] != undefined)result += "\nTCAP_POINT_CODE=( "+pointCodes[i].join(" ")+" )";
-		if(appBases[i] != undefined)result += "\nTCAP_APPLICATION_BASE=( "+appBases[i].join(" ")+" )";
-		if(appTypes[i] != undefined)result += "\nTCAP_APPLICATION_TYPE=( "+appTypes[i].join(" ")+" )";
 		if(stacks[i] != undefined)result += "\nTCAP_SS7STACK_NAME=( "+stacks[i].join(" ")+" )";
 		if(SSNs[i] != undefined)result += "\nTCAP_SSN=( "+SSNs[i].join(" ")+" )";
 		result += ifVNFCclose(e,i);
@@ -3930,6 +3914,7 @@ var UcpSmpp = new vnfResource("UcpSmpp", [
 	{name:'VNFC', type:'text', value:''}, 
 	{name:'Type', type:'choice', width:'90px', choices:['UCP', 'SMPP']},
 	{name:'Name', type:'text', width:'90px'},
+	{name:'Service name', type:'text', width:'90px'},
 	{name:'Address', type:'text', width:'200px'},
 	{name:'Port', type:'text', width:'90px'}
 	]
@@ -3938,6 +3923,7 @@ var UcpSmpp = new vnfResource("UcpSmpp", [
 UcpSmpp.help = function(){
 	return "UCP and SMPP resources"+
 	"\nName: provider's name" +
+	"\nService name: the name of the SEE service associated to this provider; default to the messaging framework one" +
 	"\nAddress: selected network CIDR to listen to, eg 192.168.69.0/24; default to any interface 0.0.0.0" +
 	"\nPort: the port to listen to (no default)";
 }
@@ -3955,12 +3941,15 @@ UcpSmpp.build = function(){
 	var nbVNFC = Nodes.count('VNFC');
 	
 	var names = new Array();
+	var serviceNames = new Array();
 	var adresses = new Array();
 	var ports = new Array();
 	names['UCP'] = new Array(nbVNFC);
+	serviceNames['UCP'] = new Array(nbVNFC);
 	adresses['UCP'] = new Array(nbVNFC);
 	ports['UCP'] = new Array(nbVNFC);
 	names['SMPP'] = new Array(nbVNFC);
+	serviceNames['SMPP'] = new Array(nbVNFC);
 	adresses['SMPP'] = new Array(nbVNFC);
 	ports['SMPP'] = new Array(nbVNFC);
 
@@ -3978,6 +3967,7 @@ UcpSmpp.build = function(){
 		
 		var type=UcpSmpp.getAndSetSelection(row, nameIndexes, 'Type', 0);
 		var name=UcpSmpp.getAndSetValue(row, nameIndexes, 'Name', type+'-'+i);
+		var serviceName=UcpSmpp.getAndSetValue(row, nameIndexes, 'Service name');
 		var address=UcpSmpp.getAndSetValue(row, nameIndexes, 'Address', '0.0.0.0');
 		var port=UcpSmpp.getAndSetValue(row, nameIndexes, 'Port', '7800');
 		if(name == "" || port == ""){
@@ -3993,6 +3983,10 @@ UcpSmpp.build = function(){
 		// New elements should be pushed at index names.length -1 to match this resource definition
 		var nameIndex = names[type][VNFCindex].length -1;
 
+		if(serviceName != ""){
+			if(serviceNames[type][VNFCindex] == undefined)serviceNames[type][VNFCindex] = new Array();
+			serviceNames[type][VNFCindex][nameIndex]=serviceName;
+		}
 		if(address != ""){
 			if(adresses[type][VNFCindex] == undefined)adresses[type][VNFCindex] = new Array();
 			adresses[type][VNFCindex][nameIndex]=address;
@@ -4006,10 +4000,12 @@ UcpSmpp.build = function(){
 	VNFCnames.forEach(function(e,i){
 		['UCP', 'SMPP'].forEach(function(type,iType){
 			if(names[type][i] == undefined || names[type][i].length == 0)return;
+			fillArrays(serviceNames[type][i]);
 			fillArrays(adresses[type][i]);
 			fillArrays(ports[type][i]);
 			result += ifVNFCopen(e,i);
 			result += "\n"+type+"_PROVIDER_NAME=( "+names[type][i].join(" ")+" )";
+			if(serviceNames[type][i] != undefined)result += "\n"+type+"_SERVICE_COMPONENT_NAME=( "+serviceNames[type][i].join(" ")+" )";
 			if(adresses[type][i] != undefined)result += "\n"+type+"_IP_ADDR=( "+adresses[type][i].join(" ")+" )";
 			if(ports[type][i] != undefined)result += "\n"+type+"_PORT=( "+ports[type][i].join(" ")+" )";
 			result += ifVNFCclose(e,i);
@@ -6658,11 +6654,16 @@ function setAppAuxDescInput(event){
 }
 function clearAppAuxDescInput(){Misc.heatAppAuxDesc=undefined; userOutput('');document.getElementById("AppAuxDescInput").value= null;}
 function viewAppAuxDescInput(){userOutput(Misc.heatAppAuxDesc);}
-function useHeatVolumesHelp(){userOutput(
+function HeatDeploymentHelp(){userOutput(
 "Heat storage allocation policy: three options are available:"+
 "\n\t- from image: create one volume per instance from a qcow2 image which name is passed as parameter Image"+
 "\n\t- from master: create one volume per instance from a master volume which id is passed as parameter Image"+
-"\n\t- none: use local storage on compute node, no volume creation" 
+"\n\t- none: use local storage on compute node, no volume creation"+
+"\nAnsible deployment of a Heat stack:"+
+"\n\t- prepare the Ansible console as per the DevOps Help section"+
+"\n\t- drop the generated Heat stack template to the Ansible console as nivr-cluster-nfv.yaml or other name"+
+"\n\t- start the ansible deployment on the console using the generic heat.ansible.yml playbook:"+
+"\n\t- ansible-playbook heat.ansible.yml --extra-vars 'the_stack=<the stack name, default mse_stack> the_template=<the Heat stack template, default nivr-cluster-nfv.yaml>'" 
 );}
 // ===========================
 // MSE Heat template build
@@ -6712,6 +6713,10 @@ function buildHeatTemplate(){
     heat+=n0+"    type: string";
     heat+=n0+"    description: The name of the openstack flavor used to build the other nodes";
     heat+=n0+"    default: v2.m2";
+	heat+=n0+"  key_name:";
+    heat+=n0+"    type: string";
+    heat+=n0+"    description: the ssh key injected in the instances for remote access";
+    heat+=n0+"    default: ''";
     if(useHeatVolumes != 'none'){
 	heat+=n0+"  VolumeSize:";
     heat+=n0+"    type: number";
@@ -6872,6 +6877,7 @@ function buildHeatTemplate(){
       	}
       	heat+=n0+"      flavor: { get_param: "+Nodes.cloudNodes[indexNode].flavor+" }";
       	heat+=n0+"      availability_zone: { get_param: AvailabilityZone }";
+      	heat+=n0+"      key_name: { get_param: key_name }";
       	heat+=n0+"      networks:";
       	heat+=port;
       	heat+=n0+"      config_drive: True";
@@ -6912,21 +6918,55 @@ function buildHeatTemplate(){
 	
     // Add outputs:
     heat+=n0+"outputs:";
-    // Public names resolution
-    heat+=n0+"  PublicNameResolution:";
-    heat+=n0+"    description: The public hosts names resolution list";
+    // Ansible deployments: list of nodes and descriptor
+    heat+=n0+"  public_nodes:";
+    heat+=n0+"    description: List of hosts as a name, fqdn, public ip address and groups membership";
     heat+=n0+"    value:";
-	heat+=n0+"      Fn::Join:"; 
-    heat+=n0+"        - '; '";
-    heat+=n0+"        - ";
-	nodesNames.forEach(function(name, indexNode){ if(Nodes.cloudNodes[indexNode].interfaces.indexOf(heatPublicInterface) == -1)return;
-	heat+=n0+"          - ";
-	heat+=n0+"            Fn::Join:"; 
-	heat+=n0+"              - ' '";
-	heat+=n0+"              - ";
-	heat+=n0+"                - {get_attr: ["+name+"-"+mgmtName+"-floatingIP, floating_ip_address]}";
-    heat+=n0+"                - "+name;
+    // For each non VIP node having a public IP address, required for Ansible client access: publish the name, fqdn, public IP address and group 'base' plus 'ems' for the last node
+    nodesNames.forEach(function(name, indexNode){ if(Nodes.cloudNodes[indexNode].isVIP || Nodes.cloudNodes[indexNode].interfaces.indexOf(heatPublicInterface) == -1)return;
+    heat+=n0+"      -";
+    heat+=n0+"        name: "+name;
+    heat+=n0+"        fqdn: "+Nodes.cloudNodes[indexNode].fqdn
+    heat+=n0+"        ipaddress: {get_attr: ["+name+"-"+mgmtName+"-floatingIP, floating_ip_address]}";
+    heat+=n0+"        groups: base"; if(indexNode == Nodes.cloudNodes.length - 1)heat+=",ems"
     });
+    heat+=n0+"  main_descriptor:";
+    heat+=n0+"    description: /etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties";
+    heat+=n0+"    value:";
+    heat+=n0+"      str_replace:";
+    heat+=n0+"        template: |";
+    heat+=n0+"          "+desc.replace(/\n/g, "\n"+  
+		     "          ");	// fix the descriptor indentation as expected by Heat
+	// Resolve ip addresses parameters 
+    heat+=n0+"        params:"+addr.replace(/\n/g, "\n"+  
+		     "          ");	// fix the descriptor indentation as expected by Heat;;
+    // Resolve default gateway IP address to the MGMT subnet holding floating IPs
+    heat+=n0+"          ~pub_gateway~: {get_attr: ["+mgmtName+"-subnet, gateway_ip]}";
+	// If a USPM descriptor is defined, push its auxiliary descriptor
+    if(Misc.heatUspmAuxDesc != undefined){
+   	heat+=n0+"  uspm_descriptor:";
+    heat+=n0+"    description: "+Misc.heatUspmAuxDescPath;
+    heat+=n0+"    value:";
+    heat+=n0+"      str_replace:";
+    heat+=n0+"        template: |";
+    heat+=n0+"          "+Misc.heatUspmAuxDesc.replace(/\n/g, "\n"+  
+		     "          ");	// fix the descriptor indentation as expected by Heat
+	// Resolve ip addresses parameters 
+    heat+=n0+"        params:"+addr.replace(/\n/g, "\n"+  
+		     "          ");	// fix the descriptor indentation as expected by Heat;;
+    }
+	if(Misc.heatAppAuxDescPath != undefined && Misc.heatAppAuxDesc != undefined){
+   	heat+=n0+"  app_descriptor:";
+    heat+=n0+"    description: "+Misc.heatAppAuxDescPath;
+    heat+=n0+"    value:";
+    heat+=n0+"      str_replace:";
+    heat+=n0+"        template: |";
+    heat+=n0+"          "+Misc.heatAppAuxDesc.replace(/\n/g, "\n"+  
+		     "          ");	// fix the descriptor indentation as expected by Heat
+	// Resolve ip addresses parameters 
+    heat+=n0+"        params:"+addr.replace(/\n/g, "\n"+  
+		     "          ");	// fix the descriptor indentation as expected by Heat;;
+    }
     
     // Show to the user and save to nivr-cluster-nfv.yaml
     userOutput(heat);
@@ -6942,7 +6982,7 @@ function buildHeatTemplate(){
 
 function chefDeploymentHelp(){userOutput(
 "DevOps limitations:"+
-"\n\t- single network interface"+
+"\n\t- single network interface except for Heat stacks on OpenStack infrastructure"+
 "\n\t- Supported environments: chef and ansible engines on openstack, azure and aws infrastructures"+
 "\nPre requisites:"+
 "\n\t- download the hpe_mse Chef recipes and Ansible roles from github: 'git clone https://github.com/HewlettPackard/hpe_mse.git'"+
@@ -6953,13 +6993,9 @@ function chefDeploymentHelp(){userOutput(
 "\n\t- install the Chef Development Kit"+
 "\n\t- install the pre requisite gem: chef gem install kitchen-nodes"+
 "\nAnsible engine:"+
-"\n\t- the playbook built is a ansible.yml file. It relies on two provided roles: ems and base. Before launching 'ansible-playbook ansible.yml' on a work station:"+
-"\n\t- install an ansible engine from epel repository: 'yum install epel-release; yum install ansible'"+
-"\n\t- in ansible.cfg, configure the remote user, and private key to use, typically:"+
-"\n\t\t[defaults]"+
-"\n\t\tremote_user = centos"+
-"\n\t\tprivate_key_file =  ./d3m.pem"+
-"\n\t\thost_key_checking = False"+
+"\n\t- prepare a workstation by installing an ansible engine from epel repository: 'yum install epel-release; yum install ansible'"+
+"\n\t- the playbook built is a ansible.yml file. It relies on two provided roles: ems and base and is invoked as 'ansible-playbook ansible.yml' on a work station"+
+"\n\t- if a cache is locally available on the Ansible console, set an extra var to point to as --extra-vars 'cacheIso=<path>'"+
 "\nFor azure target:"+
 "\n\t- install the azure CLI from https://docs.microsoft.com/fr-fr/cli/azure/install-azure-cli-windows?view=azure-cli-latest"+
 "\n\t- install pre requisite gem: chef gem install kitchen-azurerm"+
@@ -6972,11 +7008,14 @@ function chefDeploymentHelp(){userOutput(
 "\nFor openstack target:"+
 "\n\t- install ansible, git and pip from epel repository: yum install epel-release ; yum install ansible git python-pip --enablerepo='epel'"+
 "\n\t- install shade: pip install shade"+
-"\n\t- define the infrastructure credentials environment variables as per the metadata.rb file"
+"\n\t- define the infrastructure credentials environment variables as per the metadata.rb file"+
+"\n\t- invoke ansible on a work station either as:"+
+"\n\t\t- to deploy a set of instances: ansible-playbook ansible.yml"+
+"\n\t\t- to deploy a stack defined in nivr-cluster-nfv.yaml built from the Deploy button: ansible-playbook heat.ansible.yml --extra-vars 'the_stack=<the stack name>'"
 );}
 
 // ===========================
-// MSE bood for DevOps
+// MSE book for DevOps
 // ===========================
 function buildDevopsBook(){
 	var realm = document.getElementById("devOpsEngine").value;
@@ -7248,12 +7287,31 @@ function buildAnsiblePlaybook(){
 	cook+=n0+"  handlers:";
 	cook+=n0+"  - name: refresh MSE instance";
 	cook+=n0+"    raw: service nivr-nfv status && service nivr-nfv node-reload && service nivr-nfv start || echo Refresh unavailable, skipped";
-	// Append the descriptor as a variable
+	// Append the descriptors as a variables
 	cook+=n0+"  vars:";
 	cook+=n0+"    descriptor: |";
 	cook+=n0+"      "+desc.replace(/\n/g, "\n"+  
 		     "      ");	// fix the descriptor indentation as expected by Yaml
-	
+	// If a auxiliary descriptors are defined, push them with their path
+    if(Misc.heatUspmAuxDesc != undefined && Misc.heatUspmAuxDescPath != undefined){
+	cook+=n0+"    uspm_descriptor_path: "+Misc.heatUspmAuxDescPath;
+   	cook+=n0+"    uspm_descriptor: |";
+	cook+=n0+"      "+Misc.heatUspmAuxDesc.replace(/\n/g, "\n"+  
+		     "      ");	// fix the descriptor indentation as expected by Yaml
+	}else{
+	cook+=n0+"    uspm_descriptor_path: ''";
+   	cook+=n0+"    uspm_descriptor: ''";
+	}
+	if(Misc.heatAppAuxDescPath != undefined && Misc.heatAppAuxDesc != undefined){
+	cook+=n0+"    app_descriptor_path: "+Misc.heatAppAuxDescPath;
+	cook+=n0+"    app_descriptor: |";
+	cook+=n0+"      "+Misc.heatAppAuxDesc.replace(/\n/g, "\n"+  
+		     "      ");	// fix the descriptor indentation as expected by Yaml
+	}else{
+	cook+=n0+"    app_descriptor_path: ''";
+   	cook+=n0+"    app_descriptor: ''";
+	}
+    
     // Show to the user and save to ansible.yml
     userOutput(cook);
 	
