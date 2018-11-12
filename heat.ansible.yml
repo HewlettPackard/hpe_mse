@@ -1,0 +1,124 @@
+---
+- name: create a TAS/MSE stack on Heat OpenStack
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+  - name: create the Heat stack
+    os_stack:
+      state: present
+      name: "{{the_stack | default('mse_stack') }}"
+      template: "{{the_template | default('nivr-cluster-nfv.yaml') }}"
+      parameters:
+        NetworkRoot: 192.168.111
+        Image: "{{ lookup('env','CLOUD_IMAGE') }}"
+        key_name: "{{ lookup('env','CLOUD_SSH_KEY_PAIR') }}"
+    register: mse_stack
+
+  - name: set facts from stack outputs descriptions discarding verbose logs
+    with_items: "{{mse_stack.stack.outputs}}"
+    loop_control:
+      loop_var:
+        _output
+    set_fact: "{{_output.output_key}}={{_output.description}}"
+    no_log: True
+
+  - name: set facts from stack outputs values discarding verbose logs
+    with_items: "{{mse_stack.stack.outputs}}"
+    loop_control:
+      loop_var:
+        _output
+    set_fact: "{{_output.output_key}}_value={{_output.output_value}}"
+    no_log: True
+
+  - fail: msg="Missing Heat stack output value for public_nodes"
+    when: public_nodes_value is not defined
+
+  - fail: msg="Missing Heat stack output value for main_descriptor"
+    when: main_descriptor_value is not defined
+
+  - name: show stack
+    debug:
+      var=public_nodes_value
+
+  - name: show uspm auxiliary descriptor path
+    debug:
+      var=uspm_descriptor_path
+    when: uspm_descriptor_path is defined
+
+  - name: show applications auxiliary descriptor path
+    debug:
+      var=app_descriptor_path
+    when: app_descriptor_path is defined
+
+  - name: Wait for SSH 
+    with_items: "[{{public_nodes_value}}]"
+    loop_control:
+      loop_var:
+        _host
+    command: >
+      ssh -oBatchMode=yes -oStrictHostKeyChecking=no -i {{ lookup('env','CLOUD_SSH_KEY') }}
+      {{ lookup('env',' CLOUD_DEFAULT_USER') }}@{{_host['ipaddress']}} true
+    register: result
+    until: result|success
+    retries: 30
+    delay: 10
+
+  - name: add hosts in the ansible dynamic inventory
+    with_items: "[{{public_nodes_value}}]"
+    loop_control:
+      loop_var:
+        _host
+    add_host:
+      name: "{{_host['fqdn']}}"
+      groups: "{{_host['groups']}}"
+      nick_name: "{{_host['name']}}"
+      fqdn: "{{_host['fqdn']}}"
+      ansible_ssh_host: "{{_host['ipaddress']}}"
+      descriptor: "{{main_descriptor_value}}"
+      uspm_descriptor: "{{uspm_descriptor_value | default('') }}"
+      uspm_descriptor_path: "{{uspm_descriptor | default('') }}"
+      app_descriptor: "{{app_descriptor_value | default('') }}"
+      app_descriptor_path: "{{app_descriptor | default('') }}"
+
+- name: configure the base instance(s)
+  hosts: base
+  become: True
+  gather_facts: True
+  handlers:
+  - name: refresh MSE instance
+    raw: echo $(date) Refresh deferred to the ems node > /var/opt/OC/iso/refresh_trigger.log
+  vars:
+    # From the environment
+    engineIso: "{{ lookup('env','MSE_ENGINE') }}"
+    mseProduct: "{{ lookup('env','MSE_PRODUCT') }}"
+    isoUrl: "{{ lookup('env','MSE_ISO_URL') }}"
+    cacheIso: "../iso/"
+    yumReposDefUrl: "{{ lookup('env','CLOUD_REPOS_URL') }}"
+    yumReposDef: "{{ lookup('env','CLOUD_REPOS_LIST') }}"
+    yumRepo: "{{ lookup('env','MSE_YUM_REPO') }}"
+    sshKeysUrl: "{{ lookup('env','MSE_SSH_KEYS_URL') }}"
+    nameserver: "{{ lookup('env','CLOUD_NAMESERVER') }}"
+    mseLabDrops: "{{ lookup('env','MSE_LABDROPS') }}"
+    # From the inventory
+    theNode: "{{hostvars[inventory_hostname]['nick_name']}}"
+    theNodeHostname: "{{hostvars[inventory_hostname]['fqdn']}}"
+    theNodeIpAddress: "{{hostvars[inventory_hostname]['ansible_default_ipv4']['address']}}"
+    # MSE constants
+    isoRepo: '/var/opt/OC/iso/'
+    isoMountPoint: '/media/cdrom/'
+  environment: "{{ lookup('env','CLOUD_ENVIRONMENT') }}"
+  roles:
+    - role: base
+
+- name: configure the ems instance
+  hosts: ems
+  become: True
+  gather_facts: True
+  roles:
+    - role: ems
+  handlers:
+  - name: refresh MSE instance
+    raw: service nivr-nfv status && service nivr-nfv node-reload && service nivr-nfv start || echo Refresh unavailable, skipped
+  vars:
+    descriptor: "{{hostvars[inventory_hostname]['descriptor']}}"
