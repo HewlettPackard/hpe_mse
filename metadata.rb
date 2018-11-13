@@ -45,6 +45,8 @@ export MSE_LABDROPS="['hpoc-uspm-nfv-common-4.3.3-2.004656.el7.noarch.rpm','hpoc
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 # Explicit additional packages to install if available: mlocate as a quick file searcher, omping as mulitcast checker
 export YUM_EXPLICIT_PACKAGES="['mlocate','omping','firewalld']"
+# Mandatory services to be started
+export MANDATORY_SERVICES="['firewalld']"
 
 # MSE product on CentOS 6
 #########################

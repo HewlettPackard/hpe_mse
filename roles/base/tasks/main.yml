@@ -172,6 +172,15 @@
     enablerepo: "{{yumRepo}}"
   ignore_errors: yes
 
+- name: Start mandatory explicit services, if any
+  with_items: "{{ lookup('env','MANDATORY_SERVICES') | default('') }}"
+  loop_control:
+    loop_var:
+      _service
+  service:
+    name: "{{_service}}"
+    state: started
+
 - name: Make sure the host is in /etc/hosts 
   shell: grep {{theNodeHostname}} /etc/hosts || echo {{theNodeIpAddress}} {{theNodeHostname}} >> /etc/hosts
 

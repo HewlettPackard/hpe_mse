@@ -93,7 +93,7 @@
     engineIso: "{{ lookup('env','MSE_ENGINE') }}"
     mseProduct: "{{ lookup('env','MSE_PRODUCT') }}"
     isoUrl: "{{ lookup('env','MSE_ISO_URL') }}"
-    cacheIso: "../iso/"
+    #cacheIso: "../iso/"
     yumReposDefUrl: "{{ lookup('env','CLOUD_REPOS_URL') }}"
     yumReposDef: "{{ lookup('env','CLOUD_REPOS_LIST') }}"
     yumRepo: "{{ lookup('env','MSE_YUM_REPO') }}"
