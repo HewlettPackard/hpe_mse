@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-11-12 Version 3.04</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-11-16 Version 3.05</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -34,9 +34,9 @@
 <td valign="top">Build the MSE Heat template</td>
 <td valign="top"><input class="buildButton" type="button" value="Deploy" onclick="buildHeatTemplate()"> Volumes
 <select id="useHeatVolumes">
-<option name="image" selected>from image</option>
+<option name="none" selected>none</option>
+<option name="image">from image</option>
 <option name="volume">from master</option>
-<option name="none">none</option>
 </select>
 <input class="helpButton" type="button" value="Help" onclick="HeatDeploymentHelp()">
 </td> 
@@ -105,6 +105,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2018-11-16 3.05	Ansible playbook: add environment variables mandatory_services yum_explicit_packages patched_files"+
 	"\n2018-11-12 3.04	UCP/SMPP/TCAP providers: enable service component name definition, to override the default Messaging Framework service component name."+
 	"\n\t\tHeat stack: enable Ansible deployment by adding a new parameter to set the ssh key and exporting as outputs: the public nodes and the main and auxiliary descriptors"+
 	"\n2018-10-26 3.03	DevOps support: enable lab drops with Chef; add DevOps compatibility matrix."+ 
@@ -7267,6 +7268,9 @@ function buildAnsiblePlaybook(){
 	cook+=n0+"    sshKeysUrl: \"{{ lookup('env','MSE_SSH_KEYS_URL') }}\"";
 	cook+=n0+"    nameserver: \"{{ lookup('env','CLOUD_NAMESERVER') }}\"";
 	cook+=n0+"    mseLabDrops: \"{{ lookup('env','MSE_LABDROPS') }}\"";
+	cook+=n0+"    patched_files: \"{{ lookup('env','PATCHED_FILES') }}\"";
+	cook+=n0+"    mandatory_services: \"{{ lookup('env','MANDATORY_SERVICES') }}\"";
+	cook+=n0+"    yum_explicit_packages: \"{{ lookup('env','YUM_EXPLICIT_PACKAGES') }}\"";
 	cook+=n0+"    # From the inventory";
 	cook+=n0+"    theNode: \"{{hostvars[inventory_hostname]['nick_name']}}\"";
 	cook+=n0+"    theNodeHostname: \"{{hostvars[inventory_hostname]['fqdn']}}\"";
@@ -7292,6 +7296,7 @@ function buildAnsiblePlaybook(){
 	cook+=n0+"    descriptor: |";
 	cook+=n0+"      "+desc.replace(/\n/g, "\n"+  
 		     "      ");	// fix the descriptor indentation as expected by Yaml
+	
 	// If a auxiliary descriptors are defined, push them with their path
     if(Misc.heatUspmAuxDesc != undefined && Misc.heatUspmAuxDescPath != undefined){
 	cook+=n0+"    uspm_descriptor_path: "+Misc.heatUspmAuxDescPath;

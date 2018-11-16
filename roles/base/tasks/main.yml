@@ -162,8 +162,29 @@
     test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas &&
     ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='{{yumRepo}}' --iso {{engineIso}}
 
+- name: Update with patches from cache if any
+  with_dict: "{{patched_files}}"
+  loop_control:
+    loop_var:
+      _patch
+  copy:
+    src: "{{cacheIso}}{{_patch.key}}"
+    dest: "{{_patch.value}}"
+  when: cacheIso is defined
+
+- name: Update with patches from {{isoUrl}} if any
+  with_dict: "{{patched_files}}"
+  loop_control:
+    loop_var:
+      _patch
+  copy:
+    src: "{{isoUrl}}{{_patch.key}}"
+    dest: "{{_patch.value}}"
+  when: cacheIso is not defined
+
+
 - name: Install additional explicit packages, ignoring errors
-  with_items: "{{ lookup('env','YUM_EXPLICIT_PACKAGES') | default('') }}"
+  with_items: "{{ yum_explicit_packages }}"
   loop_control:
     loop_var:
       _package
@@ -173,7 +194,7 @@
   ignore_errors: yes
 
 - name: Start mandatory explicit services, if any
-  with_items: "{{ lookup('env','MANDATORY_SERVICES') | default('') }}"
+  with_items: "{{ mandatory_services }}"
   loop_control:
     loop_var:
       _service

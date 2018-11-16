@@ -36,17 +36,19 @@ To keep the generated books generic, attributes are expected as environment vari
 # URL providing MSE ISO images
 export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/TAS31/'
 # ISO image delivering the MSE automated deployer engine
-export MSE_ENGINE='TAS-3.1.1-2.019722.snap.el7.iso'
+export MSE_ENGINE='TAS-3.1.1-3.019808.el7.iso'
 # List of ISO images delivering the MSE products
 export MSE_PRODUCT="['USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.0-1.019457.el7.iso']"
 # List of lab drops as an array of rpm packages
-export MSE_LABDROPS="['hpoc-uspm-nfv-common-4.3.3-2.004656.el7.noarch.rpm','hpoc-uspm-nfv-config-4.3.3-2.004656.el7.noarch.rpm','hpoc-uspm-nfv-ems-4.3.3-2.004656.el7.noarch.rpm','hpoc-nfv-base-1.1.3-3.019736.snap.1810151642.el7.x86_64.rpm','hpoc-nfv-base-selinux-1.1.3-3.019736.snap.1810151642.el7.x86_64.rpm','hpoc-nivr-nfv-3.1.2-1.019834.snap.1811081540.el7.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.2-1.019834.snap.1811081540.el7.noarch.rpm']"
+export MSE_LABDROPS="['hpoc-uspm-nfv-common-4.3.3-2.004656.el7.noarch.rpm','hpoc-uspm-nfv-config-4.3.3-2.004656.el7.noarch.rpm','hpoc-uspm-nfv-ems-4.3.3-2.004656.el7.noarch.rpm','hpoc-nfv-base-1.1.3-3.019736.snap.1810151642.el7.x86_64.rpm','hpoc-nfv-base-selinux-1.1.3-3.019736.snap.1810151642.el7.x86_64.rpm','hpoc-nivr-nfv-3.1.2-1.019834.snap.1811151419.el7.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.2-1.019834.snap.1811151419.el7.noarch.rpm']"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 # Explicit additional packages to install if available: mlocate as a quick file searcher, omping as mulitcast checker
-export YUM_EXPLICIT_PACKAGES="['mlocate','omping','firewalld']"
+export YUM_EXPLICIT_PACKAGES="['mlocate','omping','firewalld','iptables-services']"
 # Mandatory services to be started
 export MANDATORY_SERVICES="['firewalld']"
+# Patched files as a dictionnary of files in MSE_ISO_URL or cache and their destination
+export PATCHED_FILES='{"uspm-nfv-setup.sh": "/opt/OC/sbin/uspm-nfv-setup.sh"}'
 
 # MSE product on CentOS 6
 #########################
@@ -62,6 +64,10 @@ export MSE_LABDROPS="['xerces-c-2.8.0-3.ocek.el6.x86_64.rpm','hpoc-uspm-nfv-comm
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 # Explicit additional packages to install if available: mlocate as a quick file searcher, omping as mulitcast checker
 export YUM_EXPLICIT_PACKAGES="['mlocate','omping']"
+# Mandatory services to be started
+export MANDATORY_SERVICES="[]"
+# Patched files as a dictionnary of files in MSE_ISO_URL or cache and their destination
+export PATCHED_FILES='{}'
 
 # OpenStack Infrastructure
 ##########################
