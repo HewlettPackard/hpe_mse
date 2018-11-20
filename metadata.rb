@@ -59,7 +59,7 @@ export MSE_ENGINE='ClusterManager-3.1.1-4.019727.el6.iso'
 # List of ISO images delivering the MSE products
 export MSE_PRODUCT="['MSE-3.0.5.3-1.019861.el6.iso','SEE-4.1.6.3-2.017521.el6.iso','HPE-SMSC-2.1.0-1.000764.snap.el6.x86_64.iso','OpenCall-OCMP-4.4.8.bg013842.el6.x86_64.iso','USPM4212_Linux_RHEL6_3931.iso','OpenCall_OCCP_3.0.3_004177.el6.x86_64.iso']"
 # List of lab drops as an array of rpm packages
-export MSE_LABDROPS="['xerces-c-2.8.0-3.ocek.el6.x86_64.rpm','hpoc-uspm-nfv-common-4.2-12.004413.RP5.el6.noarch.rpm','hpoc-uspm-nfv-config-4.2-12.004413.RP5.el6.noarch.rpm','hpoc-uspm-nfv-ems-4.2-12.004413.RP5.el6.noarch.rpm','hpoc-nivr-nfv-3.1.2-1.019834.snap.1811091015.el6.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.2-1.019834.snap.1811091015.el6.noarch.rpm','hpoc-nfv-base-1.1.3-3.019736.snap.1810021659.el6.x86_64.rpm','hpoc-nfv-base-selinux-1.1.3-3.019736.snap.1810021659.el6.x86_64.rpm']"
+export MSE_LABDROPS="['hpoc-uspm-nfv-common-4.2-12.004413.RP5.el6.noarch.rpm','hpoc-uspm-nfv-config-4.2-12.004413.RP5.el6.noarch.rpm','hpoc-uspm-nfv-ems-4.2-12.004413.RP5.el6.noarch.rpm','hpoc-nivr-nfv-3.1.2-1.019834.snap.1811201105.el6.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.2-1.019834.snap.1811201105.el6.noarch.rpm','hpoc-nfv-base-1.1.3-3.019736.snap.1810021659.el6.x86_64.rpm','hpoc-nfv-base-selinux-1.1.3-3.019736.snap.1810021659.el6.x86_64.rpm']"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 # Explicit additional packages to install if available: mlocate as a quick file searcher, omping as mulitcast checker
