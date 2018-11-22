@@ -21,6 +21,9 @@ if !theNodeHostname
 end
 log "MSE node:"+theNode+" at ipAddress:"+theNodeIpAddress+" is named:"+theNodeHostname
 
+log "Enable root at the console prompt"
+execute "echo 'root:hwroot' | chpasswd"
+
 log "Enforce name resolution to *not* use myhostname in /etc/nsswitch.conf for getent"
 execute "sed -i -e 's%myhostname%%' /etc/nsswitch.conf"
 
@@ -93,18 +96,20 @@ bash 'getInstaller' do
   EOH
 end
 
-log "(optional) Create a yum version lock file for lab drops /etc/opt/OC/hpe-install-tas/versionlock.d/hpe-mse-nfv-999-versionlock.list"
-execute 'labdropsVersionlock' do
-  cwd  isoRepo
-  ignore_failure true
-  command 'find *.rpm -exec rpm -qp {} --qf "%{epoch}:%{name}-%{version}-%{release}.*\n" \; > /etc/opt/OC/hpe-install-tas/versionlock.d/hpe-mse-nfv-999-versionlock.list'
+log "Create a yum version lock file for lab drops"
+bash 'labdropsVersionLock' do
+  cwd isoRepo
+  code <<-EOH
+    test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas
+    find *.rpm -exec rpm -qp {} --qf '%{epoch}:%{name}-%{version}-%{release}.*\\n' \\; > /etc/opt/OC/hpe-install-${_theInstaller}/versionlock.d/hpe-mse-nfv-999-versionlock.list
+  EOH
 end
 
 log "Create a labdrops yum repository for rpm packages in #{isoRepo}"
 execute "createrepo --database #{isoRepo}"
-file '/etc/yum.repos.d/labdrop.repo' do
+file '/etc/yum.repos.d/labdrops.repo' do
   owner'root'
-  content "[labdrops]\nname=lab drops\nbaseurl=file://#{isoRepo}\nenabled=1"
+  content "[labdrops]\nname=lab drops\nbaseurl=file://#{isoRepo}\nenabled=1\ngpgcheck=0"
 end
 
 log "Upgrade with lab drops from #{isoRepo}"
