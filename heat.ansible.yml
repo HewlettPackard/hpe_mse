@@ -80,6 +80,9 @@
       uspm_descriptor_path: "{{uspm_descriptor | default('') }}"
       app_descriptor: "{{app_descriptor_value | default('') }}"
       app_descriptor_path: "{{app_descriptor | default('') }}"
+      patched_files: "{{ lookup('env','PATCHED_FILES') }}"
+      mandatory_services: "{{ lookup('env','MANDATORY_SERVICES') }}"
+      yum_explicit_packages: "{{ lookup('env','YUM_EXPLICIT_PACKAGES') }}"
 
 - name: configure the base instance(s)
   hosts: base
