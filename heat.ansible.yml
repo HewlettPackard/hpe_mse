@@ -6,7 +6,7 @@
   tasks:
   - name: create the Heat stack
     os_stack:
-      state: present
+      state: "{{the_state | default('present') }}"
       name: "{{the_stack | default('mse_stack') }}"
       template: "{{the_template | default('nivr-cluster-nfv.yaml') }}"
       parameters:
