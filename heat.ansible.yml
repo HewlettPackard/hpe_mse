@@ -9,7 +9,7 @@
       name: "{{the_stack | default('mse_stack') }}"
       template: "{{the_template | default('nivr-cluster-nfv.yaml') }}"
       parameters:
-        NetworkRoot: 192.168.111
+        NetworkRoot: "{{the_network | default('192.168.111') }}"
         Image: "{{ lookup('env','CLOUD_IMAGE') }}"
         key_name: "{{ lookup('env','CLOUD_SSH_KEY_PAIR') }}"
     register: mse_stack
