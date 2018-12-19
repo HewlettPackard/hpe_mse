@@ -60,13 +60,13 @@
 - name: Get the MSE engine ISO image {{engineIso}} from cache {{cacheIso}}
   copy:
     src: "{{cacheIso}}{{engineIso}}"
-    dest: "{{isoRepo}}{{engineIso}}"
+    dest: "{{isoRepo}}"
   when: cacheIso is defined
 
 - name: Get the MSE engine ISO image {{engineIso}} from remote {{isoUrl}}
   get_url:
     url: "{{isoUrl}}{{engineIso}}"
-    dest: "{{isoRepo}}{{engineIso}}"
+    dest: "{{isoRepo}}"
   notify: refresh MSE instance
   when: cacheIso is not defined
 
@@ -77,7 +77,7 @@
       _isoImage
   copy:
     src: "{{cacheIso}}{{_isoImage}}"
-    dest: "{{isoRepo}}{{_isoImage}}"
+    dest: "{{isoRepo}}"
   notify: refresh MSE instance
   when: cacheIso is defined
 
@@ -88,11 +88,12 @@
       _isoImage
   get_url:
     url: "{{isoUrl}}{{_isoImage}}"
-    dest: "{{isoRepo}}{{_isoImage}}"
+    dest: "{{isoRepo}}"
   when: cacheIso is not defined
 
-- name: Remove unused ISO images
+- name: Remove unused ISO images if they are defined with a relative path to MSE_ISO_URL {{isoUrl}}
   shell: ls {{isoRepo}}*.iso | grep -v -e {{ engineIso }} -e {{' -e '.join((mseProduct )) }} | xargs rm -f
+  when: "{{ isoUrl != '' }}"
 
 - name: Retrieve lab drops in {{isoRepo}} from cache {{cacheIso }}
   with_items: "{{mseLabDrops}}"
@@ -101,7 +102,7 @@
       _rpm
   copy:
     src: "{{cacheIso }}{{_rpm}}"
-    dest: "{{isoRepo}}{{_rpm}}"
+    dest: "{{isoRepo}}"
   notify: refresh MSE instance
   when: cacheIso is defined
 
@@ -112,18 +113,24 @@
       _rpm
   get_url:
     url: "{{isoUrl}}{{_rpm}}"
-    dest: "{{isoRepo}}{{_rpm}}"
+    dest: "{{isoRepo}}"
   notify: refresh MSE instance
   when: cacheIso is not defined
 
-- name: Get MSE engine installer install-tas.sh or install-cluster-manager.sh
+- name: Set the engine ISO image as a new variable _engineIso.stdout
+  shell: |
+    cd {{isoRepo}}
+    ls ClusterManager*.iso TAS*.iso 2> /dev/null || true
+  register: _engineIso
+
+- name: Get MSE engine installer install-tas.sh or install-cluster-manager.sh from {{isoRepo}}{{_engineIso.stdout}}
   with_items: ['cluster-manager','tas']
   loop_control:
     loop_var:
       _theInstaller
   ignore_errors: yes
   iso_extract:
-    image: "{{isoRepo}}{{engineIso}}"
+    image: "{{isoRepo}}{{_engineIso.stdout}}"
     dest: "{{isoRepo}}"
     files: "utils/install-{{_theInstaller}}.sh"
 
@@ -134,16 +141,18 @@
 - name: Install the MSE Automated Deployment engine
   shell: |
     cd {{isoRepo}} &&
-    test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas &&
-    ./install-${_theInstaller}.sh --yes --install hpe-install-${_theInstaller} --disableplugin=yum-plugin-versionlock --iso {{engineIso}} && 
-    ./install-${_theInstaller}.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='{{yumRepo}}' --iso {{engineIso}}
+    if test -f install-cluster-manager.sh ; then _theInstaller=cluster-manager && _theIso=ClusterManager*.iso  ; else _theInstaller=tas && _theIso=TAS*.iso ; fi 
+    ./install-${_theInstaller}.sh --yes --install hpe-install-${_theInstaller} --disableplugin=yum-plugin-versionlock --iso ${_theIso} && 
+    ./install-${_theInstaller}.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='{{yumRepo}}' --iso ${_theIso}
 
-- name: Create a labdrops yum repository for rpm packages in {{isoRepo}} 
+- name: Create a labdrops yum repository for rpm packages in {{isoRepo}} with labdrops {{mseLabDrops }}
   shell: |
+    if find {{isoRepo}}*.rpm 2> /dev/null ; then
     cd {{isoRepo}} &&
     test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas &&
     find {{isoRepo}}*.rpm -exec rpm -qp {} --qf '%{epoch}:%{name}-%{version}-%{release}.*\n' \; > /etc/yum/pluginconf.d/versionlock.list && /bin/cp -f /etc/yum/pluginconf.d/versionlock.list /etc/opt/OC/hpe-install-${_theInstaller}/versionlock.d/hpe-mse-nfv-999-versionlock.list &&
-    > /etc/yum/pluginconf.d/versionlock.list &&
+    > /etc/yum/pluginconf.d/versionlock.list
+    fi
     createrepo --database {{isoRepo}}
 
 - name: fill /etc/yum.repos.d/labdrops.repo file
@@ -159,8 +168,8 @@
 - name: Update with lab drops from {{isoRepo}}
   shell: |
     cd {{isoRepo}} &&
-    test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas &&
-    ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='{{yumRepo}}' --iso {{engineIso}}
+    if test -f install-cluster-manager.sh ; then _theInstaller=cluster-manager && _theIso=ClusterManager*.iso  ; else _theInstaller=tas && _theIso=TAS*.iso ; fi 
+    ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='{{yumRepo}}' --iso ${_theIso}
 
 - name: Update with patches from cache if any
   with_dict: "{{patched_files}}"
@@ -177,8 +186,8 @@
   loop_control:
     loop_var:
       _patch
-  copy:
-    src: "{{isoUrl}}{{_patch.key}}"
+  get_url:
+    url: "{{isoUrl}}{{_patch.key}}"
     dest: "{{_patch.value}}"
   when: cacheIso is not defined
 

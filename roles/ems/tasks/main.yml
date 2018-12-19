@@ -42,7 +42,15 @@
 - name: create the descriptor and wait for the consolidated status
   raw: |
     sleep 2m && 
-    until service nivr-nfv consolidated-status || (( $? > 127 )) ; do sleep 20s ; done && 
-    service nivr-nfv consolidated-status
+    until service nivr-nfv consolidated-status || (( $? > 127 )) ; do sleep 20s ; done 
+
+- name: fetch the consolidated status log file to test/nivr-nfv.log
+  fetch:
+    src: /var/log/nivr-nfv.log
+    dest: test/
+    flat: yes
+
+- name: return the actual consolidated status
+  raw: service nivr-nfv consolidated-status
 
 # (C) Copyright 2018 Hewlett Packard Enterprise Development LP.

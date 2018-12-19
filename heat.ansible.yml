@@ -1,10 +1,9 @@
 ---
-- name: create a TAS/MSE stack on Heat OpenStack
-  hosts: localhost
+- hosts: localhost
   gather_facts: false
 
   tasks:
-  - name: create the Heat stack
+  - name: bring the Heat stack {{the_stack | default('mse_stack') }} to the state {{the_state | default('present') }}
     os_stack:
       state: "{{the_state | default('present') }}"
       name: "{{the_stack | default('mse_stack') }}"
