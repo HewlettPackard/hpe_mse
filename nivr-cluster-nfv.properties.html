@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-11-16 Version 3.05</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-12-13 Version 3.08</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -105,6 +105,9 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2018-12-13 3.08	Messaging Framework: support for multiple sites and new properties: single routing table, automatic disaster recovery, routing networks"+
+	"\n2018-12-06 3.07	Redis standalone: support for multiple standalone instances, one per node playing a redis DB role while no Redis HA role is defined"+
+	"\n2018-11-28 3.06	SEE4: enable Oracle database for native applications TenantMP MCM ; RedisSentinel restricted to lazy and spare modes"+
 	"\n2018-11-16 3.05	Ansible playbook: add environment variables mandatory_services yum_explicit_packages patched_files"+
 	"\n2018-11-12 3.04	UCP/SMPP/TCAP providers: enable service component name definition, to override the default Messaging Framework service component name."+
 	"\n\t\tHeat stack: enable Ansible deployment by adding a new parameter to set the ssh key and exporting as outputs: the public nodes and the main and auxiliary descriptors"+
@@ -244,7 +247,7 @@ function compatibilityMatrix(){
 	
 	// Supported features
 	new compatibleFeature(featureMatrix, "SEE simplex",	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature(featureMatrix, "SEE cluster",	['SEE3.6', 'SEE3.7', 'SEE4'], "Cluster not available on SEE5 yet");
+	new compatibleFeature(featureMatrix, "SEE cluster",	['SEE3.6', 'SEE3.7', 'SEE4','SEE5']);
 	new compatibleFeature(featureMatrix, "Linux HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "USPM", 			['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "HTTP LB", 		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
@@ -257,12 +260,12 @@ function compatibilityMatrix(){
 	new compatibleFeature(featureMatrix, "Oracle simplex",	['SEE3.6', 'SEE3.7', 'SEE4']);
 	new compatibleFeature(featureMatrix, "Pgsql Simplex",	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "Pgsql HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature(featureMatrix, "Pgsql Static",	['SEE3.6', 'SEE3.7', 'SEE4'], "Cluster not available on SEE5 yet");
+	new compatibleFeature(featureMatrix, "Pgsql Static",	['SEE3.6', 'SEE3.7', 'SEE4','SEE5']);
 	new compatibleFeature(featureMatrix, "Redis simplex",	['SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "Redis HA",		['SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "Mongo",			['SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "Applications");
-	new compatibleFeature(featureMatrix, "ACM/TenantMP",	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5'], "emscli reports LOCKED_ENABLED state on SEE5");
+	new compatibleFeature(featureMatrix, "ACM/TenantMP",	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "WebRTC",			['SEE3.6', 'SEE3.7']);
 	new compatibleFeature(featureMatrix, "SMB apps",		['SEE3.6', 'SEE3.7']);
 	new compatibleFeature(featureMatrix, "Conferencing",	['SEE3.6'], "SIP stack discontinued with SEE 3.7");
@@ -306,7 +309,7 @@ function compatibilityMatrix(){
 	tr.appendChild(th);
 	devopsMatrix.matrix.appendChild(tr);
 	
-	new compatibleFeature(devopsMatrix, "Openstack",['Ansible'], "Single network interface. Tested only on CentOS 7 image");
+	new compatibleFeature(devopsMatrix, "Openstack",['Ansible'], "Deploy a full Heat stack or a set of instances on a single network. Tested on CentOS 6 and 7 images");
 	new compatibleFeature(devopsMatrix, "Azure",	['Chef'], "Single network interface. Tested on CentOS 6.10 and 7 images");
 	new compatibleFeature(devopsMatrix, "Aws",		['Chef', 'Ansible'], "Single network interface. Tested on CentOS 6 and 7 images");
 	new compatibleFeature(devopsMatrix, "VMWare");
@@ -442,7 +445,9 @@ var kpiRole = new uniqueRole("KPI GUI");
 var cStatusRole = new uniqueRole("Consolidated Status");
 var vipSipRole = new uniqueRole("SIP balancer virtual IP");
 var mysqlRole = new uniqueRole("mysql");
-var pgsqlRole = new uniqueRole("pgsql");
+var linuxHaPriRole = new uniqueRole("Linux HA Pri");
+var linuxHaSecRole = new uniqueRole("Linux HA Sec");
+var linuxHaQrmRole = new uniqueRole("Linux HA Qrm");
 var oracleRole = new uniqueRole("oracle");
 
 consistency.initSingle = function (){
@@ -456,7 +461,9 @@ consistency.initSingle = function (){
 	vipSipRole.init();
 	mysqlRole.init();
 	oracleRole.init();
-	pgsqlRole.init();
+	linuxHaPriRole.init();
+	linuxHaSecRole.init();
+	linuxHaQrmRole.init();
 }
 consistency.init = function (){
 	consistency.initSingle();
@@ -1062,7 +1069,7 @@ Nodes.help = function(){
 	"\nPgSQL HA: role of this node in an PostgreSQL HA cluster:"+
 	"\n\tprimary, secondary: the two nodes hosting a PgSQL Linux HA resource; the VIP associated to this resource is the node which dbrole is pgsql"+
 	"\n\tmaster: the static master node hosting the read/write PgSQL database, replicated on all nodes which dbrole is pgsql"+
-	"\nRedis HA role: two Redis HA implementations available:"+
+	"\nRedis HA role: three supported modes:"+
 	"\n- Linux HA based: one VIP is instantiated for each redis entry defined in DB role column."+
 	"\n\trequires Redis HA primary and secondary roles defined"+
 	"\n\tCo-location with SEE nodes *not* supported"+
@@ -1072,6 +1079,8 @@ Nodes.help = function(){
 	"\n\tAlternatively, Redis instances can be defined in the RedisInstance section."+
 	"\n\tCo-location with SEE nodes is supported"+
 	"\n\tA valid cluster requires a minimum of 3 sentinels."+
+	"\n- Standalone (no HA): "+
+	"\n\tIf the Redis HA role is left blank on a node playing a redis DB role, one standalone redis instance is setup up this node"+
 	"\nUSPM role: role of this node in an USPM cluster: primary, secondary, backend, simulap"+
 	"\n\tNOTE for Simulap: The simulap node is defined only on the management network in the MSE Descriptor."+
 	"\n\tAddresses on other interfaces are guessed at run time from the network configuration"+
@@ -1193,7 +1202,7 @@ Nodes.build = function(target, engine){
 	var sipGroups;
 	var pgsqlNodeName = new Array(nbVNFC);
 	var pgsqlNodeIp = new Array(nbVNFC);
-	var isRedisSentinel = new Array(nbVNFC);
+	var REDIS_HA_MODE;
 	var cloudNodes = new Array();
 	
 	result += "\n# ------------------------------- #";
@@ -1322,12 +1331,23 @@ Nodes.build = function(target, engine){
 		Nodes.check += vipSipRole.setIfNotOrAlert(sipLbRole == 'VIP');
 		Nodes.check += mysqlRole.setIfNotOrAlert(dbRole == 'mysql');
 		Nodes.check += oracleRole.setIfNotOrAlert(dbRole == 'oracle');
-		Nodes.check += checkDependency(pgsqlHaRole == 'Mstr', [dbRole == 'pgsql'], nodeName + ": PgSQL HA Master role requires a pgsql DB role, not ", dbRole+".");
-		Nodes.check += checkDependency(pgsqlHaRole == 'Pri' || pgsqlHaRole == 'Sec', [dbRole == ''], nodeName + ": PgSQL HA "+pgsqlHaRole+" role is incompatible with dbrole ", dbRole);
-		Nodes.check += checkDependency(pgsqlHaRole == 'Pri' || pgsqlHaRole == 'Sec', [Nodes.count('DB role', 'pgsql') > 0], nodeName + ": PgSQL HA "+pgsqlHaRole+" role requires one VIP: ", "missing a pgsql role in DB role");
-		Nodes.check += checkDependency(pgsqlHaRole == 'Pri' || pgsqlHaRole == 'Sec', [Nodes.count('PgSQL HA', 'Mstr') == 0], nodeName + ": PgSQL HA "+pgsqlHaRole+" role is incompatible with ", "a Pgsql HA Master role");
+		Nodes.check += checkDependency(pgsqlHaRole == 'Mstr', [dbRole == 'pgsql'], "Nodes: "+nodeName + ": PgSQL HA Master role requires a pgsql DB role, not ", dbRole+".");
+		Nodes.check += checkDependency(pgsqlHaRole == 'Pri' || pgsqlHaRole == 'Sec', [dbRole == ''], "Nodes: "+nodeName + ": PgSQL HA "+pgsqlHaRole+" role is incompatible with dbrole ", dbRole);
+		Nodes.check += checkDependency(pgsqlHaRole == 'Pri' || pgsqlHaRole == 'Sec', [Nodes.count('DB role', 'pgsql') > 0], "Nodes: "+nodeName + ": PgSQL HA "+pgsqlHaRole+" role requires one VIP: ", "missing a pgsql role in DB role");
+		Nodes.check += checkDependency(pgsqlHaRole == 'Pri' || pgsqlHaRole == 'Sec', [Nodes.count('PgSQL HA', 'Mstr') == 0], "Nodes: "+nodeName + ": PgSQL HA "+pgsqlHaRole+" role is incompatible with ", "a Pgsql HA Master role");
 		Nodes.check += checkDependency(pgsqlHaRole == 'Pri', [Nodes.count('PgSQL HA', 'Sec') == 1], nodeName + ": PgSQL HA Primary role requires one and only one Secondary role: ", "found "+Nodes.count('PgSQL HA', 'Sec'));
-		Nodes.check += checkDependency(dbRole == 'pgsql', [Nodes.count('DB role', 'pgsql') < 2, seeRole != "" && seeRole != "Wit"], nodeName + ": PgSQL replicating node must be co-located with an SEE node, not ", seeRole+".");
+		Nodes.check += checkDependency(dbRole == 'pgsql', [Nodes.count('DB role', 'pgsql') < 2, seeRole != "" && seeRole != "Wit"], "Nodes: "+nodeName + ": PgSQL replicating node must be co-located with an SEE node, not ", seeRole+".");
+		Nodes.check += linuxHaPriRole.setIfNotOrAlert(linuxHaRole == 'Pri');
+		Nodes.check += linuxHaSecRole.setIfNotOrAlert(linuxHaRole == 'Sec');
+		Nodes.check += linuxHaQrmRole.setIfNotOrAlert(linuxHaRole == 'Qrm');
+		Nodes.check += checkDependency(linuxHaRole == 'Pri', [Nodes.count('Linux HA role', 'Sec') > 0], "Nodes: "+nodeName + ": Linux HA "+linuxHaRole+" role requires one secondary: ", "missing a Sec role in Linux HA role");
+		Nodes.check += checkDependency(linuxHaRole == 'Pri', [Nodes.count('Linux HA role', 'Qrm') > 0], "Nodes: "+nodeName + ": Linux HA "+linuxHaRole+" role requires one quorum: ", "missing a Qrm role in Linux HA role");
+		Nodes.check += checkDependency(linuxHaRole == 'Sec', [Nodes.count('Linux HA role', 'Pri') > 0], "Nodes: "+nodeName + ": Linux HA "+linuxHaRole+" role requires one primary: ", "missing a Pri role in Linux HA role");
+		Nodes.check += checkDependency(linuxHaRole == 'Qrm', [Nodes.count('Linux HA role', 'Pri') > 0], "Nodes: "+nodeName + ": Linux HA "+linuxHaRole+" role requires one primary: ", "missing a Pri role in Linux HA role");
+		Nodes.check += checkDependency(redisHaRole == 'Pri', [linuxHaRole == 'Pri'],"Nodes: "+nodeName + " on " + VNFdisplayName + ": Redis HA role ", redisHaRole+" requires Linux HA role Primary");
+		Nodes.check += checkDependency(redisHaRole == 'Sec', [linuxHaRole == 'Sec'],"Nodes: "+nodeName + " on " + VNFdisplayName + ": Redis HA role ", redisHaRole+" requires Linux HA role Secondary");
+		Nodes.check += checkDependency(redisHaRole == 'Pri', [Nodes.count('Redis HA', 'Sec') > 0], "Nodes: "+nodeName + ": Redis HA "+redisHaRole+" role requires one secondary: ", "missing a Sec role in Redis HA");
+		Nodes.check += checkDependency(redisHaRole == 'Sec', [Nodes.count('Redis HA', 'Pri') > 0], "Nodes: "+nodeName + ": Redis HA "+redisHaRole+" role requires one primary: ", "missing a Pri role in Redis HA");
 		Nodes.check += emsRole.setIfNotOrAlert(isEms);
 		Nodes.check += emsOcmpRole.setIfNotOrAlert(isOcmpEms);
 		Nodes.check += emsOcsnfRole.setIfNotOrAlert(isOcsnfEms);
@@ -1509,19 +1529,24 @@ Nodes.build = function(target, engine){
 		}
 		switch(redisHaRole){
 			case 'Pri': 
+				Nodes.check += checkDependency(REDIS_HA_MODE != undefined, [REDIS_HA_MODE == 'linuxha'], "Nodes section: "+nodeName, " with Redis HA role "+redisHaRole+" is not compatible with the Redis HA mode "+REDIS_HA_MODE+"; Sentinel and Linux HA modes are mutually exclusive");
+				REDIS_HA_MODE = 'linuxha';
 				result += "\n\n# Redis HA primary node";
 				result += getNameIpAddr("REDIS_PRIMARY", "", nodeName, nodeIpAddr);
 				result += getNameIpAddr("REDIS_PRIMARY", "_HA_DEVICE", nodeHaName, nodeHaIpAddr);
 				break;
 			case 'Sec': 
+				Nodes.check += checkDependency(REDIS_HA_MODE != undefined, [REDIS_HA_MODE == 'linuxha'], "Nodes section: "+nodeName, " with Redis HA role "+redisHaRole+" is not compatible with the Redis HA mode "+REDIS_HA_MODE+"; Sentinel and Linux HA modes are mutually exclusive");
+				REDIS_HA_MODE = 'linuxha';
 				result += "\n\n# Redis HA secondary node";
 				result += getNameIpAddr("REDIS_SECONDARY", "", nodeName, nodeIpAddr);
 				result += getNameIpAddr("REDIS_SECONDARY", "_HA_DEVICE", nodeHaName, nodeHaIpAddr);
 				break;
 			case 'ServerSentinel':
+				Nodes.check += checkDependency(REDIS_HA_MODE != undefined, [REDIS_HA_MODE == 'sentinel'], "Nodes section: "+nodeName, " with Redis HA role "+redisHaRole+" is not compatible with the Redis HA mode "+REDIS_HA_MODE+"; Sentinel and Linux HA modes are mutually exclusive");
+				REDIS_HA_MODE = 'sentinel';
 				REDIS_HOST['MGMT'].push(nodeName);
 				REDIS_IP_ADDR['MGMT'].push(nodeIpAddr);
-				isRedisSentinel[VNFCindex] = true;
 				if(!checkRedisNetworkConsistency())break;
 				if(nodeHaName != "")REDIS_HOST['HA'].push(nodeHaName);
 				if(nodeHaIpAddr != "")REDIS_IP_ADDR['HA'].push(nodeHaIpAddr);
@@ -1529,10 +1554,11 @@ Nodes.build = function(target, engine){
 				if(nodeAppIpAddr != "")REDIS_IP_ADDR['APP'].push(nodeAppIpAddr);
 				break;
 			case 'Sentinel':
+				Nodes.check += checkDependency(REDIS_HA_MODE != undefined, [REDIS_HA_MODE == 'sentinel'], "Nodes section: "+nodeName, " with Redis HA role "+redisHaRole+" is not compatible with the Redis HA mode "+REDIS_HA_MODE+"; Sentinel and Linux HA modes are mutually exclusive");
+				REDIS_HA_MODE = 'sentinel';
 				// all redis instances are to be concatenated in one vector
 				REDIS_SENTINEL['MGMT'].push(nodeName);
 				REDIS_SENTINEL_IP_ADDR['MGMT'].push(nodeIpAddr);
-				isRedisSentinel[VNFCindex] = true;
 				if(!checkRedisNetworkConsistency())break;
 				if(nodeHaName != "")REDIS_SENTINEL['HA'].push(nodeHaName);
 				if(nodeHaIpAddr != "")REDIS_SENTINEL_IP_ADDR['HA'].push(nodeHaIpAddr);
@@ -1618,6 +1644,7 @@ Nodes.build = function(target, engine){
 					if(i > 1)Nodes.check += "\nNodes: "+nodeName + " useless Redis DB port number: " + e + "; max 2 ports expected: redis and sentinel";
 				});
 				if(redisPorts[0].trim() == "")redisPorts[0] = undefined;
+				Nodes.check += checkDependency(redisPorts[1] != undefined, [dbRole == 'redisSpare', dbRole == 'redisLazy' ], "Nodes section: "+nodeName, " has a sentinel port "+redisPorts[1]+" not supported with a DB role "+dbRole+"; Sentinel requires a redisSpare or redisLazy mode");
 				REDIS_PORT.push(redisPorts[0]);
 				REDIS_SENTINEL_PORT.push(redisPorts[1]);
 				if(!checkRedisNetworkConsistency())break;
@@ -1846,6 +1873,9 @@ Nodes.build = function(target, engine){
 	// Build redis cluster
 	if(REDIS_HOST['MGMT'].length != 0){
 		result += "\n\n# Redis cluster";
+		// Default HA mode: standalone
+		if(REDIS_HA_MODE == undefined)REDIS_HA_MODE = 'standalone';
+		result += "\nREDIS_HA_MODE=" + REDIS_HA_MODE;
 		if(REDIS_INSTANCE_ID.length != 0)result += "\nREDIS_INSTANCE_ID=(" + REDIS_INSTANCE_ID.join(" ") + " )";
 		result += "\nREDIS_HOST=(" + REDIS_HOST['MGMT'].join(" ") + " )";
 		result += "\nREDIS_IP_ADDR=(" + REDIS_IP_ADDR['MGMT'].join(" ") + " )";
@@ -2068,7 +2098,7 @@ Nodes.build = function(target, engine){
 	Nodes.pgsqlNodeIp = pgsqlNodeIp.slice();
 	
 	// Same for Redis sentinel mode, used by Redis Sentinel instances section
-	Nodes.isRedisSentinel = isRedisSentinel.slice();
+	Nodes.REDIS_HA_MODE = REDIS_HA_MODE;
 	
 	// local check
 	if(Nodes.check != "")result = Nodes.check;
@@ -2279,7 +2309,7 @@ Misc.help = function(){
 	"\n\nAPP_CONFIG_DATA_FILE: " +MiscComment.APP_CONFIG_DATA_FILE+
 	"\n\tFor OpenStack deployments, click the button 'Import APPs descriptor' to push a local descriptor to the target."+
 	"\n\nDefault gateways:" +
-	"\n\tNOTE: declaration is mandatory on OpenStack deployments using multiple network interfaces to enable remote access; use a quetion mark ? to let the infrastructure set the appropriate address." +
+	"\n\tNOTE: declaration is mandatory on OpenStack deployments using multiple network interfaces to enable remote access; use a question mark ? to let the infrastructure set the appropriate address." +
 	"\n\tDEFAULT_GATEWAY_IP_ADDR: Default gateway IP address: useful for topologies using multiple interfaces to set the gateway on the interface offering a public access" +
 	"\n\tSIP_DEFAULT_GATEWAY_IP_ADDR: Default gateway IP address used on nodes connected to a public SIP/RTP network: useful to enable SIP calls from an external public network" +
 	"\n\nDatabase for MSE applications" +
@@ -2448,7 +2478,7 @@ RedisInstance.build = function(target){
 		var VNFCindex = VNFCnames.indexOf(VNFCName);
 		if(VNFCindex < 0){ RedisInstance.check += "\nRedisInstance section: "+VNFdisplayName+" is undefined in the nodes table"; continue; }
 		
-		if(Nodes.isRedisSentinel == undefined || Nodes.isRedisSentinel[VNFCindex] == undefined || ! Nodes.isRedisSentinel[VNFCindex] ){ 
+		if(Nodes.REDIS_HA_MODE == undefined || Nodes.REDIS_HA_MODE != 'sentinel'){ 
 			RedisInstance.check += "\nRedisInstance section: "+VNFdisplayName+" has no Redis Sentinel cluster defined in the nodes section"; 
 			continue;
 		}
@@ -2459,6 +2489,7 @@ RedisInstance.build = function(target){
 		var spare = (mode == 'redisSpare' || mode == 'redisLazy' ? 'true' : 'false');
 		var instancePort=RedisInstance.getAndSetValue(table.rows[i], nameIndexes, 'Instance Port');
 		var sentinelPort=RedisInstance.getAndSetValue(table.rows[i], nameIndexes, 'Sentinel Port');
+		RedisInstance.check += checkDependency(sentinelPort != "", [spare == "true"], "RedisInstance section: "+VNFdisplayName, " has a sentinel port "+sentinelPort+" not supported with a mode "+mode+"; Sentinel requires a redisSpare or redisLazy mode");
 		
 		if(name == ""){RedisInstance.check += '\nRedisInstance section: instance name cannot be blank'; continue; }
 		if(names[VNFCindex] == undefined)names[VNFCindex] = new Array();
@@ -2756,10 +2787,10 @@ var MessagingFramework = new vnfResource("MessagingFramework", [
 		'ARCHIVER_URL', 'MCIF_URL', 'RCIF_URL', 
 		'QMCIF_URL', 'MSC_SSN', 'HLR_SSN',
 		'ADDRESSES',
-		'SITE_ID',
+		'SITE_ID', 'SINGLE_ROUTING_TABLE', 'ROUTING_NETWORKS', 'AUTOMATIC_DISASTER_RECOVERY',
 		'APPLICATION','APPLICATION_DIAMETER_PROVIDER', 'TESTER', 'ROLE'], 
 		width:'250px'},
-	{name:'Value', type:'text', width:'600px'}
+	{name:'Value', type:'text', width:'900px'}
 	]
 	);
 
@@ -2775,6 +2806,8 @@ MessagingFrameworkDefault.ROUTING_URL="redis://${NIVRDB_LINUXHA_PASSWORD}@${REDI
 MessagingFrameworkDefault.FRONTEND_CACHE_URL="redis://${NIVRDB_LINUXHA_PASSWORD}@${REDIS_IP_ADDR}:${REDIS_PORT}";
 MessagingFrameworkDefault.ARCHIVER_URL="mongodb://${MONGODB_HOST}:${MONGODB_PORT}/smsc?ssl=false";
 MessagingFrameworkDefault.ADDRESSES="gtssn:0688888888.149,gt:12345678,gtssn:0672990000.150";
+MessagingFrameworkDefault.SINGLE_ROUTING_TABLE='false';
+MessagingFrameworkDefault.AUTOMATIC_DISASTER_RECOVERY='false';
 
 MessagingFramework.help = function(){
 	return "Messaging Framework properties:"
@@ -2791,20 +2824,26 @@ MessagingFramework.help = function(){
 	+ "\n\t1.	Mandatory: missing such a parameter prevents building the descriptor and stops the deployment immediately"
 	+ "\n\t2.	Required: missing such a parameter triggers a default value being sent to Messaging Framework"
 	+ "\n\t3.	Optional: no value sent to Messaging Framework, "
+	+ "\n\tSome properties are specific to each site and can be provided as a list of space separated values; they are prefixed by (list) here below."
 	+ "\nMandatory properties:"
 	+ "\n CONFIGURE_URL: URL of Redis Configuration Repository instance"
 	+ "\n\teg: redis://[password@]host[:port] or redis-sentinel://[password@]host[:port][,host2[:port2]][/databaseNumber]#sentinelMasterId"
-	+ "\n STORE_URL: URL of Redis Message Store instance - eg: redis://[password@]host[:port] or redis-sentinel://[password@]host[:port][,host2[:port2]][/databaseNumber]#sentinelMasterId"
-	+ "\n QUEUE_URL: URL of Redis Message Queue instance - eg: redis://[password@]host[:port] "
-	+ "\n ROUTING_URL: URL of Redis Routing Table instance - eg: redis://[password@]host[:port] or redis-sentinel://[password@]host[:port][,host2[:port2]][/databaseNumber]#sentinelMasterId"
+	+ "\n STORE_URL: (list) URL of Redis Message Store instance - eg: redis://[password@]host[:port] or redis-sentinel://[password@]host[:port][,host2[:port2]][/databaseNumber]#sentinelMasterId"
+	+ "\n QUEUE_URL: (list) URL of Redis Message Queue instance - eg: redis://[password@]host[:port] "
+	+ "\n ROUTING_URL: (list) URL of Redis Routing Table instance - eg: redis://[password@]host[:port] or redis-sentinel://[password@]host[:port][,host2[:port2]][/databaseNumber]#sentinelMasterId"
 	+ "\nRequired properties:"
-	+ "\n SITE_ID: default: $(hostname -d)"
+	+ "\n SITE_ID: (list) list of space separated sites Ids, default: $(hostname -d)"
 	+ "\n ARCHIVER_URL: URL of MongoDB Message History; required if a mongo role is defined in the nodes list, default: mongodb://${MONGODB_HOST}:${MONGODB_PORT}/smsc?ssl=false"
 	+ "\n MSC_SSN: Default subsystem number for reaching MSCs; default: 10"
 	+ "\n HLR_SSN: Default subsystem number for reaching HLRs; default: 10"
 	+ "\n MCIF_URL: URL of Orchestration Application for processing MCIF sessions; required on backend nodes, default:<empty>"
 	+ "\n RCIF_URL: URL of Orchestration Application for processing RCIF sessions; required on backend nodes, default:<empty>"
 	+ "\n QMCIF_URL: URL of Orchestration Application for processing MCIF Query sessions; required on backend nodes, default:<empty>"
+	+ "\n ROUTING_NETWORKS: (list) list of comma separated Redis routing table instances - IP addresses or subnets - deployed on each site, default: <empty>"
+	+ "\n\tExample for 3 sites with 2 routing table instances for the first and second sites, and a subnet for the third:"
+	+ "\n\t192.168.66.100,192.168.66.111 192.168.66.102,192.168.66.112 192.168.66.103,192.168.66.113 192.168.66.0/24"
+	+ "\n SINGLE_ROUTING_TABLE: true|false: in a Multi-Zones deployment model when traffic is distributed across two sites, defines whether a single cross-site Routing Table master is used, default: false."
+	+ "\n AUTOMATIC_DISASTER_RECOVERY: true|false: in a Multi-Zones deployment model when traffic is distributed across two sites, defines whether automatic failover procedure is active or not, default: false."
 	+ "\n ROLE: define the Messaging Framework role to MONOLITHIC or FRONTEND or BACKEND or HYBRID"
 	+ "\n\tInferred default role: if UCP or SMPP provider is defined, or TCAP and the node is a USPM backend, the node is a Messaging Framework FRONTEND (MONOLITHIC if simplex)"
 	+ "\n\tOtherwise the node is a Messaging Framework BACKEND." 
@@ -2820,7 +2859,7 @@ MessagingFramework.help = function(){
 	+ "\n\t- to apply a specific role setting to the hosts named see.bmh.domain and see.hmb.domain, and keep the inferred role otherwise:" 
 	+ '\n\t  $(case $(hostname) in see.bmh.domain)  echo BACKEND MONOLITHIC HYBRID ;; see.hmb.domain) echo HYBRID MONOLITHIC HYBRID ;; *) ;; esac)'
 	+ "\nOptional properties:"
-	+ "\n FRONTEND_CACHE_URL: URL of Redis Front End Cache instance; implies enableQuotaCorrection:true"
+	+ "\n FRONTEND_CACHE_URL: (list) URL of Redis Front End Cache instance; implies enableQuotaCorrection:true"
 	+ "\n\teg: redis-sentinel://[password@]host[:port][,host2[:port2]][/databaseNumber]#sentinelMasterId"
 	+ "\n ADDRESSES: Listening Addresses, as a list of comma separated addresses"
 	;
@@ -2847,6 +2886,7 @@ MessagingFramework.build = function(){
 		if(!MessagingFramework.search('Property', 'STORE_URL'))MessagingFramework.check += "\nMessaging Framework: STORE_URL is required";
 		if(!MessagingFramework.search('Property', 'QUEUE_URL'))MessagingFramework.check += "\nMessaging Framework: QUEUE_URL is required";
 		if(!MessagingFramework.search('Property', 'ROUTING_URL'))MessagingFramework.check += "\nMessaging Framework: ROUTING_URL is required";
+		MessagingFramework.check+=checkDependency(MessagingFramework.search('Property', 'SINGLE_ROUTING_TABLE'), [MessagingFramework.search('Property','ROUTING_NETWORKS')], 'Messaging Framework SINGLE_ROUTING_TABLE setting', ' requires ROUTING_NETWORKS definition');
 	} else {
 		if(rowCount > 1)MessagingFramework.check += "\nMessaging Framework: SERVICE_COMPONENT_NAME is required";
 	}
@@ -2864,10 +2904,21 @@ MessagingFramework.build = function(){
 				if(SEEliteService.types != undefined && SEEliteService.types[iSeeLiteMsgFwk] != undefined && SEEliteService.types[iSeeLiteMsgFwk] != "")result += '\nMESSAGING_FRAMEWORK_APPLICATION_TYPE="'+SEEliteService.types[iSeeLiteMsgFwk]+'"';
 			}
 		}
-		if(propertyName == 'ROLE'){
-			// This can be a vector, with embedded scripted logic: protect with single quotes and add parentheses
-			result += "\nMESSAGING_FRAMEWORK_ROLE=( "+propertyValue+" )";
-		} else result += '\nMESSAGING_FRAMEWORK_'+propertyName+'="'+propertyValue+'"';
+		// Set the property as a string or a vector, single quoted or not
+		switch(propertyName){
+			case 'ROLE':
+				// can be a vector, with embedded scripted logic: just add parentheses, free of single quotes to let the shell expansion happen
+				result += "\nMESSAGING_FRAMEWORK_ROLE=( "+propertyValue+" )";
+				break;
+			case 'STORE_URL': case 'QUEUE_URL': case 'ROUTING_URL': case 'SITE_ID': case 'ROUTING_NETWORKS': case 'FRONTEND_CACHE_URL': 
+				// can be a vector of values: double quote each property value and add parenthesis
+				result += '\nMESSAGING_FRAMEWORK_'+propertyName+'=( "'+propertyValue.split(/\s+/).join('" "')+'" )'; 
+				break
+			default:
+				// no vector: double quote the property value
+				result += '\nMESSAGING_FRAMEWORK_'+propertyName+'="'+propertyValue+'"'; 
+				break
+		}
 	}
 
 	if(MessagingFramework.check != "")result = MessagingFramework.check;
@@ -5569,7 +5620,7 @@ SOAPWebService.build = function(){
 		var WSDLURL=SOAPWebService.getAndSetValue(row, nameIndexes, 'WSDL URL suffix', 'http://myserviceprovider.com:10090/wsdl-url-suffix');
 		var serviceURL=SOAPWebService.getAndSetValue(row, nameIndexes, 'Service URL suffix', 'http://myserviceprovider.com:10090/wsdl-service-url-suffix');
 		// Use the first defined Security policy as the default value for all servers, or nothing
-		var securityPolicy=SOAPWebService.getAndSetValue(row, nameIndexes, 'Security policy', (SOAPsecurity.names != undefined && SOAPsecurity.names[VNFCindex].length > 0) ? SOAPsecurity.names[VNFCindex][0] : '', 'Recommended security policy');
+		var securityPolicy=SOAPWebService.getAndSetValue(row, nameIndexes, 'Security policy', (SOAPsecurity.names != undefined && SOAPsecurity.names[VNFCindex] != undefined && SOAPsecurity.names[VNFCindex].length > 0) ? SOAPsecurity.names[VNFCindex][0] : '', 'Recommended security policy');
 		var probeURL=SOAPWebService.getAndSetValue(row, nameIndexes, 'Probe URL timeout');
 		var retryURL=SOAPWebService.getAndSetValue(row, nameIndexes, 'Retry URL timeout');
 		var includeHeader=SOAPWebService.getAndSetSelection(row, nameIndexes, 'Include header', 1);
@@ -5621,7 +5672,7 @@ SOAPWebService.build = function(){
 		}
 		if(securityPolicy != ""){
 			// Check that this policy is defined 
-			if(SOAPsecurity.names ==  undefined || SOAPsecurity.names[VNFCindex].indexOf(securityPolicy) < 0)SOAPWebService.check += "\nSOAPWebService "+name+": security policy "+securityPolicy+" is undefined in the SOAPsecurity table for "+VNFdisplayName;
+			if(SOAPsecurity.names ==  undefined || SOAPsecurity.names[VNFCindex] ==  undefined || SOAPsecurity.names[VNFCindex].indexOf(securityPolicy) < 0)SOAPWebService.check += "\nSOAPWebService "+name+": security policy "+securityPolicy+" is undefined in the SOAPsecurity table for "+VNFdisplayName;
 			if(securityPolicies[VNFCindex] == undefined)securityPolicies[VNFCindex] = new Array();
 			securityPolicies[VNFCindex][nameIndex]=securityPolicy;
 		}
@@ -6573,10 +6624,11 @@ function buildVNFDescriptor(target, engine){
 	desc += "\nXMLRPC_SERVICE=()";
 	desc += "\nXMLRPC_SERVER_ADDR=()";
 	desc += "\nelse";
-	desc += "\n# NIVR native applications supported only on PostgreSQL database without WebRTC on SEE > 3";
-	desc += "\nACTIVATE_APPLI_NIVR=$([[ $WEBRTC_SIGNALING_IP_ADDR == '' ]] && [[ $NIVR_DB_TYPE == 'pgsql' ]] && echo $ACTIVATE_APPLI_NIVR || echo no)";
+	desc += "\n# SEE > 3: NIVR native applications supported only without WebRTC ; no Reporting System";
+	desc += "\nACTIVATE_APPLI_NIVR=$([[ $WEBRTC_SIGNALING_IP_ADDR == '' ]] && echo $ACTIVATE_APPLI_NIVR || echo no)";
 	desc += "\nACTIVATE_APPLI_CAASIVR=no";
 	desc += "\nACTIVATE_OCCP_SNTS=no";
+	desc += "\nRS_DB_TYPE='-'"
 	desc += "\nfi";
 	desc += "\n";
 	desc += "\n"+endOfDescriptor;

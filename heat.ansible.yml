@@ -101,6 +101,7 @@
     yumRepo: "{{ lookup('env','MSE_YUM_REPO') }}"
     sshKeysUrl: "{{ lookup('env','MSE_SSH_KEYS_URL') }}"
     nameserver: "{{ lookup('env','CLOUD_NAMESERVER') }}"
+    osSignature: "{{ lookup('env','CLOUD_OS_SIGNATURE') }}"
     mseLabDrops: "{{ lookup('env','MSE_LABDROPS') }}"
     # From the inventory
     theNode: "{{hostvars[inventory_hostname]['nick_name']}}"

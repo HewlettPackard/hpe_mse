@@ -26,6 +26,12 @@
   hostname: 
     name: "{{theNodeHostname}}"
 
+- name: Set OS signature {{osSignature}} in redhat-release
+  copy:
+    dest: /etc/redhat-release
+    content: "{{osSignature}}"
+  when: osSignature != ''
+
 - name: Enforce name resolution to *not* use myhostname in /etc/nsswitch.conf for getent
   replace:
     dest=/etc/nsswitch.conf
@@ -93,7 +99,7 @@
 
 - name: Remove unused ISO images if they are defined with a relative path to MSE_ISO_URL {{isoUrl}}
   shell: ls {{isoRepo}}*.iso | grep -v -e {{ engineIso }} -e {{' -e '.join((mseProduct )) }} | xargs rm -f
-  when: "{{ isoUrl != '' }}"
+  when: isoUrl != ''
 
 - name: Retrieve lab drops in {{isoRepo}} from cache {{cacheIso }}
   with_items: "{{mseLabDrops}}"
@@ -120,7 +126,7 @@
 - name: Set the engine ISO image as a new variable _engineIso.stdout
   shell: |
     cd {{isoRepo}}
-    ls ClusterManager*.iso TAS*.iso 2> /dev/null || true
+    ls ClusterManager*.iso 2> /dev/null || ls TAS*.iso 2> /dev/null || true
   register: _engineIso
 
 - name: Get MSE engine installer install-tas.sh or install-cluster-manager.sh from {{isoRepo}}{{_engineIso.stdout}}
