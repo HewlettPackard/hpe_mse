@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2018-12-13 Version 3.08</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-01-03 Version 3.1</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -31,14 +31,19 @@
 <td valign="top">Build the MSE Descriptor</td><td valign="top"><input class="buildButton" type="button" value="Build" onclick="buildVNFDescriptor()"></td>
 <td valign="top">Save the current session</td><td valign="top"><input class="helpButton" type="button" value="Save" onclick="saveSession()"></td>
 </tr><tr>
-<td valign="top">Build the MSE Heat template</td>
-<td valign="top"><input class="buildButton" type="button" value="Deploy" onclick="buildHeatTemplate()"> Volumes
+<td valign="top">Build the 
+<select id="deployer">
+<option name="Heat" selected>Heat</option>
+<option name="Tosca">Tosca</option>
+</select>
+template</td>
+<td valign="top"><input class="buildButton" type="button" value="Deploy" onclick="deploy()"> Volumes
 <select id="useHeatVolumes">
 <option name="none" selected>none</option>
 <option name="image">from image</option>
 <option name="volume">from master</option>
 </select>
-<input class="helpButton" type="button" value="Help" onclick="HeatDeploymentHelp()">
+<input class="helpButton" type="button" value="Help" onclick="deploymentHelp()">
 </td> 
 <td valign="top">Review USPM descriptor</td><td valign="top"><input class="helpButton" type="button" value="Review" onclick="viewUspmAuxDescInput()"></td>
 <td valign="top">Review APPs descriptor</td><td valign="top"><input class="helpButton" type="button" value="Review" onclick="viewAppAuxDescInput()"></td>
@@ -105,6 +110,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-01-03 3.1	Orchestration: support Tosca output for normalized orchestration"+
 	"\n2018-12-13 3.08	Messaging Framework: support for multiple sites and new properties: single routing table, automatic disaster recovery, routing networks"+
 	"\n2018-12-06 3.07	Redis standalone: support for multiple standalone instances, one per node playing a redis DB role while no Redis HA role is defined"+
 	"\n2018-11-28 3.06	SEE4: enable Oracle database for native applications TenantMP MCM ; RedisSentinel restricted to lazy and spare modes"+
@@ -2422,6 +2428,10 @@ Misc.build = function(target){
 		result += "\nORACLE_SERVICE="+oracleRole.service;
 		result += "\nNIVRDB_ORACLE_PATH="+oracleRole.path;
 	}
+	// Ensure consistency between auxiliary descriptors and their relative paths definitions
+	Misc.check += checkGroupConsistency([Misc.heatAppAuxDescPath != undefined && Misc.heatAppAuxDescPath != '', Misc.heatAppAuxDesc != undefined && Misc.heatAppAuxDesc != ''], 'Misc section vs descriptor import: APPs descriptor path APP_CONFIG_DATA_FILE and imported content consistency:',' both or none should be defined.');
+	Misc.check += checkGroupConsistency([Misc.heatUspmAuxDescPath != undefined && Misc.heatUspmAuxDescPath != '', Misc.heatUspmAuxDesc != undefined && Misc.heatUspmAuxDesc != ''], 'Misc section vs descriptor import: USPM descriptor path VNF_CONFIG_DATA_FILE and imported content consistency:',' both or none should be defined.');
+	
 
 	if(Misc.check != "")return Misc.check;
 	return result;
@@ -6707,17 +6717,28 @@ function setAppAuxDescInput(event){
 }
 function clearAppAuxDescInput(){Misc.heatAppAuxDesc=undefined; userOutput('');document.getElementById("AppAuxDescInput").value= null;}
 function viewAppAuxDescInput(){userOutput(Misc.heatAppAuxDesc);}
-function HeatDeploymentHelp(){userOutput(
-"Heat storage allocation policy: three options are available:"+
+function deploymentHelp(){userOutput(
+"Storage allocation policy: three options are available:"+
 "\n\t- from image: create one volume per instance from a qcow2 image which name is passed as parameter Image"+
 "\n\t- from master: create one volume per instance from a master volume which id is passed as parameter Image"+
 "\n\t- none: use local storage on compute node, no volume creation"+
+"\nTemplate output format: two options available "+
+"\n\t- Heat: builds a HOT format (Heat Orchestration Template) to be deployed on top of OpenStack"+
+"\n\t- Tosca: builds a TOSCA format (Topology and Orchestration Specification for Cloud Applications) to be deployed on top of normalized orchestrators"+
 "\nAnsible deployment of a Heat stack:"+
 "\n\t- prepare the Ansible console as per the DevOps Help section"+
+"\n\t- select the Heat output format in the drop down list besides the Deploy button, then click Deploy"+
 "\n\t- drop the generated Heat stack template to the Ansible console as nivr-cluster-nfv.yaml or other name"+
 "\n\t- start the ansible deployment on the console using the generic heat.ansible.yml playbook:"+
 "\n\t- ansible-playbook heat.ansible.yml --extra-vars 'the_stack=<the stack name, default mse_stack> the_template=<the Heat stack template, default nivr-cluster-nfv.yaml>'" 
 );}
+
+function deploy(){
+	switch(document.getElementById("deployer").value){
+		case 'Heat': buildHeatTemplate(); break;
+		case 'Tosca': buildToscaTemplate(); break;
+	}
+}
 // ===========================
 // MSE Heat template build
 // ===========================
@@ -6726,8 +6747,6 @@ function buildHeatTemplate(){
 	var useHeatVolumes = document.getElementById("useHeatVolumes").value;
 	
 	var n0="\n";
-	var n1="\n\t";
-	var n2="\n\t\t";
 	var quickDescription = document.getElementById("quickDescription");
 	var heat="heat_template_version: 2013-05-23"
 	heat+=n0+"description: '"+quickDescription.value+"'";
@@ -7025,6 +7044,302 @@ function buildHeatTemplate(){
     userOutput(heat);
 	
 	var blobHeat = new Blob([heat], {type: "text/plain;charset=utf-8"});
+	var a = document.createElement('a');
+	a.href = window.URL.createObjectURL(blobHeat);
+    a.download = "nivr-cluster-nfv.yaml";
+    document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+}
+
+// ===========================
+// MSE TOSCA template build
+// ===========================
+function buildToscaTemplate(){
+	// Check if Heat volume are to be used and from which source (image or volume)
+	var useHeatVolumes = document.getElementById("useHeatVolumes").value;
+	
+	var n0="\n";
+	var quickDescription = document.getElementById("quickDescription");
+	var tosca="tosca_definitions_version: tosca_simple_yaml_1_0"
+	tosca+=n0+"description: '"+quickDescription.value+"'";
+	tosca+=n0;
+	tosca+=n0+"node_types:";
+	tosca+=n0+"  tosca.nodes.mse:";
+	tosca+=n0+"    derived_from: tosca.nodes.Compute";
+	tosca+=n0+"    properties:";
+	tosca+=n0+"      key_name:";
+	tosca+=n0+"        type: string";
+	tosca+=n0+"      image:";
+	tosca+=n0+"        type: string";
+	tosca+=n0+"      flavor:";
+	tosca+=n0+"        type: string";
+	tosca+=n0;
+	tosca+=n0+"topology_template:";
+	tosca+=n0+"  inputs:";
+	tosca+=n0+"    NetworkRoot:";
+    tosca+=n0+"      type: string";
+    tosca+=n0+"      description: 3 dot separated bytes defining the 24 first bits of the internal networks, e.g. 192.168.100";
+    tosca+=n0+"      default: 192.168.100";
+	tosca+=n0+"    Image:";
+    tosca+=n0+"      type: string";
+    switch(useHeatVolumes){
+    case 'none':    	
+	tosca+=n0+"      description: The name of the image used to instantiate storage on MSE nodes"; break;
+    case 'from image':	
+	tosca+=n0+"      description: The name of the image used to instantiate MSE volumes"; break;
+    case 'from master':	
+	tosca+=n0+"      description: The id of the master volume used to instantiate MSE volumes"; break;
+    }
+    tosca+=n0+"      default: MSE30x.qcow2";
+	tosca+=n0+"    ExternalNetwork:";
+    tosca+=n0+"      type: string";
+    tosca+=n0+"      description: The name of the external public network used to connect floating IPs";
+    tosca+=n0+"      default: ext-net";
+    tosca+=n0+"    AvailabilityZone:";
+    tosca+=n0+"      type: string";
+    tosca+=n0+"      description: The name of the zone hosting the MSE nodes";
+    tosca+=n0+"      default: nova";
+	tosca+=n0+"    flavorStandard:";
+    tosca+=n0+"      type: string";
+    tosca+=n0+"      description: The name of the openstack flavor used to build the SEE Application nodes";
+    tosca+=n0+"      default: v2.m8";
+	tosca+=n0+"    flavorPerformance:";
+    tosca+=n0+"      type: string";
+    tosca+=n0+"      description: The name of the openstack flavor used to build the OCMP nodes";
+    tosca+=n0+"      default: v2.m8";
+	tosca+=n0+"    flavorSmall:";
+    tosca+=n0+"      type: string";
+    tosca+=n0+"      description: The name of the openstack flavor used to build the other nodes";
+    tosca+=n0+"      default: v2.m2";
+	tosca+=n0+"    key_name:";
+    tosca+=n0+"      type: string";
+    tosca+=n0+"      description: the ssh key injected in the instances for remote access";
+    tosca+=n0+"      default: ''";
+    if(useHeatVolumes != 'none'){
+	tosca+=n0+"    VolumeSize:";
+    tosca+=n0+"      type: number";
+    tosca+=n0+"      description: The size in Gb of the volumes attached to the nodes.";
+    tosca+=n0+"      default: 20";
+	}
+	tosca+=n0;
+	tosca+=n0+"  node_templates:";
+	
+	// Build the descriptor for Heat (or get the errors) and do not publish
+	// Required soon enough to get Heat specific variables properly setup
+    var desc = buildVNFDescriptor('Heat');
+    
+    // if the enf of descriptor is not found, show the error and quit
+    if(desc.indexOf(endOfDescriptor) == -1)return; 
+
+	// Create networks from Networks.heatNetworks array: 
+	// The networks are to be created in the interface number order to ensure that ethX is actually connected to interface X
+	var networkPrefix = 'Eth';
+	var mgmtName = networkPrefix + Networks.heatNetworks['MGMT']; 
+    
+    for(var i = 0; i <= Networks.heatMaxNetwork; i++){
+	var interfaceName = networkPrefix+i;	// network name, Networks.heatMaxNodes addresses large
+	var cidr = Networks.heatMaxNodes*i;		// first address in this network
+	var gateway = cidr + 1;	// gateway IP for this network
+	tosca+=n0+"    "+interfaceName+":";
+    tosca+=n0+"      type: tosca.nodes.network.Network";
+    tosca+=n0+"      properties:";
+	tosca+=n0+"        network_name: "+interfaceName;
+	tosca+=n0+"        cidr: { concat: [ get_input: NetworkRoot, '.', '"+cidr+"/"+Networks.heatCidrLength+"']}";
+	tosca+=n0+"        gateway_ip: { concat: [ get_input : NetworkRoot, '.', '"+gateway+"']}";
+    }
+
+    // addr will resolve all ip addresses parameters as a reference to their relative port
+    var addr=""; 
+    
+    // Nodes dependency to EMS: to ensure all nodes readiness when the EMS starts, so that descriptor push succeeds, make the EMS depending on all other nodes
+    var nodesNames = Nodes.cloudNodes.map(function(e){return e.name;});
+    // The EMS is the last node in Nodes.cloudNodes: remove it to build the list of non EMS nodes,then filter the nodes playing a VIP role
+    var nonEmsNodesNames = Nodes.cloudNodes.slice(0, Nodes.cloudNodes.length - 1).filter(function(e){return !e.isVIP;}).map(function(e){return e.name;});  
+    
+    // For each node: create the ports and optional associated floating IP on all networks, the volume and the instance
+    nodesNames.forEach(function(name, indexNode){
+    	// Create one port on every connected network
+    	for(var i = 0; i <= Networks.heatMaxNetwork; i++){
+			// VIP processing in Heat/OpenStack: 
+			// - a VIP is instantiated as a port
+			// - a VIP is declared as allowed_address_pairs on the load balancer nodes
+	    	
+	    	var interfaceName = networkPrefix+i;	// network name, Networks.heatMaxNodes addresses large
+	    	if(Nodes.cloudNodes[indexNode].interfaces.indexOf(i) == -1)continue;
+	    	tosca+=n0+"    "+name+"-"+interfaceName+"-port:";
+	    	tosca+=n0+"      type: tosca.nodes.network.Port";
+	    	tosca+=n0+"      properties:";
+	      	tosca+=n0+"        order: "+i;
+			tosca+=n0+"      requirements:";
+	      	
+			// if this node is a VIP
+			if(Nodes.cloudNodes[indexNode].isVIP){
+				// This node is a VIP: bind this port to all back end servers
+				nodesNames.forEach(function(nameBackEnd, indexBackEnd){
+					// if this node has VIPs and this VIP is defined on this interface
+					if(Nodes.cloudNodes[indexBackEnd].hasVIP && Nodes.cloudNodes[indexBackEnd].interfaces.indexOf(i) != -1)
+					// Enable this address in the firewall 
+			tosca+=n0+"        - binding: "+nameBackEnd;
+				});
+			} // if this node is a VIP
+	      	else{
+			tosca+=n0+"        - binding: "+name;
+			}
+			tosca+=n0+"        - link: "+interfaceName;
+	      				
+	      	// Resolve ip address for this port on this node
+	      	if(Networks.heatNetworks['MGMT'] == i)	addr+=n0+"~"+name+"_mgmt~: {get_attribute: ["+name+"-"+interfaceName+"-port, ip_address]}";
+	      	if(Networks.heatNetworks['APP'] == i)	addr+=n0+"~"+name+"_app~: {get_attribute: ["+name+"-"+interfaceName+"-port, ip_address]}";
+	      	if(Networks.heatNetworks['SIP'] == i)	addr+=n0+"~"+name+"_sip~: {get_attribute: ["+name+"-"+interfaceName+"-port, ip_address]}";
+	      	if(Networks.heatNetworks['LBNAT'] == i)	addr+=n0+"~"+name+"_nat~: {get_attribute: ["+name+"-"+interfaceName+"-port, ip_address]}";
+	      	if(Networks.heatNetworks['HA'] == i)	addr+=n0+"~"+name+"_ha~: {get_attribute: ["+name+"-"+interfaceName+"-port, ip_address]}";
+	      	if(Networks.heatNetworks['DATA'] == i)	addr+=n0+"~"+name+"_data~: {get_attribute: ["+name+"-"+interfaceName+"-port, ip_address]}";
+	      	if(Networks.heatNetworks['M3UA1'] == i)	addr+=n0+"~"+name+"_m3ua1~: {get_attribute: ["+name+"-"+interfaceName+"-port, ip_address]}";
+	      	if(Networks.heatNetworks['M3UA2'] == i)	addr+=n0+"~"+name+"_m3ua2~: {get_attribute: ["+name+"-"+interfaceName+"-port, ip_address]}";
+      	}
+      	if(Nodes.cloudNodes[indexNode].interfaces.indexOf(heatPublicInterface) != -1){
+	   		addr+=n0+"~"+name+"_pub~: {get_attribute: ["+name+", public_address]}";
+      	}
+      	
+      	// if this node is a VIP, neither volume nor instance are needed
+      	// Volumes can be instantiated from image or master volume: in the latter case, a volume id is expected in the Image parameter
+      	if(!Nodes.cloudNodes[indexNode].isVIP){
+      	// if volume usage is enabled
+      	if(useHeatVolumes != 'none'){
+      	tosca+=n0+"    "+name+"-Volume:";
+    	tosca+=n0+"      type: BlockStorage";
+    	tosca+=n0+"      properties: ";
+      	if(useHeatVolumes == 'from image'){
+      	tosca+=n0+"        snapshot_id: { get_input: Image }";
+      	}else{ 
+      	tosca+=n0+"        volume_id : { get_input: Image }";
+      	}
+      	tosca+=n0+"        size: { get_input: VolumeSize }";
+      	}
+      	tosca+=n0+"    "+name+":";
+    	tosca+=n0+"      type: tosca.nodes.mse";
+		if(useHeatVolumes != 'none'){
+      	tosca+=n0+"      requirements:";
+      	tosca+=n0+"        - local_storage:";
+      	tosca+=n0+"            node: "+name+"-Volume:";
+      	tosca+=n0+"            relationship:";
+      	tosca+=n0+"              type: AttachesTo";
+      	tosca+=n0+"              properties:";
+      	tosca+=n0+"                location: vda";
+      	}
+		tosca+=n0+"      properties:";
+      	if(useHeatVolumes == 'none'){
+      	tosca+=n0+"        image: { get_input: Image }"; 
+      	}
+      	tosca+=n0+"        flavor: { get_input: "+Nodes.cloudNodes[indexNode].flavor+" }";
+      	tosca+=n0+"        key_name: { get_input: key_name }";
+      	if(nonEmsNodesNames.indexOf(name) == -1){
+		// EMS node:
+		// Express dependency on other nodes if any
+		nonEmsNodesNames.forEach(function(nameDependance, indexDependance){
+		if(indexDependance == 0){
+		tosca+=n0+"      requirements:";
+		}
+		tosca+=n0+"        - dependency: "+nameDependance;
+		});
+		// pass the descriptors as raw data on this node
+		tosca+=n0+"      interfaces:";
+		tosca+=n0+"        Standard:";
+		tosca+=n0+"          configure:";
+		tosca+=n0+"            implementation:";
+		tosca+=n0+"              str_replace:";
+		tosca+=n0+"                template: |";
+		tosca+=n0+"                  #!/bin/bash";
+		tosca+=n0+"                  cat > /etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties << 'EOFILE'";
+		tosca+=n0+"                  "+desc.replace(/\n/g, "\n"+  
+				  "                  ");	// fix the descriptor indentation as expected by tosca
+		tosca+=n0+"                  EOFILE";
+
+		// If a USPM descriptor is defined, push its auxiliary descriptor
+		if(Misc.heatUspmAuxDesc != undefined){
+		tosca+=n0+"                  cat > "+Misc.heatUspmAuxDescPath+" << 'EOFILE'";
+		tosca+=n0+"                  "+Misc.heatUspmAuxDesc.replace(/\n/g, "\n"+  
+				  "                  ");	// fix the descriptor indentation as expected by tosca
+		tosca+=n0+"                  EOFILE";
+		}
+		if(Misc.heatAppAuxDescPath != undefined && Misc.heatAppAuxDesc != undefined){
+		tosca+=n0+"                  cat > "+Misc.heatAppAuxDescPath+" << 'EOFILE'";
+		tosca+=n0+"                  "+Misc.heatAppAuxDesc.replace(/\n/g, "\n"+  
+				  "                  ");	// fix the descriptor indentation as expected by tosca
+		tosca+=n0+"                  EOFILE";
+		}
+		tosca+=n0+"                  exit 0   # required to properly execute this script";
+		// Resolve ip addresses parameters 
+		tosca+=n0+"                params:"+addr.replace(/\n/g, "\n"+  
+				  "                  ");	// fix the descriptor indentation as expected by tosca;;
+		// Resolve default gateway IP address to the MGMT subnet holding floating IPs
+		tosca+=n0+"                  ~pub_gateway~: {get_property: ["+mgmtName+", gateway_ip]}";
+		
+		
+		} // EMS node, pass the descriptors
+      	}  	// if this node is a VIP, neither volume nor instance are needed
+    }); // For each node: create the resources
+
+  	// Add outputs:
+    tosca+=n0+"  outputs:";
+    // Ansible deployments: list of nodes and descriptor
+    // For each non VIP node having a public IP address, required for Ansible client access: publish the name, fqdn, public IP address and group 'base' plus 'ems' for the last node
+	// tosc(a) once h(eader) for public nodes output
+	var tosch='';	
+	tosch+=n0+"    public_nodes:";
+    tosch+=n0+"      description: List of hosts as a name, fqdn, public ip address and groups membership";
+    tosch+=n0+"      value:";
+    nodesNames.forEach(function(name, indexNode){ if(Nodes.cloudNodes[indexNode].isVIP || Nodes.cloudNodes[indexNode].interfaces.indexOf(heatPublicInterface) == -1)return;
+	tosca+=tosch; tosch='';
+    tosca+=n0+"        -";
+    tosca+=n0+"          name: "+name;
+    tosca+=n0+"          fqdn: "+Nodes.cloudNodes[indexNode].fqdn
+    tosca+=n0+"          ipaddress: {get_attribute: ["+name+", public_address]}";
+    tosca+=n0+"          groups: base"; if(indexNode == Nodes.cloudNodes.length - 1)tosca+=",ems"
+    });
+    tosca+=n0+"    main_descriptor:";
+    tosca+=n0+"      description: /etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties";
+    tosca+=n0+"      value:";
+    tosca+=n0+"        str_replace:";
+    tosca+=n0+"          template: |";
+    tosca+=n0+"            "+desc.replace(/\n/g, "\n"+  
+		     "            ");	// fix the descriptor indentation as expected by tosca
+	// Resolve ip addresses parameters 
+    tosca+=n0+"          params:"+addr.replace(/\n/g, "\n"+  
+		     "            ");	// fix the descriptor indentation as expected by tosca;;
+    // Resolve default gateway IP address to the MGMT subnet holding floating IPs
+    tosca+=n0+"            ~pub_gateway~: {get_property: ["+mgmtName+", gateway_ip]}";
+	// If a USPM descriptor is defined, push its auxiliary descriptor
+    if(Misc.heatUspmAuxDesc != undefined){
+   	tosca+=n0+"    uspm_descriptor:";
+    tosca+=n0+"      description: "+Misc.heatUspmAuxDescPath;
+    tosca+=n0+"      value:";
+    tosca+=n0+"        str_replace:";
+    tosca+=n0+"          template: |";
+    tosca+=n0+"            "+Misc.heatUspmAuxDesc.replace(/\n/g, "\n"+  
+		     "            ");	// fix the descriptor indentation as expected by tosca
+	// Resolve ip addresses parameters 
+    tosca+=n0+"          params:"+addr.replace(/\n/g, "\n"+  
+		     "            ");	// fix the descriptor indentation as expected by tosca;;
+    }
+	if(Misc.heatAppAuxDescPath != undefined && Misc.heatAppAuxDesc != undefined){
+   	tosca+=n0+"    app_descriptor:";
+    tosca+=n0+"      description: "+Misc.heatAppAuxDescPath;
+    tosca+=n0+"      value:";
+    tosca+=n0+"        str_replace:";
+    tosca+=n0+"          template: |";
+    tosca+=n0+"            "+Misc.heatAppAuxDesc.replace(/\n/g, "\n"+  
+		     "            ");	// fix the descriptor indentation as expected by tosca
+	// Resolve ip addresses parameters 
+    tosca+=n0+"          params:"+addr.replace(/\n/g, "\n"+  
+		     "            ");	// fix the descriptor indentation as expected by tosca;;
+    }
+    
+    // Show to the user and save to nivr-cluster-nfv.yaml
+    userOutput(tosca);
+	
+	var blobHeat = new Blob([tosca], {type: "text/plain;charset=utf-8"});
 	var a = document.createElement('a');
 	a.href = window.URL.createObjectURL(blobHeat);
     a.download = "nivr-cluster-nfv.yaml";
