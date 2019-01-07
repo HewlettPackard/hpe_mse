@@ -49,6 +49,8 @@ export YUM_EXPLICIT_PACKAGES="['mlocate','omping','firewalld','iptables-services
 export MANDATORY_SERVICES="['firewalld']"
 # Patched files as a dictionnary of files in MSE_ISO_URL or cache and their destination
 export PATCHED_FILES='{"uspm-nfv-setup.sh": "/opt/OC/sbin/uspm-nfv-setup.sh"}'
+# To force an OS signature as expected by demanding components like USPM, SEE
+export CLOUD_OS_SIGNATURE="Red Hat Enterprise Linux Server release 7.4 (Maipo)"
 
 # MSE product on CentOS 6
 #########################
@@ -68,6 +70,8 @@ export YUM_EXPLICIT_PACKAGES="['mlocate','omping']"
 export MANDATORY_SERVICES="[]"
 # Patched files as a dictionnary of files in MSE_ISO_URL or cache and their destination
 export PATCHED_FILES='{}'
+# To force an OS signature as expected by demanding components like USPM, SEE
+export CLOUD_OS_SIGNATURE=""
 
 # OpenStack Infrastructure
 ##########################

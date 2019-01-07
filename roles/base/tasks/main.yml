@@ -238,34 +238,64 @@
     state: directory
     recurse: yes
     owner: 'ocadmin'
-- name: root id_rsa.pub
+- name: root id_rsa.pub from cache {{cacheSshKeys}}
+  copy:
+    src: "{{cacheSshKeys}}id_rsa.pub"
+    dest: "/root/.ssh/"
+    mode: 0600
+  when: cacheSshKeys is defined
+- name: root id_rsa.pub from remote {{sshKeysUrl}}
   get_url:
     url: "{{sshKeysUrl}}id_rsa.pub"
     dest: "/root/.ssh/"
     mode: 0600
-- name: root id_rsa
+  when: cacheSshKeys is not defined
+- name: root id_rsa from cache {{cacheSshKeys}}
+  copy:
+    src: "{{cacheSshKeys}}id_rsa"
+    dest: "/root/.ssh/"
+    mode: 0600
+  when: cacheSshKeys is defined
+- name: root id_rsa from remote {{sshKeysUrl}}
   get_url:
     url: "{{sshKeysUrl}}id_rsa"
     dest: "/root/.ssh/"
     mode: 0600
+  when: cacheSshKeys is not defined
 - name: root authorized_keys
   copy:
     remote_src: yes
     src: "/root/.ssh/id_rsa.pub"
     dest: "/root/.ssh/authorized_keys"
     mode: 0600
-- name: ocadmin id_rsa.pub
+- name: ocadmin id_rsa.pub from cache {{cacheSshKeys}}
+  copy:
+    src: "{{cacheSshKeys}}id_rsa.pub"
+    dest: "/home/ocadmin/.ssh/"
+    owner: 'ocadmin'
+    mode: 0600
+  when: cacheSshKeys is defined
+- name: ocadmin id_rsa.pub from remote {{sshKeysUrl}}
   get_url:
     url: "{{sshKeysUrl}}id_rsa.pub"
     dest: "/home/ocadmin/.ssh/"
     owner: 'ocadmin'
     mode: 0600
-- name: ocadmin id_rsa
+  when: cacheSshKeys is not defined
+- name: ocadmin id_rsa from cache {{cacheSshKeys}}
+  copy:
+    src: "{{cacheSshKeys}}id_rsa"
+    dest: "/home/ocadmin/.ssh/"
+    owner: 'ocadmin'
+    mode: 0600
+  when: cacheSshKeys is defined
+- name: ocadmin id_rsa from remote {{sshKeysUrl}}
   get_url:
     url: "{{sshKeysUrl}}id_rsa"
     dest: "/home/ocadmin/.ssh/"
     owner: 'ocadmin'
     mode: 0600
+  when: cacheSshKeys is not defined
 - name: ocadmin authorized_keys
   copy:
     remote_src: yes
@@ -273,7 +303,17 @@
     dest: "/home/ocadmin/.ssh/authorized_keys"
     owner: 'ocadmin'
     mode: 0600
-- name: ssh_host private keys ecdsa ed25519
+- name: ssh_host private keys ecdsa ed25519 from cache {{cacheSshKeys}}
+  with_items: ['ecdsa','ed25519']
+  loop_control:
+    loop_var:
+      _aKeyType
+  copy:
+    src: "{{cacheSshKeys}}ssh_host_{{_aKeyType}}_key"
+    dest: "/etc/ssh/"
+    mode: 0640
+  when: cacheSshKeys is defined
+- name: ssh_host private keys ecdsa ed25519 from remote {{sshKeysUrl}}
   with_items: ['ecdsa','ed25519']
   loop_control:
     loop_var:
@@ -282,7 +322,18 @@
     url: "{{sshKeysUrl}}ssh_host_{{_aKeyType}}_key"
     dest: "/etc/ssh/"
     mode: 0640
-- name: ssh_host private keys rsa
+  when: cacheSshKeys is not defined
+- name: ssh_host private keys rsa from cache {{cacheSshKeys}}
+  with_items: ['rsa']
+  loop_control:
+    loop_var:
+      _aKeyType
+  copy:
+    src: "{{cacheSshKeys}}ssh_host_{{_aKeyType}}_key"
+    dest: "/etc/ssh/"
+    mode: 0600
+  when: cacheSshKeys is defined
+- name: ssh_host private keys rsa from remote {{sshKeysUrl}}
   with_items: ['rsa']
   loop_control:
     loop_var:
@@ -291,7 +342,18 @@
     url: "{{sshKeysUrl}}ssh_host_{{_aKeyType}}_key"
     dest: "/etc/ssh/"
     mode: 0600
-- name: ssh_host public keys ecdsa ed25519 rsa
+  when: cacheSshKeys is not defined
+- name: ssh_host public keys ecdsa ed25519 rsa from cache {{cacheSshKeys}}
+  with_items: ['ecdsa','ed25519','rsa']
+  loop_control:
+    loop_var:
+      _aKeyType
+  copy:
+    src: "{{cacheSshKeys}}ssh_host_{{_aKeyType}}_key.pub"
+    dest: "/etc/ssh/"
+    mode: 0644
+  when: cacheSshKeys is defined
+- name: ssh_host public keys ecdsa ed25519 rsa from remote {{sshKeysUrl}}
   with_items: ['ecdsa','ed25519','rsa']
   loop_control:
     loop_var:
@@ -300,6 +362,7 @@
     url: "{{sshKeysUrl}}ssh_host_{{_aKeyType}}_key.pub"
     dest: "/etc/ssh/"
     mode: 0644
+  when: cacheSshKeys is not defined
 - name: Restart service sshd
   service:
     name: sshd
