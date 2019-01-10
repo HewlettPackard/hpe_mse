@@ -3,7 +3,7 @@
   gather_facts: false
 
   tasks:
-  - name: bring the Heat stack {{the_stack | default('mse_stack') }} to the state {{the_state | default('present') }}
+  - name: bring the Heat stack {{the_stack | default('mse_stack') }} to the state {{the_state | default('present') }} with 2 retries max
     os_stack:
       state: "{{the_state | default('present') }}"
       name: "{{the_stack | default('mse_stack') }}"
@@ -13,6 +13,9 @@
         Image: "{{ lookup('env','CLOUD_IMAGE') }}"
         key_name: "{{ lookup('env','CLOUD_SSH_KEY_PAIR') }}"
     register: mse_stack
+    until: mse_stack|success
+    retries: 2
+    delay: 10
 
   - name: set facts from stack outputs descriptions discarding verbose logs
     with_items: "{{mse_stack.stack.outputs}}"
@@ -36,7 +39,7 @@
   - fail: msg="Missing Heat stack output value for main_descriptor"
     when: main_descriptor_value is not defined
 
-  - name: show stack
+  - name: stack description {{mse_stack.stack.description}}
     debug:
       var=public_nodes_value
 
