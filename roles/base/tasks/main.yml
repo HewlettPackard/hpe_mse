@@ -129,16 +129,11 @@
     ls ClusterManager*.iso 2> /dev/null || ls TAS*.iso 2> /dev/null || true
   register: _engineIso
 
-- name: Get MSE engine installer install-tas.sh or install-cluster-manager.sh from {{isoRepo}}{{_engineIso.stdout}}
-  with_items: ['cluster-manager','tas']
-  loop_control:
-    loop_var:
-      _theInstaller
-  ignore_errors: yes
+- name: Get MSE engine installer install-cluster-manager.sh from {{isoRepo}}{{_engineIso.stdout}}
   iso_extract:
     image: "{{isoRepo}}{{_engineIso.stdout}}"
     dest: "{{isoRepo}}"
-    files: "utils/install-{{_theInstaller}}.sh"
+    files: "utils/install-cluster-manager.sh"
 
 - name: Install versionlock plugin for yum
   yum: 
@@ -198,7 +193,7 @@
   when: cacheIso is not defined
 
 
-- name: Install additional explicit packages, ignoring errors
+- name: Install additional explicit packages from "{{yumRepo}}", ignoring errors
   with_items: "{{ yum_explicit_packages }}"
   loop_control:
     loop_var:
@@ -207,6 +202,13 @@
     name: "{{_package}}"
     enablerepo: "{{yumRepo}}"
   ignore_errors: yes
+
+- name: Setup YUM version lock from {{isoUrl}}{{yum_version_lock}}, if any
+  get_url:
+    url: "{{isoUrl}}{{yum_version_lock}}"
+    dest: "/etc/yum/pluginconf.d/versionlock.list"
+    force: yes
+  when: yum_version_lock != ''
 
 - name: Start mandatory explicit services, if any
   with_items: "{{ mandatory_services }}"

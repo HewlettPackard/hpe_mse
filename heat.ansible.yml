@@ -85,6 +85,7 @@
       patched_files: "{{ lookup('env','PATCHED_FILES') }}"
       mandatory_services: "{{ lookup('env','MANDATORY_SERVICES') }}"
       yum_explicit_packages: "{{ lookup('env','YUM_EXPLICIT_PACKAGES') }}"
+      yum_version_lock: "{{ lookup('env','YUM_VERSION_LOCK') }}"
 
 - name: configure the base instance(s)
   hosts: base
