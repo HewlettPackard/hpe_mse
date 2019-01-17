@@ -51,6 +51,8 @@ export MANDATORY_SERVICES="['firewalld']"
 export PATCHED_FILES='{"uspm-nfv-setup.sh": "/opt/OC/sbin/uspm-nfv-setup.sh"}'
 # To force an OS signature as expected by demanding components like USPM, SEE
 export CLOUD_OS_SIGNATURE="Red Hat Enterprise Linux Server release 7.4 (Maipo)"
+# Optional YUM version lock file 
+export YUM_VERSION_LOCK=''
 
 # MSE product on CentOS 6
 #########################
@@ -65,13 +67,17 @@ export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.3-3.020151.snap.1812201543.el6.noarch.r
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 # Explicit additional packages to install if available: mlocate as a quick file searcher, omping as mulitcast checker
-export YUM_EXPLICIT_PACKAGES="['mlocate','omping']"
+export YUM_EXPLICIT_PACKAGES="['mlocate','omping','perl-Class-MethodMakerOcbu']"
 # Mandatory services to be started
 export MANDATORY_SERVICES="[]"
 # Patched files as a dictionnary of files in MSE_ISO_URL or cache and their destination
-export PATCHED_FILES='{}'
+export PATCHED_FILES='{"uspm-nfv-setup.sh": "/opt/OC/sbin/uspm-nfv-setup.sh"}'
 # To force an OS signature as expected by demanding components like USPM, SEE
-export CLOUD_OS_SIGNATURE=""
+export CLOUD_OS_SIGNATURE='Red Hat Enterprise Linux Server release 6.9 (Santiago)'
+# Optional YUM version lock file 
+export YUM_VERSION_LOCK=''
+# Optional list of YUM excluded packages
+export YUM_EXCLUDE='xerces-c-3* perl-Class-MethodMaker-*'
 
 # OpenStack Infrastructure
 ##########################
@@ -100,7 +106,7 @@ export CLOUD_ENVIRONMENT='{"http_proxy": "http://x.y.z.t:port", "https_proxy": "
 # The OpenStack image flavor used to instantiate the nodes
 export CLOUD_FLAVOR="v4.m8"
 # labdrops is mandatory to enable the labdrops
-export MSE_YUM_REPO='labdrops,base'
+export MSE_YUM_REPO='uspm,labdrops,base'
 # Cent OS 7
 # The OpenStack image name and default user
 export CLOUD_IMAGE="Centos 7"
