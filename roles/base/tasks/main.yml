@@ -203,6 +203,13 @@
     enablerepo: "{{yumRepo}}"
   ignore_errors: yes
 
+- name: Define YUM exclude list {{yum_exclude}} in /etc/yum.conf
+  lineinfile:
+    path: /etc/yum.conf
+    line: "exclude: {{yum_exclude}}"
+    insertafter: "logfile"
+  when: yum_exclude != ''
+
 - name: Setup YUM version lock from {{isoUrl}}{{yum_version_lock}}, if any
   get_url:
     url: "{{isoUrl}}{{yum_version_lock}}"

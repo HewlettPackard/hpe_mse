@@ -75,7 +75,9 @@ export PATCHED_FILES='{"uspm-nfv-setup.sh": "/opt/OC/sbin/uspm-nfv-setup.sh"}'
 # To force an OS signature as expected by demanding components like USPM, SEE
 export CLOUD_OS_SIGNATURE='Red Hat Enterprise Linux Server release 6.9 (Santiago)'
 # Optional YUM version lock file 
-export YUM_VERSION_LOCK='versionlock.list'
+export YUM_VERSION_LOCK=''
+# Optional list of YUM excluded packages
+export YUM_EXCLUDE='xerces-c-3* perl-Class-MethodMaker-*'
 
 # OpenStack Infrastructure
 ##########################
