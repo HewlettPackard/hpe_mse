@@ -146,6 +146,7 @@
 
 - name: Install the MSE Automated Deployment engine
   shell: |
+    > /etc/yum/pluginconf.d/versionlock.list
     cd {{isoRepo}} &&
     if test -f install-cluster-manager.sh ; then _theInstaller=cluster-manager && _theIso=ClusterManager*.iso  ; else _theInstaller=tas && _theIso=TAS*.iso ; fi 
     ./install-${_theInstaller}.sh --yes --install hpe-install-${_theInstaller} --disableplugin=yum-plugin-versionlock --iso ${_theIso} && 
@@ -171,7 +172,7 @@
       enabled=1
       gpgcheck=0
 
-- name: Update with lab drops from {{isoRepo}}
+- name: Update with labdrops from {{isoRepo}}
   shell: |
     cd {{isoRepo}} &&
     if test -f install-cluster-manager.sh ; then _theInstaller=cluster-manager && _theIso=ClusterManager*.iso  ; else _theInstaller=tas && _theIso=TAS*.iso ; fi 

@@ -13,7 +13,7 @@
         Image: "{{ lookup('env','CLOUD_IMAGE') }}"
         key_name: "{{ lookup('env','CLOUD_SSH_KEY_PAIR') }}"
     register: mse_stack
-    until: mse_stack|success
+    until: mse_stack is success
     retries: 2
     delay: 10
 
@@ -62,7 +62,7 @@
       ssh -oBatchMode=yes -oStrictHostKeyChecking=no -i {{ lookup('env','CLOUD_SSH_KEY') }}
       {{ lookup('env',' CLOUD_DEFAULT_USER') }}@{{_host['ipaddress']}} true
     register: result
-    until: result|success
+    until: result is success
     retries: 30
     delay: 10
 
