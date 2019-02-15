@@ -62,6 +62,10 @@
 - name: Install createrepo for labdrops management
   yum:
     name: createrepo
+  register: result
+  until: result is success
+  retries: 3
+  delay: 10
 
 - name: Get the MSE engine ISO image {{engineIso}} from cache {{cacheIso}}
   copy:
@@ -138,6 +142,10 @@
 - name: Install versionlock plugin for yum
   yum: 
     name: yum-plugin-versionlock
+  register: result
+  until: result is success
+  retries: 3
+  delay: 10
 
 - name: Install the MSE Automated Deployment engine
   shell: |
@@ -173,25 +181,26 @@
     if test -f install-cluster-manager.sh ; then _theInstaller=cluster-manager && _theIso=ClusterManager*.iso  ; else _theInstaller=tas && _theIso=TAS*.iso ; fi 
     ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='{{yumRepo}}' --iso ${_theIso}
 
-- name: Update with patches from cache if any
+- name: Update with patches from cache {{cachePatch}} if any
   with_dict: "{{patched_files}}"
   loop_control:
     loop_var:
       _patch
   copy:
-    src: "{{cacheIso}}{{_patch.key}}"
+    src: "{{cachePatch}}{{_patch.key}}"
     dest: "{{_patch.value}}"
-  when: cacheIso is defined
+  when: cachePatch is defined
 
-- name: Update with patches from {{isoUrl}} if any
+- name: Update with patches from {{patchUrl}} if any
   with_dict: "{{patched_files}}"
   loop_control:
     loop_var:
       _patch
   get_url:
-    url: "{{isoUrl}}{{_patch.key}}"
+    url: "{{patchUrl}}{{_patch.key}}"
     dest: "{{_patch.value}}"
-  when: cacheIso is not defined
+    force: yes
+  when: cachePatch is not defined
 
 
 - name: Install additional explicit packages from "{{yumRepo}}", ignoring errors

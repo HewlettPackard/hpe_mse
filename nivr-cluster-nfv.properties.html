@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-01-03 Version 3.1</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-02-04 Version 3.14</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -35,6 +35,7 @@
 <select id="deployer">
 <option name="Heat" selected>Heat</option>
 <option name="Tosca">Tosca</option>
+<option name="Tosca">NFV-D</option>
 </select>
 template</td>
 <td valign="top"><input class="buildButton" type="button" value="Deploy" onclick="deploy()"> Volumes
@@ -110,7 +111,12 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
-	"\n2019-01-03 3.1	Orchestration: support Tosca output for normalized orchestration"+
+	"\n2019-02-04 3.14	Orchestration: support Tosca output format 1.2 for NFV Director (experimental)"+
+	"\n2019-02-01 3.13	Default scaling role: idle instead of OCMP node; Heat deployment: use the standard flavor for OCSNF nodes and nodes without any defined role; allow one simulap node per VNFC"+
+	"\n2019-01-17 3.12	Redis : support 2 instances in standalone mode; default to sentinel mode if sentinel ports are defined"+
+	"\n2019-01-08 3.11	Ansible deployment on Heat/OpenStack with multiple networks:"+
+	"\n\t\tset the default route to the management interface on all nodes at startup to ensure external connectivity for Ansible agent"+
+	"\n2019-01-03 3.1	Orchestration: support Tosca output for normalized orchestration (experimental)"+
 	"\n2018-12-13 3.08	Messaging Framework: support for multiple sites and new properties: single routing table, automatic disaster recovery, routing networks"+
 	"\n2018-12-06 3.07	Redis standalone: support for multiple standalone instances, one per node playing a redis DB role while no Redis HA role is defined"+
 	"\n2018-11-28 3.06	SEE4: enable Oracle database for native applications TenantMP MCM ; RedisSentinel restricted to lazy and spare modes"+
@@ -902,7 +908,7 @@ Networks.help = function(){
 	"\nSIP: optional SIP network used for SIP traffic by OCMP, SEE and OCSNF nodes"+
 	"\nLBNAT: optional application network for load balancer in NAT mode, typically used by SEE nodes to deliver Ccxml/Vxml scripts behind an http load balancer"+
 	"\nPUBLIC: optional external IP address of nodes visible through an address translation (OCMP and WebRTC Front End nodes OpenStack instances typically)"+
-	"\nHA: optional high availability network used by SEE nodes for cluster communication, Pgsql static cluster for replication, and Linux HA nodes as a second corosync network"+
+	"\nHA: optional high availability network used by SEE nodes for cluster communication, Redis Sentinel, Pgsql static cluster for replication, and Linux HA nodes as a second corosync network"+
 	"\nSEE cluster interfaces:"+
 	"\n\t- SEE public bind address refer to the application interface, ie VNF LBNAT or APP or MGMT as fall-backs"+
 	"\n\t- EMS public and SEE management refer to the VNF MGMT interface"+ 
@@ -1046,6 +1052,9 @@ var Nodes= new vnfResource("Nodes", [
 Nodes.help = function(){
 	return "Nodes and roles definition and assignement"+
 	"\n<network> fqdn/IP addr: name and IP address on the <network> interface" +	
+	"\n\tFor OpenStack deployments, IP addresses are available as place holders on all nodes and interfaces conforming to the naming scheme ~<name>_<network>~"+
+	"\n\tWhere name is the short node name and network identifies the network interface as one of mgmt app sip nat ha data m3ua1 m3ua2 pub"+
+	"\n\tExamples: ~see1_mgmt~ ~uspm1_data~ ~simulap_m3ua1~"+
 	"\nVNFC: (optional) VNF component name: only SEE clusters and HTTP Load balancer can be part of a VNFC" +
 	"\n\tso that several SEE clusters can be instantiated in one single composed VNF"+
 	"\n\tonce defined, a VNFC can be associated to resources restricted to this specific SEE cluster"+
@@ -1165,6 +1174,8 @@ Nodes.build = function(target, engine){
 		seeWitnessIpAddr[e] = new Array(nbVNFC);
 		seeNodesIpAddr[e] = new Array(nbVNFC);
 	});
+	simulapNames = new Array(nbVNFC);
+	simulapIpAddr = new Array(nbVNFC);
 	// Network interfaces concerned with Linux HA
 	linuxHANetworks = ['MGMT', 'HA'];
 	
@@ -1383,7 +1394,7 @@ Nodes.build = function(target, engine){
 		Nodes.check += checkDependency(VNFCindex != 0, [pgsqlHaRole == "", seeRole != "", httpLbRole != ""], "Nodes: "+nodeName + " on " + VNFdisplayName + ": pgsqlHaRole not supported on a VNFC", " (SEE cluster and HTTP LB roles only)");
 		Nodes.check += checkDependency(VNFCindex != 0, [redisHaRole  != "Pri", redisHaRole  != "Sec", seeRole != "", httpLbRole != "" ],"Nodes: "+nodeName + " on " + VNFdisplayName + ": redis on Linux HA not supported on a VNFC", " (SEE cluster and HTTP LB roles only)");
 		Nodes.check += checkDependency(VNFCindex != 0, [dbRole == "", seeRole != "", httpLbRole != "" ], 	"Nodes: "+nodeName + " on " + VNFdisplayName + ": dbRole not supported on a VNFC", " (SEE cluster and HTTP LB roles only)");
-		Nodes.check += checkDependency(VNFCindex != 0, [uspmRole == "", seeRole != "", httpLbRole != "" ], 	"Nodes: "+nodeName + " on " + VNFdisplayName + ": uspmRole not supported on a VNFC", " (SEE cluster and HTTP LB roles only)");
+		Nodes.check += checkDependency(VNFCindex != 0, [uspmRole == "", uspmRole == 'Simulap', seeRole != "", httpLbRole != "" ], 	"Nodes: "+nodeName + " on " + VNFdisplayName + ": uspmRole not supported on a VNFC", " (SEE cluster and HTTP LB roles only)");
 		Nodes.check += checkDependency(VNFCindex != 0, [ocmpRole == ""], 	"Nodes: "+nodeName + " on " + VNFdisplayName + ": ocmpRole not supported on a VNFC", " (SEE cluster and HTTP LB roles only)");
 		Nodes.check += checkDependency((nodeHaName != "" || nodeHaIpAddr != "") && (linuxHaRole != "" || redisHaRole != ""), [Security.search('Property','NIVRDB_LINUXHA_PASSWORD')], 
 			"Nodes vs Security sections: "+ nodeName+" connection to HA network", " requires NIVRDB_LINUXHA_PASSWORD");
@@ -1421,9 +1432,10 @@ Nodes.build = function(target, engine){
 		Nodes.check += checkDependency(Networks.search('network', 'SIP') && (ocmpRole != "" || ( seeRole != "" && seeRole != "Wit" ) || sipLbRole != "") , [nodeSipName != "" && nodeSipIpAddr != ""], 
 			nodeName + " " + nodeSipName + ": SIP network interface definition ", " requires both name and IP address on SIP network");
 		
-		// Select a Heat profile for this node, default to small, performance for OCMP, standard for SEE nodes
+		// Select a Heat profile for this node, default to small, performance for OCMP, standard for SEE and SNF nodes and nodes without explicit role 
 		if(ocmpRole != "")theCloudNode.flavor = 'flavorPerformance';
-		if(seeRole != "" && seeRole != "Wit")theCloudNode.flavor = 'flavorStandard'; 
+		if(seeRole != "" && seeRole != "Wit" || sipLbRole == "Spx" || sipLbRole == "Pri" || sipLbRole == "Sec")theCloudNode.flavor = 'flavorStandard'; 
+		if(!isEms && !isOcmpEms && !isOcsnfEms && !isUspmEms && seeRole=="" && linuxHaRole=="" && httpLbRole=="" && sipLbRole=="" && pgsqlHaRole=="" && redisHaRole=="" && dbRole=="" && uspmRole=="" && ocmpRole=="")theCloudNode.flavor = 'flavorStandard'; 	
 		
 		// Store SEE nodes not playing an USPM back end role: Messaging Gateway does not support such nodes
 		if(seeRole != "" && seeRole != "Wit" && uspmRole != 'BE')seeNodesNonUspmBackEnd.push(nodeName);
@@ -1549,7 +1561,8 @@ Nodes.build = function(target, engine){
 				result += getNameIpAddr("REDIS_SECONDARY", "_HA_DEVICE", nodeHaName, nodeHaIpAddr);
 				break;
 			case 'ServerSentinel':
-				Nodes.check += checkDependency(REDIS_HA_MODE != undefined, [REDIS_HA_MODE == 'sentinel'], "Nodes section: "+nodeName, " with Redis HA role "+redisHaRole+" is not compatible with the Redis HA mode "+REDIS_HA_MODE+"; Sentinel and Linux HA modes are mutually exclusive");
+				// Redis Sentinel mode has precedence on standalone
+				Nodes.check += checkDependency(REDIS_HA_MODE != undefined, [REDIS_HA_MODE == 'sentinel', REDIS_HA_MODE == 'standalone'], "Nodes section: "+nodeName, " with Redis HA role "+redisHaRole+" is not compatible with the Redis HA mode "+REDIS_HA_MODE+"; Sentinel and Linux HA modes are mutually exclusive");
 				REDIS_HA_MODE = 'sentinel';
 				REDIS_HOST['MGMT'].push(nodeName);
 				REDIS_IP_ADDR['MGMT'].push(nodeIpAddr);
@@ -1560,7 +1573,8 @@ Nodes.build = function(target, engine){
 				if(nodeAppIpAddr != "")REDIS_IP_ADDR['APP'].push(nodeAppIpAddr);
 				break;
 			case 'Sentinel':
-				Nodes.check += checkDependency(REDIS_HA_MODE != undefined, [REDIS_HA_MODE == 'sentinel'], "Nodes section: "+nodeName, " with Redis HA role "+redisHaRole+" is not compatible with the Redis HA mode "+REDIS_HA_MODE+"; Sentinel and Linux HA modes are mutually exclusive");
+				// Redis Sentinel mode has precedence on standalone
+				Nodes.check += checkDependency(REDIS_HA_MODE != undefined, [REDIS_HA_MODE == 'sentinel', REDIS_HA_MODE == 'standalone'], "Nodes section: "+nodeName, " with Redis HA role "+redisHaRole+" is not compatible with the Redis HA mode "+REDIS_HA_MODE+"; Sentinel and "+REDIS_HA_MODE+" modes are mutually exclusive");
 				REDIS_HA_MODE = 'sentinel';
 				// all redis instances are to be concatenated in one vector
 				REDIS_SENTINEL['MGMT'].push(nodeName);
@@ -1654,6 +1668,9 @@ Nodes.build = function(target, engine){
 				REDIS_PORT.push(redisPorts[0]);
 				REDIS_SENTINEL_PORT.push(redisPorts[1]);
 				if(!checkRedisNetworkConsistency())break;
+				// Default HA mode: standalone, unless sentinel ports are defined; sentinel has precedence on standalone
+				Nodes.check += checkDependency(REDIS_HA_MODE != undefined && redisPorts[1] != undefined, [REDIS_HA_MODE == 'sentinel', REDIS_HA_MODE == 'standalone'], "Nodes section: "+nodeName, " with Redis sentinel port "+redisPorts[1]+" is not compatible with the Redis HA mode "+REDIS_HA_MODE+"; Sentinel and "+REDIS_HA_MODE+" modes are mutually exclusive");
+				if(REDIS_HA_MODE == undefined || REDIS_HA_MODE == 'standalone'){if(redisPorts[1] != undefined){REDIS_HA_MODE = 'sentinel';}else{REDIS_HA_MODE = 'standalone';}}
 				break;
 			case 'mongo':
 				result += "\n\n# Mongo database";
@@ -1842,9 +1859,10 @@ Nodes.build = function(target, engine){
 				// The simulap node is defined only on the management network in the MSE Descriptor
 				// Addresses on other interfaces are guessed at run time from the network configuration
 				// => pre requisite on the target node: data and m3ua1 networks are configured
-				result += "\n\n# SIMULAP Tester";
-				result += "\nSIMULAP_HOST="+nodeName;
-				result += "\nSIMULAP_IP_ADDR="+nodeIpAddr;
+				// One simulap node can be instantiated per VNFC
+				if(simulapNames[VNFCindex] != undefined)Nodes.check += "\nNodes: "+nodeName + " is duplicating simulap role compared to "+simulapNames[VNFCindex]+" for "+VNFdisplayName;
+				simulapNames[VNFCindex] = nodeName; 
+				simulapIpAddr[VNFCindex] = nodeIpAddr;
 				break;
 		}
 		if(isWrtcBE){
@@ -1879,8 +1897,6 @@ Nodes.build = function(target, engine){
 	// Build redis cluster
 	if(REDIS_HOST['MGMT'].length != 0){
 		result += "\n\n# Redis cluster";
-		// Default HA mode: standalone
-		if(REDIS_HA_MODE == undefined)REDIS_HA_MODE = 'standalone';
 		result += "\nREDIS_HA_MODE=" + REDIS_HA_MODE;
 		if(REDIS_INSTANCE_ID.length != 0)result += "\nREDIS_INSTANCE_ID=(" + REDIS_INSTANCE_ID.join(" ") + " )";
 		result += "\nREDIS_HOST=(" + REDIS_HOST['MGMT'].join(" ") + " )";
@@ -1950,7 +1966,7 @@ Nodes.build = function(target, engine){
 		Nodes.check += checkDependency(VNFCusingInterface, [VNFusingInterface], "Nodes section: Unsupported topology on interface "+n,"; the composed VNF should include an SEE Cluster using this interface since at least one VNFC uses it");
 	});
 	// Redis sentinel clusters cannot have 2 nodes, minimum 3
-	Nodes.check += checkDependency(! Nodes.search('Redis HA', 'Pri'), [ (REDIS_SENTINEL['MGMT'].length+REDIS_HOST['MGMT'].length) != 2 ], "Nodes section: topology Redis Sentinel cluster with 2 nodes is not supported: ", "redis+sentinel should contain 3 or more nodes.");
+	Nodes.check += checkDependency(REDIS_HA_MODE == 'sentinel', [ (REDIS_SENTINEL['MGMT'].length+REDIS_HOST['MGMT'].length) != 2 ], "Nodes section: topology Redis Sentinel cluster with 2 nodes is not supported: ", "redis+sentinel should contain 3 or more nodes.");
 	
 	// Build the SEE clusters definition
 	result += "\n";
@@ -1970,6 +1986,9 @@ Nodes.build = function(target, engine){
 	fillArrays(seeNodesNames[e]);
 	fillArrays(seeNodesIpAddr[e]);
 	});
+	
+	// HTTP load balancer does not make sense with a single SEE simplex
+	Nodes.check += checkDependency(httpLb[0] != undefined, [seeSimplexNames['MGMT'].length != 1], 'Nodes section: HTTP load balancer', ' not supported on a single SEE simplex');
 	
 	result += "\n# SEE Simplex      #";
 	result += getNameIpAddr("SIMPLEX_SEE", "", seeSimplexNames['MGMT'], seeSimplexIpAddr['MGMT']);
@@ -2007,7 +2026,19 @@ Nodes.build = function(target, engine){
 	result += getNameIpAddr("NODE_SEE", "_LBNAT_DEVICE", seeNodesNames['LBNAT'], seeNodesIpAddr['LBNAT']);
 	result += getNameIpAddr("NODE_SEE", "_HA_DEVICE", seeNodesNames['HA'], seeNodesIpAddr['HA']);
 
-
+	fillArrays(simulapNames);
+	fillArrays(simulapIpAddr);
+	if(simulapNames.length != 0){
+	result += "\n\n# SIMULAP Tester    #";
+	VNFCnames.forEach(function(e,i){
+		if(simulapNames[i] == undefined || simulapNames[i] == '""')return;
+		result += ifVNFCopen(e,i);
+		result += "\nSIMULAP_HOST="+simulapNames[i];
+		result += "\nSIMULAP_IP_ADDR="+simulapIpAddr[i];
+		result += ifVNFCclose(e,i);
+		});
+	}
+	
 	// HTTP LB nodes
 	// HTTP LB consistency
 	VNFCnames.forEach(function(e,i,t){
@@ -2332,8 +2363,11 @@ Misc.help = function(){
 	"\n\ta stop or start REST request is sent to the orchestrator at NFVD_ADDR to instantiate a new stack using"+
 	"\n\tNFVD_SCALING_TEMPLATE template, with the credentials, targeting the tenant NFVD_TENANT_NAME, and joining"+
 	"\n\tthe existing stack NFVD_STACK_NAME"+
-	"\n\nNIVR_SCALING_ROLE: Scaling role: Override OCMP default scaling role : NODE_SEE"+
-	"\nYUM_REPO_LIST: "+MiscComment.YUM_REPO_LIST+
+	"\n\nNIVR_SCALING_ROLE: role used when no explicit role is assigned in the descriptor to this node. Two supported values:"+
+	"\n\t- NODE_SEE: additional node in the SEE cluster"+
+	"\n\t- NODE_OCMP: additional node in the OCMP cluster"+
+	"\n\tOtherwise, a node not getting an explicit role will idle"+
+	"\n\nYUM_REPO_LIST: "+MiscComment.YUM_REPO_LIST+
 	"\nVNF_RETRY_POLICY_MAX_TIMEOUT: "+MiscComment.VNF_RETRY_POLICY_MAX_TIMEOUT;
 }
 
@@ -6617,6 +6651,9 @@ function buildVNFDescriptor(target, engine){
 	desc += "\nDIAMETER_SERVICE_COMPONENT_NAME=()";
 	desc += "\nUCP_PROVIDER_NAME=()";
 	desc += "\nSMPP_PROVIDER_NAME=()";
+	desc += "\nSMPP_SESSION=()";
+	desc += "\nSMPP_PROFILE=()";
+	desc += "\nSMPP_PAIR=()";
 	desc += "\nMRF_ADAPTER_SERVICE_COMPONENT_NAME=()";
 	desc += "\nDATASOURCE_NAME=()";
 	desc += "\nLDAP_PROFILE_NAME=()";
@@ -6737,6 +6774,7 @@ function deploy(){
 	switch(document.getElementById("deployer").value){
 		case 'Heat': buildHeatTemplate(); break;
 		case 'Tosca': buildToscaTemplate(); break;
+		case 'NFV-D': buildToscaTemplate('nfvd'); break;
 	}
 }
 // ===========================
@@ -6937,6 +6975,7 @@ function buildHeatTemplate(){
       	}
       	heat+=n0+"  "+name+":";
     	heat+=n0+"    type: OS::Nova::Server";
+    	// The ems node depends on all other nodes and the router so that everything is ready when igniting the configuration from this ems node
       	if(nonEmsNodesNames.indexOf(name) == -1){
       	heat+=n0+"    depends_on: [ Router-gw-int, "+nonEmsNodesNames.join(', ')+" ]";
       	}
@@ -6952,16 +6991,23 @@ function buildHeatTemplate(){
       	heat+=n0+"      key_name: { get_param: key_name }";
       	heat+=n0+"      networks:";
       	heat+=port;
+      	// Bootstrap bash script aimed at setting the default route on the management public gateway, so that floating IPs work
       	heat+=n0+"      config_drive: True";
       	heat+=n0+"      user_data_format: 'RAW'";
-      	}  	// if this node is a VIP, neither volume nor instance are needed
+		heat+=n0+"      user_data:";
+		heat+=n0+"        str_replace:";
+	  	heat+=n0+"          template: |";
+	    heat+=n0+"            #!/bin/bash";
+	    heat+=n0+"            /sbin/ip route replace default via ~pub_gateway~";
+      	if(nonEmsNodesNames.indexOf(name) != -1){
+	    // Non ems nodes: only one expected parameter: the default gateway IP address to the MGMT subnet holding floating IPs
+	    heat+=n0+"          params:";  
+	    heat+=n0+"            ~pub_gateway~: {get_attr: ["+mgmtName+"-subnet, gateway_ip]}";
+      	}
+    	}  	// if this node is a VIP, neither volume nor instance are needed
     }); // For each node: create the resources
 
   	// Last node is the EMS: pass the Descriptor as raw data on this node
-	heat+=n0+"      user_data:";
-	heat+=n0+"        str_replace:";
-  	heat+=n0+"          template: |";
-    heat+=n0+"            #!/bin/bash";
     heat+=n0+"            cat > /etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties << 'EOFILE'";
 	heat+=n0+"            "+desc.replace(/\n/g, "\n"+  
 		     "            ");	// fix the descriptor indentation as expected by Heat
@@ -7052,21 +7098,88 @@ function buildHeatTemplate(){
 	document.body.removeChild(a);
 }
 
-// ===========================
+// ===============================
 // MSE TOSCA template build
-// ===========================
-function buildToscaTemplate(){
+// Support for NFV Director flavor
+// ===============================
+function buildToscaTemplate(flavor){
 	// Check if Heat volume are to be used and from which source (image or volume)
 	var useHeatVolumes = document.getElementById("useHeatVolumes").value;
 	
 	var n0="\n";
 	var quickDescription = document.getElementById("quickDescription");
-	var tosca="tosca_definitions_version: tosca_simple_yaml_1_0"
+	var tosca="tosca_definitions_version: tosca_simple_yaml_"
+	switch(flavor){
+		case 'nfvd':	tosca+="1_2"; break;
+		default: 		tosca+="1_0"; break;
+	}
 	tosca+=n0+"description: '"+quickDescription.value+"'";
 	tosca+=n0;
+	if(flavor == 'nfvd'){
+	tosca+=n0+"imports:";
+	tosca+=n0+"  - SOL001Type/etsi_nfv_sol001_vnfd_0_10_0_types.yaml";
+	tosca+=n0+"";
+	tosca+=n0+"dsl_definitions:";
+	tosca+=n0+"  descriptor_id: &descriptor_id b1bb0ce7-ebca-4fa7-95ed-4840d70a1169";
+	tosca+=n0+"  provider: &provider CMS";
+	tosca+=n0+"  product_name: &product_name CMS_TAS_VNF";
+	tosca+=n0+"  software_version: &software_version '3.2.0'";
+	tosca+=n0+"  descriptor_version: &descriptor_version '0.0.1'";
+	tosca+=n0+"  flavour_id: &flavour_id simple";
+	tosca+=n0+"  flavour_description: &flavour_description simple deployment";
+	tosca+=n0+"  vnfm: &vnfm";
+	tosca+=n0+"    - HPE";
+	}
+	tosca+=n0;
 	tosca+=n0+"node_types:";
-	tosca+=n0+"  tosca.nodes.mse:";
+	switch(flavor){
+		case 'nfvd':
+	tosca+=n0+"  tosca.nodes.nfv.VNF.hpe.tas.3_2:";
+	tosca+=n0+"    derived_from: tosca.nodes.nfv.VNF"; 
+	tosca+=n0+"    properties:";
+	tosca+=n0+"      descriptor_id:";
+	tosca+=n0+"        type: string";
+	tosca+=n0+"        constraints: [ valid_values: [ *descriptor_id ] ]";
+	tosca+=n0+"        default: *descriptor_id";
+	tosca+=n0+"      provider:";
+	tosca+=n0+"        type: string";
+	tosca+=n0+"        constraints: [ valid_values: [ *provider ] ]";
+	tosca+=n0+"        default: *provider";
+	tosca+=n0+"      product_name:";
+	tosca+=n0+"        type: string";
+	tosca+=n0+"        constraints: [ valid_values: [ *product_name ] ]";
+	tosca+=n0+"        default: *product_name";
+	tosca+=n0+"      software_version:";
+	tosca+=n0+"        type: string";
+	tosca+=n0+"        constraints: [ valid_values: [ *software_version ] ]";
+	tosca+=n0+"        default: *software_version";
+	tosca+=n0+"      descriptor_version:";
+	tosca+=n0+"        type: string";
+	tosca+=n0+"        constraints: [ valid_values: [ *descriptor_version ] ]";
+	tosca+=n0+"        default: *descriptor_version";
+	tosca+=n0+"      flavour_id:";
+	tosca+=n0+"        type: string";
+	tosca+=n0+"        constraints: [ valid_values: [ *flavour_id ] ]";
+	tosca+=n0+"        default: *flavour_id";
+	tosca+=n0+"      flavour_description:";
+	tosca+=n0+"        type: string";
+	tosca+=n0+"        constraints: [ valid_values: [ *flavour_description ] ]";
+	tosca+=n0+"        default: *flavour_description";
+	tosca+=n0+"      vnfm_info:";
+	tosca+=n0+"          type: list";
+	tosca+=n0+"          entry_schema:";
+	tosca+=n0+"            type: string";
+	tosca+=n0+"          constraints: [ valid_values: *vnfm  ]";
+	tosca+=n0+"          default: *vnfm";
+	tosca+=n0+"";
+	tosca+=n0+"  tosca.nodes.tas:";
+	tosca+=n0+"    derived_from: tosca.nodes.nfv.Vdu.Compute";
+		break;
+		default:
+	tosca+=n0+"  tosca.nodes.tas:";
 	tosca+=n0+"    derived_from: tosca.nodes.Compute";
+		break;
+	}
 	tosca+=n0+"    properties:";
 	tosca+=n0+"      key_name:";
 	tosca+=n0+"        type: string";
@@ -7124,7 +7237,10 @@ function buildToscaTemplate(){
 	}
 	tosca+=n0;
 	tosca+=n0+"  node_templates:";
-	
+	if(flavor == 'nfvd'){
+	tosca+=n0+"    VNF:";
+    tosca+=n0+"      type: tosca.nodes.nfv.VNF.hpe.tas.3_2"; 
+	}
 	// Build the descriptor for Heat (or get the errors) and do not publish
 	// Required soon enough to get Heat specific variables properly setup
     var desc = buildVNFDescriptor('Heat');
@@ -7218,7 +7334,7 @@ function buildToscaTemplate(){
       	tosca+=n0+"        size: { get_input: VolumeSize }";
       	}
       	tosca+=n0+"    "+name+":";
-    	tosca+=n0+"      type: tosca.nodes.mse";
+    	tosca+=n0+"      type: tosca.nodes.tas";
 		if(useHeatVolumes != 'none'){
       	tosca+=n0+"      requirements:";
       	tosca+=n0+"        - local_storage:";
@@ -7229,6 +7345,12 @@ function buildToscaTemplate(){
       	tosca+=n0+"                location: vda";
       	}
 		tosca+=n0+"      properties:";
+		tosca+=n0+"        name: "+name;
+      	tosca+=n0+"        description: "+name+" node";
+      	tosca+=n0+"        vdu_profile:";
+      	tosca+=n0+"          min_number_of_instances: 1";
+      	tosca+=n0+"          max_number_of_instances: 1";
+
       	if(useHeatVolumes == 'none'){
       	tosca+=n0+"        image: { get_input: Image }"; 
       	}
@@ -7363,7 +7485,7 @@ function chefDeploymentHelp(){userOutput(
 "\nAnsible engine:"+
 "\n\t- prepare a workstation by installing an ansible engine from epel repository: 'yum install epel-release; yum install ansible'"+
 "\n\t- the playbook built is a ansible.yml file. It relies on two provided roles: ems and base and is invoked as 'ansible-playbook ansible.yml' on a work station"+
-"\n\t- if a cache is locally available on the Ansible console, set an extra var to point to as --extra-vars 'cacheIso=<path>'"+
+"\n\t- if a cache is locally available on the Ansible console, set extra vars to point to as --extra-vars 'cacheIso=<path to ISOs> cachePatch=<path to patches> cacheSshKeys=<path to ssh keys>'"+
 "\nFor azure target:"+
 "\n\t- install the azure CLI from https://docs.microsoft.com/fr-fr/cli/azure/install-azure-cli-windows?view=azure-cli-latest"+
 "\n\t- install pre requisite gem: chef gem install kitchen-azurerm"+
@@ -7379,7 +7501,14 @@ function chefDeploymentHelp(){userOutput(
 "\n\t- define the infrastructure credentials environment variables as per the metadata.rb file"+
 "\n\t- invoke ansible on a work station either as:"+
 "\n\t\t- to deploy a set of instances: ansible-playbook ansible.yml"+
-"\n\t\t- to deploy a stack defined in nivr-cluster-nfv.yaml built from the Deploy button: ansible-playbook heat.ansible.yml --extra-vars 'the_stack=<the stack name>'"
+"\n\t\t- to deploy a stack defined in nivr-cluster-nfv.yaml built from the Deploy button: ansible-playbook heat.ansible.yml --extra-vars 'the_stack=<the stack name>'"+
+"\n\t\tOptional extra variables:"+
+"\n\t\t\t- the_template: name of the yaml file to use as the stack template"+
+"\n\t\t\t- the_state: target state of the instance: 'absent' to delete the stack, default 'present'"+
+"\n\t\t\t- cacheIso: slash terminated directory path, hosting a local copy of the MSE ISO images deployed, ex: ../iso/"+
+"\n\t\t\t- cachePatch: slash terminated directory path, hosting a local copy of the patches to apply on all nodes, ex: ../patches/"+
+"\n\t\t\t- cacheSshKeys: slash terminated directory path, hosting a local copy of the ssh keys used to enable promptless ssh between nodes"+
+'\n\t\tExample: ansible-playbook heat.ansible.yml --extra-vars "the_stack=smsc the_template=smsc.yaml cacheIso=../iso/ cacheSshKeys=../sshKeys/"'
 );}
 
 // ===========================

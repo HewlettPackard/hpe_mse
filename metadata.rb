@@ -22,6 +22,7 @@ Two recipes/roles:
 The MSE Descriptor Assistant nivr-cluster-nfv.properties.html must be used to depict the MSE instance topology and build 
 the .kitchen.yml/ansible.yml file used to deploy the MSE instance. This file embedds the MSE descriptor template,
 dynamically turned to the actual MSE Descriptor at run time based on the instantiated nodes IP addresses and names.
+Refer to the on-line help in this assistant for details on Ansible/Chef invocation.
 
 = REQUIREMENTS:
 
@@ -35,19 +36,21 @@ To keep the generated books generic, attributes are expected as environment vari
 #########################
 # URL providing MSE ISO images
 export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/TAS31/'
-# ISO image delivering the MSE automated deployer engine
+# URL providing MSE patches
+export MSE_PATCH_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/TAS31/'
+# ISO image delivering the MSE automated deployer engine in MSE_ISO_URL or directory specified by cacheIso variable
 export MSE_ENGINE='ClusterManager-3.1.3-2.020130.el7.iso'
-# List of ISO images delivering the MSE products
+# List of ISO images delivering the MSE products in MSE_ISO_URL or directory specified by cacheIso variable
 export MSE_PRODUCT="['TAS-3.1.1-6.020166.el7.iso','USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.0-1.019457.el7.iso']"
 # List of lab drops as an array of rpm packages
 export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.3-3.020151.snap.1812211444.el7.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.3-3.020151.snap.1812211444.el7.noarch.rpm']"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 # Explicit additional packages to install if available: mlocate as a quick file searcher, omping as mulitcast checker
-export YUM_EXPLICIT_PACKAGES="['mlocate','omping','firewalld','iptables-services']"
+export YUM_EXPLICIT_PACKAGES="['mlocate','firewalld','iptables-services']"
 # Mandatory services to be started
 export MANDATORY_SERVICES="['firewalld']"
-# Patched files as a dictionnary of files in MSE_ISO_URL or cache and their destination
+# Patched files as a dictionnary of files in MSE_PATCH_URL or variable cachePatch directory and their destination
 export PATCHED_FILES='{"uspm-nfv-setup.sh": "/opt/OC/sbin/uspm-nfv-setup.sh"}'
 # To force an OS signature as expected by demanding components like USPM, SEE
 export CLOUD_OS_SIGNATURE="Red Hat Enterprise Linux Server release 7.4 (Maipo)"
@@ -58,9 +61,11 @@ export YUM_VERSION_LOCK=''
 #########################
 # URL providing MSE ISO images
 export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/MSE30/'
-# ISO image delivering the MSE automated deployer engine
+# URL providing MSE patches
+export MSE_PATCH_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/MSE30/'
+# ISO image delivering the MSE automated deployer engine in MSE_ISO_URL or directory specified by cacheIso variable
 export MSE_ENGINE='ClusterManager-3.1.3-2.020130.el6.iso'
-# List of ISO images delivering the MSE products
+# List of ISO images delivering the MSE products in MSE_ISO_URL or directory specified by cacheIso variable
 export MSE_PRODUCT="['SEE-4.1.6.4-3.017751.el6.iso','MSE-3.0.5.3-8.020108.el6.iso','HPE-SMSC-2.1.0-1.000764.snap.el6.x86_64.iso','OpenCall-OCMP-4.4.8.bg013842.el6.x86_64.iso','USPM4212_Linux_RHEL6_3931.iso','OpenCall_OCCP_3.0.3_004177.el6.x86_64.iso']"
 # List of lab drops as an array of rpm packages
 export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.3-3.020151.snap.1812201543.el6.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.3-3.020151.snap.1812201543.el6.noarch.rpm']"
@@ -70,7 +75,7 @@ export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 export YUM_EXPLICIT_PACKAGES="['mlocate','omping','perl-Class-MethodMakerOcbu']"
 # Mandatory services to be started
 export MANDATORY_SERVICES="[]"
-# Patched files as a dictionnary of files in MSE_ISO_URL or cache and their destination
+# Patched files as a dictionnary of files in MSE_PATCH_URL or variable cachePatch directory and their destination
 export PATCHED_FILES='{"uspm-nfv-setup.sh": "/opt/OC/sbin/uspm-nfv-setup.sh"}'
 # To force an OS signature as expected by demanding components like USPM, SEE
 export CLOUD_OS_SIGNATURE='Red Hat Enterprise Linux Server release 6.9 (Santiago)'
