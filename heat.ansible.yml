@@ -14,8 +14,8 @@
         key_name: "{{ lookup('env','CLOUD_SSH_KEY_PAIR') }}"
     register: mse_stack
     until: mse_stack is success
-    retries: 2
-    delay: 10
+    retries: 5
+    delay: 30
 
   - name: set facts from stack outputs descriptions discarding verbose logs
     with_items: "{{mse_stack.stack.outputs}}"
@@ -132,3 +132,10 @@
     raw: service nivr-nfv status && service nivr-nfv node-reload && service nivr-nfv start || echo Refresh unavailable, skipped
   vars:
     descriptor: "{{hostvars[inventory_hostname]['descriptor']}}"
+
+- name: collect deployment information
+  hosts: base
+  become: True
+  gather_facts: True
+  roles:
+    - role: collectInfo
