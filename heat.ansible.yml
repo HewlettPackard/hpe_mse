@@ -3,7 +3,7 @@
   gather_facts: false
 
   tasks:
-  - name: bring the Heat stack {{the_stack | default('mse_stack') }} to the state {{the_state | default('present') }} with 2 retries max
+  - name: bring the Heat stack {{the_stack | default('mse_stack') }} to the state {{the_state | default('present') }} with 5 retries max
     os_stack:
       state: "{{the_state | default('present') }}"
       name: "{{the_stack | default('mse_stack') }}"
