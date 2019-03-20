@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-02-04 Version 3.14</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-03-19 Version 3.15</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -29,13 +29,11 @@
 <TABLE border=0 cellspacing="5">
 <tr>
 <td valign="top">Build the MSE Descriptor</td><td valign="top"><input class="buildButton" type="button" value="Build" onclick="buildVNFDescriptor()"></td>
-<td valign="top">Save the current session</td><td valign="top"><input class="helpButton" type="button" value="Save" onclick="saveSession()"></td>
 </tr><tr>
 <td valign="top">Build the 
 <select id="deployer">
 <option name="Heat" selected>Heat</option>
 <option name="Tosca">Tosca</option>
-<option name="Tosca">NFV-D</option>
 </select>
 template</td>
 <td valign="top"><input class="buildButton" type="button" value="Deploy" onclick="deploy()"> Volumes
@@ -43,11 +41,10 @@ template</td>
 <option name="none" selected>none</option>
 <option name="image">from image</option>
 <option name="volume">from master</option>
-</select>
+</select></td>
+<td valign="top">
 <input class="helpButton" type="button" value="Help" onclick="deploymentHelp()">
 </td> 
-<td valign="top">Review USPM descriptor</td><td valign="top"><input class="helpButton" type="button" value="Review" onclick="viewUspmAuxDescInput()"></td>
-<td valign="top">Review APPs descriptor</td><td valign="top"><input class="helpButton" type="button" value="Review" onclick="viewAppAuxDescInput()"></td>
 </tr><tr>
 <td valign="top">Build a DevOps book</td>
 <td valign="top"><input class="buildButton" type="button" value="DevOps" onclick="buildDevopsBook()"> 
@@ -60,17 +57,16 @@ on
 <option name="openstack" selected>openstack</option>
 <option name="aws">aws</option>
 <option name="azure">azure</option>
-</select>
+</select></td>
+<td valign="top">
 <input class="helpButton" type="button" value="Help" onclick="chefDeploymentHelp()">
 </td> 
-
-<td valign="top">Clear USPM descriptor</td><td valign="top"><input class="buildButton" type="button" value="Clear" onclick="clearUspmAuxDescInput()"></td>
-<td valign="top">Clear APPs descriptor</td><td valign="top"><input class="buildButton" type="button" value="Clear" onclick="clearAppAuxDescInput()"></td>
+</tr><tr>
+<td valign="top">Save the current session</td><td valign="top"><input class="helpButton" type="button" value="Save" onclick="saveSession()"></td>
 </tr><tr>
 <td valign="top">Import session from file</td><td valign="top"><input id="importSession" class="helpButton" type="file" value="Import..." onchange="importSession()"><BR><B style="color:red">(Directory change is *NOT* supported)</B></td>
-<td valign="top">Import USPM descriptor</td><td valign="top"><input id="uspmAuxDescInput" class="buildButton" type="file" value="Import..." onchange="setUspmAuxDescInput(event)"></td>
-<td valign="top">Import APPs descriptor</td><td valign="top"><input id="AppAuxDescInput" class="buildButton" type="file" value="Import..." onchange="setAppAuxDescInput(event)"></td>
-</tr></table>
+</tr>
+</table>
 
 <!-- Link to the end of the user area, useful to focus the user on the result on long pages -->
 <p>Quick links: <a id="endOfUserArea" href="#endOfUserArea" >Outputs and Result</a></p>
@@ -79,7 +75,7 @@ on
 <a name="endOfUserArea"></a>
 </p>
 <iframe width="1500" height="200" name="importedDocument" style="display:none"></iframe>
-<P class="copyright">&copy; 2018 Hewlett Packard Enterprise Development LP</P>
+<P class="copyright">&copy; 2019 Hewlett Packard Enterprise Development LP</P>
 <script>
 
 // Define an HPE standard style
@@ -111,7 +107,8 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
-	"\n2019-02-04 3.14	Orchestration: support Tosca output format 1.2 for NFV Director (experimental)"+
+	"\n2019-03-08 3.15	SEE clustering: offer MTU seting to address network limitations in OpenStack environments; move auxiliary descriptor buttons to the MISC section; replace COROSYNC_UNICAST with MULTICAST_MTU OCMP 4.5 settings (experimental)"+
+	"\n2019-02-28 3.14	Messaging Framework: introduce the single zone property for multi site deployments"+
 	"\n2019-02-01 3.13	Default scaling role: idle instead of OCMP node; Heat deployment: use the standard flavor for OCSNF nodes and nodes without any defined role; allow one simulap node per VNFC"+
 	"\n2019-01-17 3.12	Redis : support 2 instances in standalone mode; default to sentinel mode if sentinel ports are defined"+
 	"\n2019-01-08 3.11	Ansible deployment on Heat/OpenStack with multiple networks:"+
@@ -191,7 +188,7 @@ function versionHistory(){
 
 // Display the compatibility matrix in a distinct window
 function compatibilityMatrix(){
-	var w = window.open('', 'MSE compatibility matrix', 'width=800,height=1000,status=no,menubar=no');
+	var w = window.open('', 'MSE compatibility matrix', 'width=800,height=1200,status=no,menubar=no,location=no');
 	w.document.head.innerHTML = "<title>MSE compatibility matrix</title>"
 	var localStyle = w.document.createElement('style');
 	localStyle.innerHTML = HPEStyle;
@@ -266,7 +263,7 @@ function compatibilityMatrix(){
 	new compatibleFeature(featureMatrix, "SIP LB simplex", ['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "SIP LB HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "Simulap",		['SEE4']);
-	new compatibleFeature(featureMatrix, "OCMP",			['SEE3.6', 'SEE3.7', 'SEE4'], "OCMP not ready yet on RHEL7?");
+	new compatibleFeature(featureMatrix, "OCMP",			['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "Databases");
 	new compatibleFeature(featureMatrix, "MySQL simplex",	['SEE3.6', 'SEE3.7', 'SEE4']);
 	new compatibleFeature(featureMatrix, "Oracle simplex",	['SEE3.6', 'SEE3.7', 'SEE4']);
@@ -281,9 +278,9 @@ function compatibilityMatrix(){
 	new compatibleFeature(featureMatrix, "WebRTC",			['SEE3.6', 'SEE3.7']);
 	new compatibleFeature(featureMatrix, "SMB apps",		['SEE3.6', 'SEE3.7']);
 	new compatibleFeature(featureMatrix, "Conferencing",	['SEE3.6'], "SIP stack discontinued with SEE 3.7");
-	new compatibleFeature(featureMatrix, "MessagingFramework",	['SEE4']);
+	new compatibleFeature(featureMatrix, "MessagingFramework",	['SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "SMSC",			['SEE4']);
-	new compatibleFeature(featureMatrix, "MessagingGateway",['SEE4']);
+	new compatibleFeature(featureMatrix, "MessagingGateway",['SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "OCCP",			['SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "Connectivities");
 	new compatibleFeature(featureMatrix, "TCAP",			['SEE4', 'SEE5']);
@@ -324,9 +321,10 @@ function compatibilityMatrix(){
 	new compatibleFeature(devopsMatrix, "Openstack",['Ansible'], "Deploy a full Heat stack or a set of instances on a single network. Tested on CentOS 6 and 7 images");
 	new compatibleFeature(devopsMatrix, "Azure",	['Chef'], "Single network interface. Tested on CentOS 6.10 and 7 images");
 	new compatibleFeature(devopsMatrix, "Aws",		['Chef', 'Ansible'], "Single network interface. Tested on CentOS 6 and 7 images");
-	new compatibleFeature(devopsMatrix, "VMWare");
+	new compatibleFeature(devopsMatrix, "TOSCA",[], "Experimental");
+	new compatibleFeature(devopsMatrix, "VMWare",[]);
 	
-	return false;
+	return true;
 }
 
 function userOutput(aText){
@@ -348,6 +346,63 @@ uniqueRole.prototype.setIfNotOrAlert = function(y){
 		this.v = true;
 	}
 	return "";
+}
+
+// Class implementing a file which content is loaded from the user file system (content)
+// to be dropped on the VNF at a specified path (path)
+// Interface:
+// - a constructor 
+// - methods to load, display and clear the content.
+// - public members: content and path
+// Constructor: 
+// - name of the variable instantiated: required to link the user's events to the object's methods
+// - label describing the purpose of this file, displayed besides the 'browse' button
+var userLoadedFile = function(aVarName, aLabel){
+	this.label = aLabel;
+	this.var = aVarName;
+	this.inputId = aVarName+"_inputId";
+	this.content = undefined;
+	this.path = undefined;
+}
+// Usage example:
+// - instantiate the object; parameter: the name of the HTML input button Id to allow clearance  
+// 	var uspmAuxDescInput = new userLoadedFile("uspmAuxDescInput", "Import USPM auxiliary descriptor..."); 
+// - pass this variable while constructing a section to get the file controls browse/view/clear
+// new vnfResource("Misc", [...], [uspmAuxDescInput, ...]);
+// - use the content: 
+//	if(aUserFile.isDefined()){result += aUserFile.content;}else{ manage error...} 
+userLoadedFile.prototype.load = function(event){
+	// Gratitude to https://stackoverflow.com/questions/27254735/filereader-onload-with-result-and-parameter
+	var file = event.target.files[0];
+	var reader = new FileReader();
+    reader.onload = ( function(target){ return function(e){
+    	// Store the file content in the original object
+    	target.content = this.result;
+    	// Display for control
+    	target.view();
+    	}
+    })(this);
+    reader.readAsText(file);
+}
+userLoadedFile.prototype.clear = function(){
+	this.content=undefined; 
+	userOutput(''); 
+	if(this.inputId != undefined)document.getElementById(this.inputId).value= null;
+}
+userLoadedFile.prototype.view = function(){
+	userOutput(this.content);
+}
+// Ensure that both the content and the path are defined
+userLoadedFile.prototype.isDefined = function(){
+	return this.content != undefined && this.content != '' && this.path != undefined && this.path != '';
+}
+// Ensure that neither the content nor the path are defined
+userLoadedFile.prototype.isUndefined = function(){
+	return (this.content == undefined || this.content == '') && (this.path == undefined || this.path == '');
+}
+// Check that both path and content are either defined or undefined
+userLoadedFile.prototype.isConsistent = function(){
+	return this.isDefined() || this.isUndefined();
 }
 
 // Class implementing a Heat node: a short name, and a flavor
@@ -528,6 +583,7 @@ consistency.check = function (){
 // display(column, value): set the display style attribute for a given column, where 'value' typically is 'none' to hide a column, and id one by default
 // count(column, value): count the number of occurrences of a specific value in a specific column
 // isEmpty(): check if the table is empty
+// A optional parameter user file list, allowing the resource to load a set of user file, as a list of objects instantiated from userLoadedFile class
  
 // Cell width control
 var cellWidth="85px";
@@ -539,7 +595,7 @@ var _uniqueInputId=1;
 // List of VNF resources for applying actions to multiples resources
 vnfResources = new Array();
 
-var vnfResource = function(title, columns){
+var vnfResource = function(title, columns, userFiles){
 	this.result = "\nWARNING: " + title + " section is not defined yet: please apply and rebuild\n";
 	var self = this;
 	
@@ -592,6 +648,49 @@ var vnfResource = function(title, columns){
 	self.columns = columns;
 	self.check = "";
 	
+	// For each user file, add a set of buttons to load, view and clear the associated text. 
+	var tableFiles = document.createElement('TABLE');
+	if(userFiles != undefined)userFiles.forEach(function(aFile){
+		var trFile = document.createElement('TR');
+		var tdLabel = document.createElement('TD');
+		tdLabel.setAttribute("valign", "top");
+		tdLabel.append(document.createTextNode(aFile.label));
+		trFile.append(tdLabel);
+		
+		var tdBrowse = document.createElement('TD');
+		tdBrowse.setAttribute("valign", "top");
+		var browseButton = document.createElement('INPUT');
+		browseButton.type="file";
+		browseButton.id=aFile.inputId;
+		browseButton.className="buildButton";
+		//browseButton.value="Import...";
+		browseButton.setAttribute("onchange", aFile.var + ".load(event)");
+		tdBrowse.appendChild(browseButton);
+		trFile.appendChild(tdBrowse);
+		
+		var tdView = document.createElement('TD');
+		tdView.setAttribute("valign", "top");
+		var viewButton = document.createElement('INPUT');
+		viewButton.type="button";
+		viewButton.className="helpButton";
+		viewButton.value="Review";
+		viewButton.setAttribute("onClick", aFile.var + ".view(event)");
+		tdView.appendChild(viewButton);
+		trFile.appendChild(tdView);
+		
+		var tdClear = document.createElement('TD');
+		tdClear.setAttribute("valign", "top");
+		var clearButton = document.createElement('INPUT');
+		clearButton.type="button";
+		clearButton.className="helpButton";
+		clearButton.value="Clear";
+		clearButton.setAttribute("onClick", aFile.var + ".clear(event)");
+		tdClear.appendChild(clearButton);
+		trFile.appendChild(tdClear);
+		
+		tableFiles.appendChild(trFile);
+	});
+	
 	// Add a button to trigger the MSE Descriptor build for this section
 	var buildButton = document.createElement('INPUT');
 	buildButton.type="button";
@@ -632,6 +731,7 @@ var vnfResource = function(title, columns){
 		thisTableDiv.id = title+'Section';
 		thisTableDiv.appendChild(anchorTable);
 		thisTableDiv.appendChild(table);
+		thisTableDiv.appendChild(tableFiles);
 		thisTableDiv.appendChild(buildButton);
 		thisTableDiv.appendChild(helpButton);
 		myTableDiv.appendChild(thisTableDiv);
@@ -1410,10 +1510,6 @@ Nodes.build = function(target, engine){
 			Licensing.search('Feature', 'OCMP_BRE_LIC_FEATURE_INSTANCES')], 
 			nodeName + ": OCMP SIP and BRE licensing: SEE_SIP_SERIAL SEE_SIP_CODEWORD OCMP_BRE_LIC_KEY OCMP_BRE_LIC_EXPIRES OCMP_BRE_LIC_DESCRIPTION OCMP_BRE_LIC_VXML_INSTANCES OCMP_BRE_LIC_ASR_INSTANCES OCMP_BRE_LIC_TTS_INSTANCES OCMP_BRE_LIC_FEATURE_NAME OCMP_BRE_LIC_FEATURE_INSTANCES",
 			" are required in the Licensing section");
-		Nodes.check += checkDependency(seeRole != "", [
-			Licensing.search('Feature', 'SEE_SIP_SERIAL') && Licensing.search('Feature', 'SEE_SIP_CODEWORD')], 
-			nodeName + ": SEE SIP licensing: SEE_SIP_SERIAL SEE_SIP_CODEWORD ",
-			" are required in the Licensing section, for SEE version < 3.7");
 		Nodes.check += checkDependency(nbVNFC > 0 && dbRole != "", [seeRole == "" && httpLbRole == "", seeRole == 'Spx' ], 
 			"Nodes: "+nodeName + " cannot play a " + dbRole+" DB role concurrently with "+seeRole+" SEE role and "+httpLbRole+" HTTP LB role because databases are shared across the composed VNF and ", nbVNFC + " VNFC(s)");
 		Nodes.check += checkDependency(dbRole.startsWith("redis") || redisHaRole.endsWith("Sentinel"), [Security.search('Property','NIVRDB_LINUXHA_PASSWORD')], 
@@ -2265,20 +2361,25 @@ if(Security.isEmpty()){
 // Miscellaneous settings
 // (required before all sections using the SEE_INSTANCES_MAX property)
 // ===========================
+// Files candidate for user import: auxiliary descriptors
+var uspmAuxDescInput = new userLoadedFile("uspmAuxDescInput", "Import USPM auxiliary descriptor...");
+var AppAuxDescInput = new userLoadedFile("AppAuxDescInput", "Import SEE lite applications auxiliary descriptor...");
+
 var Misc = new vnfResource("Misc", [
 	{name:'Property', width:'400px', type:'choice', choices:[ 
-		'DEFAULT_GATEWAY_IP_ADDR', 'SIP_DEFAULT_GATEWAY_IP_ADDR', 
 		'SNMP_TRAP_DESTINATION', 'SNMP_TRAP_COMMUNITY', 'SEE_INSTANCES_MAX', 
 		'VNF_CONFIG_DATA_FILE', 'APP_CONFIG_DATA_FILE', 
+		'DEFAULT_GATEWAY_IP_ADDR', 'SIP_DEFAULT_GATEWAY_IP_ADDR', 
 		'NIVR_OTHER_HOSTS', 'REDIS_SENTINEL_PORT_OFFSET', 'REDIS_DOWNAFTER', 'REDIS_PARALLEL_SYNCS', 'REDIS_FAILOVER_TIMEOUT',
 		'ORACLE_SERVICE', 'ORACLE_CONSOLE_PORT', 'ORACLE_PATH',
-		'YUM_REPO_LIST', 'HA_PING_IP_ADDR', 'COROSYNC_UNICAST',
+		'YUM_REPO_LIST', 'HA_PING_IP_ADDR', 'MULTICAST_MTU',
 		'NFVD_ADDR', 'NFVD_TENANT_NAME', 'NFVD_APPLICATION', 'NFVD_DATACENTER',
 		'NFVD_USERNAME', 'NFVD_PASSWORD', 'NFVD_STACK_NAME', 'NFVD_REST_ADDR', 'NFVD_SCALING_TEMPLATE',
 		'NIVR_SCALING_ROLE','VNF_RETRY_POLICY_MAX_TIMEOUT'
 		]},
 	{name:'Value', type:'text', width:'400px'}
-	]
+	],
+	[uspmAuxDescInput, AppAuxDescInput]
 	);
 	
 // Default values for misc properties
@@ -2290,7 +2391,7 @@ MiscDefault.ORACLE_PATH="/u01/app/oracle/oradata/${ORACLE_SERVICE}";
 MiscDefault.ORACLE_CONSOLE_PORT="5500";
 MiscDefault.VNF_CONFIG_DATA_FILE="/etc/opt/OC/hpoc-nivr-nfv/uspm-nfv-app.properties";
 MiscDefault.APP_CONFIG_DATA_FILE="/etc/opt/OC/hpoc-nivr-nfv/appConfig.json";
-MiscDefault.COROSYNC_UNICAST="no";
+MiscDefault.MULTICAST_MTU="1200";
 MiscDefault.YUM_REPO_LIST="yum_repos";
 MiscDefault.NFVD_REST_ADDR="${NFVD_ADDR}:5000/v2.0";
 MiscDefault.REDIS_SENTINEL_PORT_OFFSET="20000";
@@ -2324,7 +2425,7 @@ MiscComment.REDIS_SENTINEL_PORT_OFFSET="The Sentinel associated port number offs
 MiscComment.REDIS_DOWNAFTER="Number of milliseconds the master (or any attached slave or sentinel) should be unreachable in order to consider it in S_DOWN state (default 5000).";
 MiscComment.REDIS_PARALLEL_SYNCS="How many slaves we can reconfigure to point to the new slave simultaneously during the failover (default 1)";
 MiscComment.REDIS_FAILOVER_TIMEOUT="Specifies the failover timeout in milliseconds. It is used in many ways, for instance: the maximum time a failover in progress waits for all the slaves to be reconfigured as slaves of the new master (default 60000).";
-MiscComment.COROSYNC_UNICAST="Use unicast for corosync management: yes/no, default is no, yes recommended on Helion";
+MiscComment.MULTICAST_MTU="the maximum transmission unit (MTU) of UDP packets used for SEE cluster management. The value has to prevent fragmentation while accomodating the SEE requirements: minimum is 968 for SEE IMMS clustering. A value greater than 1500 requires end to end support of jumbo frames. Most infrastructures support up to 1500 bytes, but OpenStack introduces an overhead: 1200 is recommended on OpenStack.";
 MiscComment.VNF_RETRY_POLICY_MAX_TIMEOUT="Max timeout applied to all actions in the VNF; default 900s";
 
 Misc.help = function(){
@@ -2349,12 +2450,13 @@ Misc.help = function(){
 	"\n\tNOTE: declaration is mandatory on OpenStack deployments using multiple network interfaces to enable remote access; use a question mark ? to let the infrastructure set the appropriate address." +
 	"\n\tDEFAULT_GATEWAY_IP_ADDR: Default gateway IP address: useful for topologies using multiple interfaces to set the gateway on the interface offering a public access" +
 	"\n\tSIP_DEFAULT_GATEWAY_IP_ADDR: Default gateway IP address used on nodes connected to a public SIP/RTP network: useful to enable SIP calls from an external public network" +
+	"\n\nSEE multicast mangement:"+
+	"\n\tMULTICAST_MTU: " +MiscComment.MULTICAST_MTU+
 	"\n\nDatabase for MSE applications" +
 	"\nORACLE_SERVICE: " +MiscComment.ORACLE_SERVICE+
 	"\nORACLE_PATH: " +MiscComment.ORACLE_PATH+
 	"\nORACLE_CONSOLE_PORT: " +MiscComment.ORACLE_CONSOLE_PORT+
 	"\n\nHA_PING_IP_ADDR: Reference IP address for LB HA" +
-	"\nCOROSYNC_UNICAST: " +MiscComment.COROSYNC_UNICAST+
 	"\nNFVD_ADDR, NFVD_TENANT_NAME, NFVD_APPLICATION, NFVD_DATACENTER:"+
 	"\n\tif SNMP_TRAP_DESTINATION is the EMS, SNMP traps are bounced to NFV_ADDR address,"+
 	"\n\tadding the NFVD_TENANT_NAME, NFVD_APPLICATION, NFVD_DATACENTER and NFVD_DATACENTER fields" + 
@@ -2375,7 +2477,8 @@ Misc.build = function(target){
 	var nameIndexes = Misc.nameIndexes;
 	var result = "\n";
 	Misc.check="";
-	Misc.heatUspmAuxDescPath="";
+	uspmAuxDescInput.path="";
+	AppAuxDescInput.path="";
 	var table = document.getElementById("Misc");
 	var rowCount = table.rows.length;
 	// Reset seeInstancesMax to the default value
@@ -2416,11 +2519,11 @@ Misc.build = function(target){
 				var candidate=Misc.getAndSetValue(row, nameIndexes, 'Value', "4", MiscComment.SEE_INSTANCES_MAX);
 				seeInstancesMax = Number(candidate);
 				if(Number.isNaN(seeInstancesMax)){
-					Misc.check += "Illegal value for SEE_INSTANCES_MAX: "+candidate+"; expecting integer";
+					Misc.check += "\nMisc section: Illegal value for SEE_INSTANCES_MAX: "+candidate+"; expecting integer";
 					break;
 				} 
 				if(seeInstancesMax < 1 || seeInstancesMax > 8){
-					Misc.check += "Illegal value for SEE_INSTANCES_MAX: "+candidate+"; expecting integer in the range 1 to 8";
+					Misc.check += "\nMisc section: Illegal value for SEE_INSTANCES_MAX: "+candidate+"; expecting integer in the range 1 to 8";
 					break;
 				}
 				result += "\n# "+MiscComment[propertyName];
@@ -2436,16 +2539,27 @@ Misc.build = function(target){
 				break;
 			case 'VNF_CONFIG_DATA_FILE':
 				// Store the path to USPM descriptor for Heat template elaboration
-				Misc.heatUspmAuxDescPath=Misc.getAndSetValue(row, nameIndexes, 'Value', MiscDefault[propertyName], MiscComment[propertyName]);
+				uspmAuxDescInput.path=Misc.getAndSetValue(row, nameIndexes, 'Value', MiscDefault[propertyName], MiscComment[propertyName]);
 				result += "\n# "+MiscComment[propertyName];
-				result += "\n"+propertyName+"="+Misc.heatUspmAuxDescPath;
+				result += "\n"+propertyName+"="+uspmAuxDescInput.path;
 				break;
 			case 'APP_CONFIG_DATA_FILE':
 				// Store the path to Application descriptor for Heat template elaboration
-				Misc.heatAppAuxDescPath=Misc.getAndSetValue(row, nameIndexes, 'Value', MiscDefault[propertyName], MiscComment[propertyName]);
+				AppAuxDescInput.path=Misc.getAndSetValue(row, nameIndexes, 'Value', MiscDefault[propertyName], MiscComment[propertyName]);
 				result += "\n# "+MiscComment[propertyName];
-				result += "\n"+propertyName+"="+Misc.heatAppAuxDescPath;
+				result += "\n"+propertyName+"="+AppAuxDescInput.path;
 				break;
+			case 'MULTICAST_MTU':
+				// Do not allow less than 968 bytes as requested by the SEE imms
+				var netmtu=Misc.getAndSetValue(row, nameIndexes, 'Value', MiscDefault[propertyName], MiscComment[propertyName]);
+				if(netmtu < 968){
+					Misc.check+="\nMisc section: SEE IMMS clustering requires MULTICAST_MTU greater or equal than 968: "+netmtu+" not supported";
+					break;
+				}
+				result += "\n# "+MiscComment[propertyName];
+				result += "\n"+propertyName+"="+netmtu;
+				break;
+				
 			default:
 				if(propertyName != ""){
 				result += "\n# "+MiscComment[propertyName];
@@ -2463,8 +2577,8 @@ Misc.build = function(target){
 		result += "\nNIVRDB_ORACLE_PATH="+oracleRole.path;
 	}
 	// Ensure consistency between auxiliary descriptors and their relative paths definitions
-	Misc.check += checkGroupConsistency([Misc.heatAppAuxDescPath != undefined && Misc.heatAppAuxDescPath != '', Misc.heatAppAuxDesc != undefined && Misc.heatAppAuxDesc != ''], 'Misc section vs descriptor import: APPs descriptor path APP_CONFIG_DATA_FILE and imported content consistency:',' both or none should be defined.');
-	Misc.check += checkGroupConsistency([Misc.heatUspmAuxDescPath != undefined && Misc.heatUspmAuxDescPath != '', Misc.heatUspmAuxDesc != undefined && Misc.heatUspmAuxDesc != ''], 'Misc section vs descriptor import: USPM descriptor path VNF_CONFIG_DATA_FILE and imported content consistency:',' both or none should be defined.');
+	Misc.check+=checkDependency(target != undefined, [AppAuxDescInput.isConsistent()], 'Misc section: APPs descriptor path APP_CONFIG_DATA_FILE and imported content consistency: ', 'both or none should be defined.');
+	Misc.check+=checkDependency(target != undefined, [uspmAuxDescInput.isConsistent()], 'Misc section: USPM descriptor path VNF_CONFIG_DATA_FILE and imported content consistency: ', 'both or none should be defined.');
 	
 
 	if(Misc.check != "")return Misc.check;
@@ -2473,7 +2587,7 @@ Misc.build = function(target){
 
 // Add 2 lines by default, typically for the default gateways
 if(Misc.isEmpty()){
-	Misc.add();Misc.add();
+	Misc.add();
 }
 
 // ========================
@@ -2573,6 +2687,72 @@ RedisInstance.build = function(target){
 	if(RedisInstance.check != "")result = RedisInstance.check;
 	return result;
 }
+
+// ==================
+// OCMP settings
+// ==================
+// One user file to be loaded: the license
+var ocmpLicense = new userLoadedFile("ocmpLicense", "Import OCMP license...");
+var OCMPsettings = new vnfResource("OCMPsettings", [
+	{name:'Cluster name', type:'text', width: '150px'},
+	{name:'sip', type:'bool'},
+	{name:'srf', type:'bool'},
+	{name:'tdm', type:'bool'},
+	{name:'Startup configuration', type:'choice', width: '150px', choices:['VxmlPlay', 'netann', 'mediacontrol', 'msml', 'mscml']}, 
+	{name:'License file', type:'text', width: '300px', value:'/home/ocadmin/CMS-OCMP-licfile.dat'}],
+	[ocmpLicense]
+	);
+	
+OCMPsettings.help = function(){return "NOTE: this section applies to OCMP product starting with version 4.5" +
+	"\nCluster name: name of the OCMP cluster" +
+	"\nModules to be deployed on the cluster, in addition to em, base, bre and ccxml" +
+	"\n\tsip: SIP connectivity: netann-mscml, msml, mccf, mediacontrol, sipi" +
+	"\n\tsrf: Specialized Resource Function: bableapi, srf" +
+	"\n\ttdm: TDM connectivity: bableapi, kmod, isup, isdn" +
+	"\nStartup configuration: default OCMP configuration to be loaded after installation." +
+	"\nLicense file: path to OCMP license file; the content must be loaded using the 'Import OCMP license...' button"
+};
+OCMPsettings.build = function(target){
+	var nameIndexes = OCMPsettings.nameIndexes;
+	var result = '\n';
+	OCMPsettings.check = "";
+	ocmpLicense.path = undefined;
+	var table = document.getElementById('OCMPsettings');
+	var rowCount = table.rows.length - 1;
+	var modules = new Array();
+	var separator="";
+	// Limitation: only one set of settings; need to consider multiple OCMP clusters with multiple settings
+	if(rowCount > 1)OCMPsettings.check = "OCMPsettings section: only one definition supported, "+rowCount+" found.";
+	
+	result += '\n# ------------------------ #';
+	result += '\n# OCMP settings            #';
+	result += '\n# ------------------------ #';
+	for(var i=1; i <= rowCount; i++){
+		var row = table.rows[i];
+		var name = OCMPsettings.getAndSetValue(table.rows[i], nameIndexes, 'Cluster name', 'ocmpnfv');
+		if(name ==  undefined || name == '')OCMPsettings.check += "OCMPsettings section: Cluster name cannot be blank";
+		var sip=OCMPsettings.getAndSetChecked(row, nameIndexes, 'sip');
+		var srf=OCMPsettings.getAndSetChecked(row, nameIndexes, 'srf');
+		var tdm=OCMPsettings.getAndSetChecked(row, nameIndexes, 'tdm');
+		if(sip)modules.push("hpeocmp-sip");
+		if(srf)modules.push("hpeocmp-srf");
+		if(tdm)modules.push("hpeocmp-tdm");
+		if(modules.length < 1)OCMPsettings.check += "OCMPsettings section: no module selected: one minimum is required"; 
+		
+		var config = OCMPsettings.getAndSetSelection(table.rows[i], nameIndexes, 'Startup configuration');
+		ocmpLicense.path = OCMPsettings.getAndSetValue(table.rows[i], nameIndexes, 'License file');
+		Misc.check+=checkDependency(target != undefined, [ocmpLicense.isConsistent()], 'OCMPsettings section: license file path and imported content consistency:', 'both or none should be defined.');
+		
+		result += '\nOCMP_CLUSTER_NAME="'+name+'"';
+		result += '\nOCMP_INSTALL_MODULE="'+modules.join(",")+'"';
+		result += '\nOCMP_STARTUP_CONFIGURATION="'+config+'.xml"';
+		result += '\nOCMP_LIC_FILE="'+ocmpLicense.path+'"';
+	}
+
+	// local check
+	if(OCMPsettings.check != "")result = OCMPsettings.check;
+	return result;
+};
 
 // ===========================
 // OCSNF Policy
@@ -2831,7 +3011,7 @@ var MessagingFramework = new vnfResource("MessagingFramework", [
 		'ARCHIVER_URL', 'MCIF_URL', 'RCIF_URL', 
 		'QMCIF_URL', 'MSC_SSN', 'HLR_SSN',
 		'ADDRESSES',
-		'SITE_ID', 'SINGLE_ROUTING_TABLE', 'ROUTING_NETWORKS', 'AUTOMATIC_DISASTER_RECOVERY',
+		'SITE_ID', 'SINGLE_ROUTING_TABLE', 'SINGLE_ZONE', 'ROUTING_NETWORKS', 'AUTOMATIC_DISASTER_RECOVERY',
 		'APPLICATION','APPLICATION_DIAMETER_PROVIDER', 'TESTER', 'ROLE'], 
 		width:'250px'},
 	{name:'Value', type:'text', width:'900px'}
@@ -2851,6 +3031,7 @@ MessagingFrameworkDefault.FRONTEND_CACHE_URL="redis://${NIVRDB_LINUXHA_PASSWORD}
 MessagingFrameworkDefault.ARCHIVER_URL="mongodb://${MONGODB_HOST}:${MONGODB_PORT}/smsc?ssl=false";
 MessagingFrameworkDefault.ADDRESSES="gtssn:0688888888.149,gt:12345678,gtssn:0672990000.150";
 MessagingFrameworkDefault.SINGLE_ROUTING_TABLE='false';
+MessagingFrameworkDefault.SINGLE_ZONE='true';
 MessagingFrameworkDefault.AUTOMATIC_DISASTER_RECOVERY='false';
 
 MessagingFramework.help = function(){
@@ -2886,7 +3067,10 @@ MessagingFramework.help = function(){
 	+ "\n ROUTING_NETWORKS: (list) list of comma separated Redis routing table instances - IP addresses or subnets - deployed on each site, default: <empty>"
 	+ "\n\tExample for 3 sites with 2 routing table instances for the first and second sites, and a subnet for the third:"
 	+ "\n\t192.168.66.100,192.168.66.111 192.168.66.102,192.168.66.112 192.168.66.103,192.168.66.113 192.168.66.0/24"
-	+ "\n SINGLE_ROUTING_TABLE: true|false: in a Multi-Zones deployment model when traffic is distributed across two sites, defines whether a single cross-site Routing Table master is used, default: false."
+	+ "\n SINGLE_ROUTING_TABLE: true|false, default: false."
+	+ "\n\tin a Multi-Zones deployment model when traffic is distributed across two sites, defines whether a single cross-site Routing Table master is used."
+	+ "\n SINGLE_ZONE: true|false; default: true."
+	+ "\n\tsingle zone matches the case where routing table is fully accessible from both front-end and back-end; false is required when front-end and back-end run in different networks."
 	+ "\n AUTOMATIC_DISASTER_RECOVERY: true|false: in a Multi-Zones deployment model when traffic is distributed across two sites, defines whether automatic failover procedure is active or not, default: false."
 	+ "\n ROLE: define the Messaging Framework role to MONOLITHIC or FRONTEND or BACKEND or HYBRID"
 	+ "\n\tInferred default role: if UCP or SMPP provider is defined, or TCAP and the node is a USPM backend, the node is a Messaging Framework FRONTEND (MONOLITHIC if simplex)"
@@ -2956,7 +3140,7 @@ MessagingFramework.build = function(){
 				break;
 			case 'STORE_URL': case 'QUEUE_URL': case 'ROUTING_URL': case 'SITE_ID': case 'ROUTING_NETWORKS': case 'FRONTEND_CACHE_URL': 
 				// can be a vector of values: double quote each property value and add parenthesis
-				result += '\nMESSAGING_FRAMEWORK_'+propertyName+'=( "'+propertyValue.split(/\s+/).join('" "')+'" )'; 
+				result += '\nMESSAGING_FRAMEWORK_'+propertyName+'=( "'+propertyValue.split(/\s+(?![^\(]*\))/).join('" "')+'" )'; 
 				break
 			default:
 				// no vector: double quote the property value
@@ -6728,32 +6912,6 @@ function importSession(){
 		}, 1000);
 }
 
-function setUspmAuxDescInput(event){
-	var input = event.target;
-	var reader = new FileReader();
-    reader.onload = function(){
-    	// Store the USPM descriptor 
-    	Misc.heatUspmAuxDesc = reader.result;
-    	// Display for control
-    	userOutput(reader.result);
-    	};
-    reader.readAsText(input.files[0]);
-}
-function clearUspmAuxDescInput(){Misc.heatUspmAuxDesc=undefined; userOutput(''); document.getElementById("uspmAuxDescInput").value= null;}
-function viewUspmAuxDescInput(){userOutput(Misc.heatUspmAuxDesc);}
-function setAppAuxDescInput(event){
-	var input = event.target;
-	var reader = new FileReader();
-    reader.onload = function(){
-    	// Store the applications auxiliary descriptor 
-    	Misc.heatAppAuxDesc = reader.result;
-    	// Display for control
-    	userOutput(reader.result);
-    };
-    reader.readAsText(input.files[0]);
-}
-function clearAppAuxDescInput(){Misc.heatAppAuxDesc=undefined; userOutput('');document.getElementById("AppAuxDescInput").value= null;}
-function viewAppAuxDescInput(){userOutput(Misc.heatAppAuxDesc);}
 function deploymentHelp(){userOutput(
 "Storage allocation policy: three options are available:"+
 "\n\t- from image: create one volume per instance from a qcow2 image which name is passed as parameter Image"+
@@ -6774,7 +6932,6 @@ function deploy(){
 	switch(document.getElementById("deployer").value){
 		case 'Heat': buildHeatTemplate(); break;
 		case 'Tosca': buildToscaTemplate(); break;
-		case 'NFV-D': buildToscaTemplate('nfvd'); break;
 	}
 }
 // ===========================
@@ -7014,15 +7171,21 @@ function buildHeatTemplate(){
 	heat+=n0+"            EOFILE";
 
     // If a USPM descriptor is defined, push its auxiliary descriptor
-    if(Misc.heatUspmAuxDesc != undefined){
-   	heat+=n0+"            cat > "+Misc.heatUspmAuxDescPath+" << 'EOFILE'";
-    heat+=n0+"            "+Misc.heatUspmAuxDesc.replace(/\n/g, "\n"+  
+    if(uspmAuxDescInput.isDefined()){
+   	heat+=n0+"            cat > "+uspmAuxDescInput.path+" << 'EOFILE'";
+    heat+=n0+"            "+uspmAuxDescInput.content.replace(/\n/g, "\n"+  
 		     "            ");	// fix the descriptor indentation as expected by Heat
 	heat+=n0+"            EOFILE";
     }
-	if(Misc.heatAppAuxDescPath != undefined && Misc.heatAppAuxDesc != undefined){
-   	heat+=n0+"            cat > "+Misc.heatAppAuxDescPath+" << 'EOFILE'";
-    heat+=n0+"            "+Misc.heatAppAuxDesc.replace(/\n/g, "\n"+  
+	if(AppAuxDescInput.path != undefined && AppAuxDescInput.isDefined()){
+   	heat+=n0+"            cat > "+AppAuxDescInput.path+" << 'EOFILE'";
+    heat+=n0+"            "+AppAuxDescInput.content.replace(/\n/g, "\n"+  
+		     "            ");	// fix the descriptor indentation as expected by Heat
+	heat+=n0+"            EOFILE";
+    }
+    if(ocmpLicense.path != undefined && ocmpLicense.isDefined()){
+   	heat+=n0+"            cat > "+ocmpLicense.path+" << 'EOFILE'";
+    heat+=n0+"            "+ocmpLicense.content.replace(/\n/g, "\n"+  
 		     "            ");	// fix the descriptor indentation as expected by Heat
 	heat+=n0+"            EOFILE";
     }
@@ -7061,29 +7224,38 @@ function buildHeatTemplate(){
     // Resolve default gateway IP address to the MGMT subnet holding floating IPs
     heat+=n0+"          ~pub_gateway~: {get_attr: ["+mgmtName+"-subnet, gateway_ip]}";
 	// If a USPM descriptor is defined, push its auxiliary descriptor
-    if(Misc.heatUspmAuxDesc != undefined){
+    if(uspmAuxDescInput.isDefined()){
    	heat+=n0+"  uspm_descriptor:";
-    heat+=n0+"    description: "+Misc.heatUspmAuxDescPath;
+    heat+=n0+"    description: "+uspmAuxDescInput.path;
     heat+=n0+"    value:";
     heat+=n0+"      str_replace:";
     heat+=n0+"        template: |";
-    heat+=n0+"          "+Misc.heatUspmAuxDesc.replace(/\n/g, "\n"+  
+    heat+=n0+"          "+uspmAuxDescInput.content.replace(/\n/g, "\n"+  
 		     "          ");	// fix the descriptor indentation as expected by Heat
 	// Resolve ip addresses parameters 
     heat+=n0+"        params:"+addr.replace(/\n/g, "\n"+  
 		     "          ");	// fix the descriptor indentation as expected by Heat;;
     }
-	if(Misc.heatAppAuxDescPath != undefined && Misc.heatAppAuxDesc != undefined){
+	if(AppAuxDescInput.isDefined()){
    	heat+=n0+"  app_descriptor:";
-    heat+=n0+"    description: "+Misc.heatAppAuxDescPath;
+    heat+=n0+"    description: "+AppAuxDescInput.path;
     heat+=n0+"    value:";
     heat+=n0+"      str_replace:";
     heat+=n0+"        template: |";
-    heat+=n0+"          "+Misc.heatAppAuxDesc.replace(/\n/g, "\n"+  
+    heat+=n0+"          "+AppAuxDescInput.content.replace(/\n/g, "\n"+  
 		     "          ");	// fix the descriptor indentation as expected by Heat
 	// Resolve ip addresses parameters 
     heat+=n0+"        params:"+addr.replace(/\n/g, "\n"+  
 		     "          ");	// fix the descriptor indentation as expected by Heat;;
+	}
+	if(ocmpLicense.isDefined()){
+   	heat+=n0+"  ocmp_license:";
+    heat+=n0+"    description: "+ocmpLicense.path;
+    heat+=n0+"    value:";
+    heat+=n0+"      str_replace:";
+    heat+=n0+"        template: |";
+    heat+=n0+"          "+ocmpLicense.content.replace(/\n/g, "\n"+  
+		     "          ");	// fix the descriptor indentation as expected by Heat
     }
     
     // Show to the user and save to nivr-cluster-nfv.yaml
@@ -7098,88 +7270,21 @@ function buildHeatTemplate(){
 	document.body.removeChild(a);
 }
 
-// ===============================
+// ===========================
 // MSE TOSCA template build
-// Support for NFV Director flavor
-// ===============================
-function buildToscaTemplate(flavor){
+// ===========================
+function buildToscaTemplate(){
 	// Check if Heat volume are to be used and from which source (image or volume)
 	var useHeatVolumes = document.getElementById("useHeatVolumes").value;
 	
 	var n0="\n";
 	var quickDescription = document.getElementById("quickDescription");
-	var tosca="tosca_definitions_version: tosca_simple_yaml_"
-	switch(flavor){
-		case 'nfvd':	tosca+="1_2"; break;
-		default: 		tosca+="1_0"; break;
-	}
+	var tosca="tosca_definitions_version: tosca_simple_yaml_1_0"
 	tosca+=n0+"description: '"+quickDescription.value+"'";
 	tosca+=n0;
-	if(flavor == 'nfvd'){
-	tosca+=n0+"imports:";
-	tosca+=n0+"  - SOL001Type/etsi_nfv_sol001_vnfd_0_10_0_types.yaml";
-	tosca+=n0+"";
-	tosca+=n0+"dsl_definitions:";
-	tosca+=n0+"  descriptor_id: &descriptor_id b1bb0ce7-ebca-4fa7-95ed-4840d70a1169";
-	tosca+=n0+"  provider: &provider CMS";
-	tosca+=n0+"  product_name: &product_name CMS_TAS_VNF";
-	tosca+=n0+"  software_version: &software_version '3.2.0'";
-	tosca+=n0+"  descriptor_version: &descriptor_version '0.0.1'";
-	tosca+=n0+"  flavour_id: &flavour_id simple";
-	tosca+=n0+"  flavour_description: &flavour_description simple deployment";
-	tosca+=n0+"  vnfm: &vnfm";
-	tosca+=n0+"    - HPE";
-	}
-	tosca+=n0;
 	tosca+=n0+"node_types:";
-	switch(flavor){
-		case 'nfvd':
-	tosca+=n0+"  tosca.nodes.nfv.VNF.hpe.tas.3_2:";
-	tosca+=n0+"    derived_from: tosca.nodes.nfv.VNF"; 
-	tosca+=n0+"    properties:";
-	tosca+=n0+"      descriptor_id:";
-	tosca+=n0+"        type: string";
-	tosca+=n0+"        constraints: [ valid_values: [ *descriptor_id ] ]";
-	tosca+=n0+"        default: *descriptor_id";
-	tosca+=n0+"      provider:";
-	tosca+=n0+"        type: string";
-	tosca+=n0+"        constraints: [ valid_values: [ *provider ] ]";
-	tosca+=n0+"        default: *provider";
-	tosca+=n0+"      product_name:";
-	tosca+=n0+"        type: string";
-	tosca+=n0+"        constraints: [ valid_values: [ *product_name ] ]";
-	tosca+=n0+"        default: *product_name";
-	tosca+=n0+"      software_version:";
-	tosca+=n0+"        type: string";
-	tosca+=n0+"        constraints: [ valid_values: [ *software_version ] ]";
-	tosca+=n0+"        default: *software_version";
-	tosca+=n0+"      descriptor_version:";
-	tosca+=n0+"        type: string";
-	tosca+=n0+"        constraints: [ valid_values: [ *descriptor_version ] ]";
-	tosca+=n0+"        default: *descriptor_version";
-	tosca+=n0+"      flavour_id:";
-	tosca+=n0+"        type: string";
-	tosca+=n0+"        constraints: [ valid_values: [ *flavour_id ] ]";
-	tosca+=n0+"        default: *flavour_id";
-	tosca+=n0+"      flavour_description:";
-	tosca+=n0+"        type: string";
-	tosca+=n0+"        constraints: [ valid_values: [ *flavour_description ] ]";
-	tosca+=n0+"        default: *flavour_description";
-	tosca+=n0+"      vnfm_info:";
-	tosca+=n0+"          type: list";
-	tosca+=n0+"          entry_schema:";
-	tosca+=n0+"            type: string";
-	tosca+=n0+"          constraints: [ valid_values: *vnfm  ]";
-	tosca+=n0+"          default: *vnfm";
-	tosca+=n0+"";
-	tosca+=n0+"  tosca.nodes.tas:";
-	tosca+=n0+"    derived_from: tosca.nodes.nfv.Vdu.Compute";
-		break;
-		default:
-	tosca+=n0+"  tosca.nodes.tas:";
+	tosca+=n0+"  tosca.nodes.mse:";
 	tosca+=n0+"    derived_from: tosca.nodes.Compute";
-		break;
-	}
 	tosca+=n0+"    properties:";
 	tosca+=n0+"      key_name:";
 	tosca+=n0+"        type: string";
@@ -7237,10 +7342,7 @@ function buildToscaTemplate(flavor){
 	}
 	tosca+=n0;
 	tosca+=n0+"  node_templates:";
-	if(flavor == 'nfvd'){
-	tosca+=n0+"    VNF:";
-    tosca+=n0+"      type: tosca.nodes.nfv.VNF.hpe.tas.3_2"; 
-	}
+	
 	// Build the descriptor for Heat (or get the errors) and do not publish
 	// Required soon enough to get Heat specific variables properly setup
     var desc = buildVNFDescriptor('Heat');
@@ -7334,7 +7436,7 @@ function buildToscaTemplate(flavor){
       	tosca+=n0+"        size: { get_input: VolumeSize }";
       	}
       	tosca+=n0+"    "+name+":";
-    	tosca+=n0+"      type: tosca.nodes.tas";
+    	tosca+=n0+"      type: tosca.nodes.mse";
 		if(useHeatVolumes != 'none'){
       	tosca+=n0+"      requirements:";
       	tosca+=n0+"        - local_storage:";
@@ -7345,12 +7447,6 @@ function buildToscaTemplate(flavor){
       	tosca+=n0+"                location: vda";
       	}
 		tosca+=n0+"      properties:";
-		tosca+=n0+"        name: "+name;
-      	tosca+=n0+"        description: "+name+" node";
-      	tosca+=n0+"        vdu_profile:";
-      	tosca+=n0+"          min_number_of_instances: 1";
-      	tosca+=n0+"          max_number_of_instances: 1";
-
       	if(useHeatVolumes == 'none'){
       	tosca+=n0+"        image: { get_input: Image }"; 
       	}
@@ -7379,15 +7475,15 @@ function buildToscaTemplate(flavor){
 		tosca+=n0+"                  EOFILE";
 
 		// If a USPM descriptor is defined, push its auxiliary descriptor
-		if(Misc.heatUspmAuxDesc != undefined){
-		tosca+=n0+"                  cat > "+Misc.heatUspmAuxDescPath+" << 'EOFILE'";
-		tosca+=n0+"                  "+Misc.heatUspmAuxDesc.replace(/\n/g, "\n"+  
+		if(uspmAuxDescInput.isDefined()){
+		tosca+=n0+"                  cat > "+uspmAuxDescInput.path+" << 'EOFILE'";
+		tosca+=n0+"                  "+uspmAuxDescInput.content.replace(/\n/g, "\n"+  
 				  "                  ");	// fix the descriptor indentation as expected by tosca
 		tosca+=n0+"                  EOFILE";
 		}
-		if(Misc.heatAppAuxDescPath != undefined && Misc.heatAppAuxDesc != undefined){
-		tosca+=n0+"                  cat > "+Misc.heatAppAuxDescPath+" << 'EOFILE'";
-		tosca+=n0+"                  "+Misc.heatAppAuxDesc.replace(/\n/g, "\n"+  
+		if(AppAuxDescInput.isDefined()){
+		tosca+=n0+"                  cat > "+AppAuxDescInput.path+" << 'EOFILE'";
+		tosca+=n0+"                  "+AppAuxDescInput.content.replace(/\n/g, "\n"+  
 				  "                  ");	// fix the descriptor indentation as expected by tosca
 		tosca+=n0+"                  EOFILE";
 		}
@@ -7433,25 +7529,25 @@ function buildToscaTemplate(flavor){
     // Resolve default gateway IP address to the MGMT subnet holding floating IPs
     tosca+=n0+"            ~pub_gateway~: {get_property: ["+mgmtName+", gateway_ip]}";
 	// If a USPM descriptor is defined, push its auxiliary descriptor
-    if(Misc.heatUspmAuxDesc != undefined){
+    if(uspmAuxDescInput.isDefined()){
    	tosca+=n0+"    uspm_descriptor:";
-    tosca+=n0+"      description: "+Misc.heatUspmAuxDescPath;
+    tosca+=n0+"      description: "+uspmAuxDescInput.path;
     tosca+=n0+"      value:";
     tosca+=n0+"        str_replace:";
     tosca+=n0+"          template: |";
-    tosca+=n0+"            "+Misc.heatUspmAuxDesc.replace(/\n/g, "\n"+  
+    tosca+=n0+"            "+uspmAuxDescInput.content.replace(/\n/g, "\n"+  
 		     "            ");	// fix the descriptor indentation as expected by tosca
 	// Resolve ip addresses parameters 
     tosca+=n0+"          params:"+addr.replace(/\n/g, "\n"+  
 		     "            ");	// fix the descriptor indentation as expected by tosca;;
     }
-	if(Misc.heatAppAuxDescPath != undefined && Misc.heatAppAuxDesc != undefined){
+	if(AppAuxDescInput.isDefined()){
    	tosca+=n0+"    app_descriptor:";
-    tosca+=n0+"      description: "+Misc.heatAppAuxDescPath;
+    tosca+=n0+"      description: "+AppAuxDescInput.path;
     tosca+=n0+"      value:";
     tosca+=n0+"        str_replace:";
     tosca+=n0+"          template: |";
-    tosca+=n0+"            "+Misc.heatAppAuxDesc.replace(/\n/g, "\n"+  
+    tosca+=n0+"            "+AppAuxDescInput.content.replace(/\n/g, "\n"+  
 		     "            ");	// fix the descriptor indentation as expected by tosca
 	// Resolve ip addresses parameters 
     tosca+=n0+"          params:"+addr.replace(/\n/g, "\n"+  
@@ -7794,19 +7890,19 @@ function buildAnsiblePlaybook(){
 		     "      ");	// fix the descriptor indentation as expected by Yaml
 	
 	// If a auxiliary descriptors are defined, push them with their path
-    if(Misc.heatUspmAuxDesc != undefined && Misc.heatUspmAuxDescPath != undefined){
-	cook+=n0+"    uspm_descriptor_path: "+Misc.heatUspmAuxDescPath;
+    if(uspmAuxDescInput.isDefined()){
+	cook+=n0+"    uspm_descriptor_path: "+uspmAuxDescInput.path;
    	cook+=n0+"    uspm_descriptor: |";
-	cook+=n0+"      "+Misc.heatUspmAuxDesc.replace(/\n/g, "\n"+  
+	cook+=n0+"      "+uspmAuxDescInput.content.replace(/\n/g, "\n"+  
 		     "      ");	// fix the descriptor indentation as expected by Yaml
 	}else{
 	cook+=n0+"    uspm_descriptor_path: ''";
    	cook+=n0+"    uspm_descriptor: ''";
 	}
-	if(Misc.heatAppAuxDescPath != undefined && Misc.heatAppAuxDesc != undefined){
-	cook+=n0+"    app_descriptor_path: "+Misc.heatAppAuxDescPath;
+	if(AppAuxDescInput.isDefined()){
+	cook+=n0+"    app_descriptor_path: "+AppAuxDescInput.path;
 	cook+=n0+"    app_descriptor: |";
-	cook+=n0+"      "+Misc.heatAppAuxDesc.replace(/\n/g, "\n"+  
+	cook+=n0+"      "+AppAuxDescInput.content.replace(/\n/g, "\n"+  
 		     "      ");	// fix the descriptor indentation as expected by Yaml
 	}else{
 	cook+=n0+"    app_descriptor_path: ''";
