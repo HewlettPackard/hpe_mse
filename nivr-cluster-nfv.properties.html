@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-03-19 Version 3.15</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-03-26 Version 3.17</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -107,6 +107,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-03-29 3.17	Messaging Gateway: new MessagingGatewayGroups section offers more flexibility to define Service Groups in addition to the built-in DSP and SMPPGrp"+
 	"\n2019-03-08 3.15	SEE clustering: offer MTU seting to address network limitations in OpenStack environments; move auxiliary descriptor buttons to the MISC section; replace COROSYNC_UNICAST with MULTICAST_MTU OCMP 4.5 settings (experimental)"+
 	"\n2019-02-28 3.14	Messaging Framework: introduce the single zone property for multi site deployments"+
 	"\n2019-02-01 3.13	Default scaling role: idle instead of OCMP node; Heat deployment: use the standard flavor for OCSNF nodes and nodes without any defined role; allow one simulap node per VNFC"+
@@ -3215,7 +3216,7 @@ MessagingGateway.build = function(){
 	var table = document.getElementById('MessagingGateway');
 	var rowCount = table.rows.length;
 	result += '\n# ------------------------------- #';
-	result += '\n#       Messaging Gateway       #';
+	result += '\n#       Messaging Gateway         #';
 	result += '\n# ------------------------------- #';
 	if(MessagingGateway.search('Property', 'SERVICE_COMPONENT_NAME')){
 		// Activate Messaging Gateway
@@ -3275,44 +3276,169 @@ MessagingGateway.build = function(){
 }
 
 // ===========================
+// Messaging Gateway Groups
+// ===========================
+var MessagingGatewayGroups = new vnfResource("MessagingGatewayGroups", [
+	{name:'Name', type:'text', width:'80x'},
+	{name:'Code', type:'text', width:'80px'},
+	{name:'Description', type:'text', width:'200px'},
+	{name:'SMPP', type:'bool'},
+	{name:'Gateway', type:'bool'},
+	{name:'Service Path', type:'text', width:'400px'},
+	{name:'Connect timeout', type:'text', width:'80px'},
+	{name:'Read timeout', type:'text', width:'80px'}
+	]
+	);
+
+MessagingGatewayGroups.help = function(){
+	return "Messaging Gateway Groups:" +
+	"\nA Service Group is used for grouping multiple USSD services under a single menu, it is managing services and organizing them hierarchically." +
+	"\nFor SMS Gateway, the ServiceGroup has no particular meaning (as there is no grouping of SMS services). A ServiceGroup must be defined however." +
+	"\nService groups attributes:" +
+	"\n\tName and description: the name is a single word identifying the group, plus an optional verbose description." +
+	"\n\tCode: Integer (range 100-999)" +
+	"\n\tSMPP: (SMS Gateway only parameter) set for services in this group to use the SMPP interface"+
+	"\n\tGateway: (USSD Gateway only parameter) set for services in this group to be included in the first level menu presented by the gateway"+
+	"\n\tService Path: list of comma separated URLS as <port number>/<path to the script on the server>, eg: 8080/ListeningUSSDEtSMSMOservice/smsmo.jsp (not supported on SMPP services)" +
+	"\n\tConnect timeout: HTTP connection timeout for service group in milliseconds, 0 to disable"+
+	"\n\tRead timeout: Maximum time to get a response to a HTTP request, in milliseconds, 0 to disable"
+	;
+};
+
+MessagingGatewayGroups.build = function(){
+	var nameIndexes = MessagingGatewayGroups.nameIndexes;
+	var result = "\n";
+	var names = new Array();
+	var codes = new Array();
+	var descriptions = new Array();
+	var smpps = new Array();
+	var gateways = new Array();
+	var paths = new Array();
+	var connectTOs = new Array();
+	var readTOs = new Array();
+	
+	MessagingGatewayGroups.check = "";
+	var table = document.getElementById('MessagingGatewayGroups');
+	var rowCount = table.rows.length;
+	var numberCandidate;
+	result += '\n# ------------------------------- #';
+	result += '\n#    Messaging Gateway Groups     #';
+	result += '\n# ------------------------------- #';
+	for(var i=1; i < rowCount; i++){
+		var Name=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Name', 'group-'+i);
+		numberCandidate=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Code', 100+i);
+		var Code=Number(numberCandidate);
+		if(Code == "" || Number.isNaN(Code) || Code < 100 || Code > 999)MessagingGatewayGroups.check += "Messaging Gateway Groups section: invalid code "+numberCandidate+"; integer in the range 100-999 expected";
+		var Description=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Description');
+		var smpp=MessagingGatewayGroups.getAndSetChecked(table.rows[i], nameIndexes, 'SMPP');
+		var gateway=MessagingGatewayGroups.getAndSetChecked(table.rows[i], nameIndexes, 'Gateway');
+		var Path=MessagingGatewayServices.getAndSetValue(table.rows[i], nameIndexes, 'Service Path');
+		numberCandidate=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Connect timeout');
+		var connectTO=Number(numberCandidate);
+		if(Number.isNaN(connectTO) || connectTO <0)MessagingGatewayGroups.check += "Messaging Gateway Groups section: invalid Connect timeout "+numberCandidate+"; positive integer expected"; 
+		numberCandidate=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Read timeout');
+		if(Number.isNaN(readTO) || readTO <0)MessagingGatewayGroups.check += "Messaging Gateway Groups section: invalid Read timeout "+numberCandidate+"; positive integer expected";
+		var readTO=Number(numberCandidate);
+		
+		// Consistency check
+		if(Name == "" || Name == undefined) MessagingGatewayGroups.check += "Messaging Gateway Groups section: name cannot be undefined";
+		MessagingGatewayGroups.check += checkDependency(smpp, [Path == ""], 'Service path ', Path+' not supported for SMPP service '+ Name);
+		
+		names.push(Name);
+		codes.push(Code);
+		if(Description != undefined && Description != "")descriptions[i-1]='"'+Description+'"';
+		smpps.push(smpp);
+		gateways.push(gateway);
+		if(Path != undefined && Path != "")paths[i-1]='"'+Path+'"';
+		if(connectTO != undefined && connectTO != "")connectTOs[i-1]=connectTO;
+		if(readTO != undefined && readTO != "")readTOs[i-1]=readTO;
+	}
+
+	if(MessagingGatewayGroups.check != "")return MessagingGatewayGroups.check;
+	fillArrays(descriptions);
+	if(paths.length > 0)fillArrays(paths);
+	if(connectTOs.length > 0)fillArrays(connectTOs);
+	if(readTOs.length > 0)fillArrays(readTOs);
+	if(names.length > 0){
+		result += "\nMESSAGING_GATEWAY_GROUPS=("+names.join(' ')+")";
+		result += "\nMESSAGING_GATEWAY_GROUPS_CODE=("+codes.join(' ')+")";
+		if(descriptions.length > 0)result += "\nMESSAGING_GATEWAY_GROUPS_DESCRIPTION=("+descriptions.join(' ')+")";
+		result += "\nMESSAGING_GATEWAY_GROUPS_SMPP=("+smpps.join(' ')+")";
+		result += "\nMESSAGING_GATEWAY_GROUPS_GATEWAY=("+gateways.join(' ')+")";
+		if(paths.length > 0){result += "\nMESSAGING_GATEWAY_GROUPS_PATH=( "+paths.join(" ")+" )";}
+		if(connectTOs.length > 0)result += "\nMESSAGING_GATEWAY_GROUPS_CONNECT_TIMEOUT=("+connectTOs.join(' ')+")";
+		if(readTOs.length > 0)result += "\nMESSAGING_GATEWAY_GROUPS_READ_TIMEOUT=("+readTOs.join(' ')+")";	
+	}
+	
+	// Make the Messaging Gateway group names available, useful for Messaging Gateway services consistency checks
+	MessagingGatewayGroups.names = names.slice();	
+	return result;
+}
+
+// ===========================
 // Messaging Gateway Services
 // ===========================
 var MessagingGatewayServices = new vnfResource("MessagingGatewayServices", [
-	{name:'Type', type:'choice', choices:[ 'Standard', 'SMPP' ], width:'80px'},
+	{name:'Type', type:'choice', choices:[ 'Standard', 'SMPP', 'Group' ], width:'80px'},
 	{name:'Name', type:'text', width:'120x'},
+	{name:'Description', type:'text', width:'200px'},
+	{name:'Group', type:'text', width:'80px'},
 	{name:'User', type:'text', width:'80px'},
 	{name:'Password', type:'text', width:'80px'},
-	{name:'Code', type:'text', width:'120px'},
+	{name:'Code', type:'text', width:'80px'},
 	{name:'Service Path', type:'text', width:'400px'}
 	]
 	);
 
 MessagingGatewayServices.help = function(){
-	return "Messaging Gateway services to be provisioned: " +
-	"\n\tname, user, password and service code are all required" +
-	"\n\tTypical service names: SMS_MO SMS_MT SMPP..."+
-	"\n\tService Path: <port number>/<path to the script on the server>, eg: 8080/ListeningUSSDEtSMSMOservice/smsmo.jsp (not supported on SMPP services)";
+	return "Messaging Gateway Service Logics:" +
+	"\nA Service Logic is defining the parameters for a given Application service. It is referred as a Service." +
+	"\nNOTE: one to n services can be attached to a particular ServiceGroup instance. Each service must define:" +
+	"\n\tCode: Mandatory for Mobile-initiated USSD and for MOSMS. For a USSD Gateway, this is the USSD code (feature code)." +
+	"\n\t\tThe special code 99999 will catch the USSD requests without dial-code (8bit-data)." +
+	"\n\t\tFor a SMS Gateway, this is the MSISDN or short-code associated to the service: and it must match the destination MSISDN of the received MO-SMS messages" +
+	"\n\tUser: Mandatory. Must be matched by the username parameter of http requests from the application" +
+	"\n\tPassword: Mandatory. Must be matched by the password parameter of http requests from the application" +
+	"\n\tService Path: list of comma separated URLS for this group as <port number>/<path to the script on the server>, eg: 8080/ListeningUSSDEtSMSMOservice/smsmo.jsp (not supported on SMPP services)" +
+	"\nNOTE: the services with type Standard or SMPP use built-in service groups, Dsp and SMPPGrp respectively:" +
+	"\n\tSMPPGrp: Code=244, Description=SMPP Service Group" +
+	"\n\tDSP: Code=243, Description=DSP Service Group" +
+	"\nThose built-in groups are deprecated: using an explicit group defined in the MessagingGatewayGroups section is recommended.";
 };
 
 MessagingGatewayServices.build = function(){
 	var nameIndexes = MessagingGatewayServices.nameIndexes;
 	var result = "\n";
+	var defaultGroup='';
+	if(MessagingGatewayGroups.names != undefined && MessagingGatewayGroups.names.length > 0)defaultGroup = MessagingGatewayGroups.names[0];
+		
 	
 	var names = new Array();
+	var descriptions = new Array()
+	var groups = new Array();
 	var users = new Array();
 	var passwords = new Array();
 	var codes = new Array();
 	var paths = new Array();
 	names['Standard'] = new Array();
+	descriptions['Standard'] = new Array();
 	codes['Standard'] = new Array();
 	users['Standard'] = new Array();
 	passwords['Standard'] = new Array();
 	paths['Standard'] = new Array();
 	names['SMPP'] = new Array();
+	descriptions['SMPP'] = new Array();
 	users['SMPP'] = new Array();
 	passwords['SMPP'] = new Array();
 	codes['SMPP'] = new Array();
 	paths['SMPP'] = new Array();
+	names['Group'] = new Array();
+	descriptions['Group'] = new Array();
+	groups['Group'] = new Array();
+	users['Group'] = new Array();
+	passwords['Group'] = new Array();
+	codes['Group'] = new Array();
+	paths['Group'] = new Array();
 
 	MessagingGatewayServices.check = "";
 	var table = document.getElementById('MessagingGatewayServices');
@@ -3322,19 +3448,26 @@ MessagingGatewayServices.build = function(){
 	result += '\n# ------------------------------- #';
 	for(var i=1; i < rowCount; i++){
 		var type=MessagingGatewayServices.getAndSetSelection(table.rows[i], nameIndexes, 'Type');
-		var Name=MessagingGatewayServices.getAndSetValue(table.rows[i], nameIndexes, 'Name', 'msggw'+type + i);
+		var Name=MessagingGatewayServices.getAndSetValue(table.rows[i], nameIndexes, 'Name', 'service-'+i);
+		var Description=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Description');
+		var Group=MessagingGatewayServices.getAndSetValue(table.rows[i], nameIndexes, 'Group', type == 'Group' ? defaultGroup : '');
 		var User=MessagingGatewayServices.getAndSetValue(table.rows[i], nameIndexes, 'User', 'ocadmin');
 		var Password=MessagingGatewayServices.getAndSetValue(table.rows[i], nameIndexes, 'Password', 'ocadmin');
-		var Code=MessagingGatewayServices.getAndSetValue(table.rows[i], nameIndexes, 'Code', '1234567890');
-		var Path=MessagingGatewayServices.getAndSetValue(table.rows[i], nameIndexes, 'Service Path', type != 'SMPP' ? '8080/ListeningUSSDEtSMSMOservice/smsmo.jsp' : '', 'Messaging Gateway Service Example:');
+		var Code=MessagingGatewayServices.getAndSetValue(table.rows[i], nameIndexes, 'Code', i);
+		var Path=MessagingGatewayServices.getAndSetValue(table.rows[i], nameIndexes, 'Service Path');
 		
-		MessagingGatewayServices.check += checkGroupConsistency([Name != "", User != "", Password != "", Code != ""], "Messaging Gateway service " + Name, " is missing User or Password or Code");
+		MessagingGatewayServices.check += checkGroupConsistency([Name != "", User != "", Password != ""], "Messaging Gateway service " + Name, " is missing User or Password");
+		MessagingGatewayServices.check += checkGroupConsistency([type == 'Group', Group != ""], "Messaging Gateway service " + Name, ": the Group must be defined for type Group and undefined otherwise");
 		MessagingGatewayServices.check += checkDependency(type == 'SMPP', [Path == ""], 'Service path ', Path+' not supported for SMPP service '+ Name);
+		MessagingGatewayServices.check += checkDependency(type == 'Group', [MessagingGatewayGroups.search('Name', Group)], "Messaging Gateway service " + Name, ": the Group "+Group+" is unknonw in section MessagingGatewayGroups");
+		
 		names[type].push(Name);
+		if(type == 'Group')groups[type].push(Group);
 		users[type].push(User);
 		passwords[type].push(Password);
 		codes[type].push(Code);
 		paths[type].push('"'+Path+'"');
+		descriptions[type].push('"'+Description+'"');
 	}
 
 	if(MessagingGatewayServices.check != "")return MessagingGatewayServices.check;
@@ -3343,13 +3476,24 @@ MessagingGatewayServices.build = function(){
 		result += "\nSMSGW_APP_SERVICE_USERNAME=( "+users['Standard'].join(" ")+" )";
 		result += "\nSMSGW_APP_SERVICE_PASSWORD=( "+passwords['Standard'].join(" ")+" )";
 		result += "\nSMSGW_APP_SERVICE_CODE=( "		+codes['Standard'].join(" ")+" )";
-		result += "\nSMSGW_APP_SERVICE_PATH=( "		+paths['Standard'].join(" ")+" )";
+		fillArrays(paths['Standard']); if(paths['Standard'].length > 0){result += "\nSMSGW_APP_SERVICE_PATH=( "+paths['Standard'].join(" ")+" )";}
+		fillArrays(descriptions['Standard']); if(descriptions['Standard'].length > 0){result += "\nSMSGW_APP_SERVICE_DESCRIPTION=( "+descriptions['Standard'].join(" ")+" )";}
 	}
 	if(names['SMPP'].length > 0){
 		result += "\nSMSGW_APP_SMPP_SERVICE=( "+		names['SMPP'].join(" ")+" )";
 		result += "\nSMSGW_APP_SMPP_SERVICE_USERNAME=( "+users['SMPP'].join(" ")+" )";
 		result += "\nSMSGW_APP_SMPP_SERVICE_PASSWORD=( "+passwords['SMPP'].join(" ")+" )";
 		result += "\nSMSGW_APP_SMPP_SERVICE_CODE=( "	+codes['SMPP'].join(" ")+" )";
+		fillArrays(descriptions['SMPP']); if(descriptions['SMPP'].length > 0){result += "\nSMSGW_APP_SMPP_SERVICE_DESCRIPTION=( "+descriptions['SMPP'].join(" ")+" )";}
+	}
+	if(names['Group'].length > 0){
+		result += "\nMESSAGING_GATEWAY_SERVICES=( "+		names['Group'].join(" ")+" )";
+		result += "\nMESSAGING_GATEWAY_SERVICES_GROUP=( "+	groups['Group'].join(" ")+" )";
+		result += "\nMESSAGING_GATEWAY_SERVICES_USERNAME=( "+users['Group'].join(" ")+" )";
+		result += "\nMESSAGING_GATEWAY_SERVICES_PASSWORD=( "+passwords['Group'].join(" ")+" )";
+		result += "\nMESSAGING_GATEWAY_SERVICES_CODE=( "	+codes['Group'].join(" ")+" )";
+		fillArrays(paths['Group']); if(paths['Group'].length > 0){result += "\nMESSAGING_GATEWAY_SERVICES_PATH=( "+paths['Group'].join(" ")+" )";}
+		fillArrays(descriptions['Group']); if(descriptions['Group'].length > 0){result += "\nMESSAGING_GATEWAY_SERVICES_DESCRIPTION=( "+descriptions['Group'].join(" ")+" )";}
 	}
 	
 	return result;
