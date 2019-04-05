@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-04-02 Version 3.2</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-04-02 Version 3.21</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -108,6 +108,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-04-05 3.21	Messaging Gateway: on-line help update, adding CDR_LEVEL property, turning GLOBAL_TITLE as optional; restore ansible deployment on aws."+
 	"\n2019-04-02 3.2	DevOps support for deployment on static nodes, bare metal or pre-allocated VMs"+
 	"\n2019-03-29 3.17	Messaging Gateway: new MessagingGatewayGroups section offers more flexibility to define Service Groups in addition to the built-in DSP and SMPPGrp"+
 	"\n2019-03-08 3.15	SEE clustering: offer MTU seting to address network limitations in OpenStack environments; move auxiliary descriptor buttons to the MISC section; replace COROSYNC_UNICAST with MULTICAST_MTU OCMP 4.5 settings (experimental)"+
@@ -3168,7 +3169,7 @@ MessagingFramework.build = function(){
 var MessagingGateway = new vnfResource("MessagingGateway", [
 	{name:'Property', type:'choice', choices:[ 
 		'SERVICE_COMPONENT_NAME', 'INSTANCE_ID',
-		'POINTCODE', 'COUNTRY_CODE', 'NAT_PREFIX_LENGTH', 
+		'POINTCODE', 'COUNTRY_CODE', 'NAT_PREFIX_LENGTH', 'CDR_LEVEL',
 		'GLOBAL_TITLE_SMS', 'GLOBAL_TITLE_USSD', 'GLOBAL_TITLE_MS',
 		'SMSGW_APPLICATION_CTX_NAME_PRESENT', 'SMSGW_DIALOGPORTIONPRESENT_FOR_MTFWD', 'SMSGW_PID_SMS_TPDU_FIELD',
 		'SMSGW_APP_HOST', 'SMSGW_APP_AVAILABILITY_PATH', 'SMSGW_SMPP_PORT',
@@ -3184,12 +3185,12 @@ MessagingGatewayDefault.SERVICE_COMPONENT_NAME="MSGGW_GATEWAY";
 MessagingGatewayDefault.POINTCODE="2050";
 MessagingGatewayDefault.COUNTRY_CODE="49";
 MessagingGatewayDefault.INSTANCE_ID="1";
+MessagingGatewayDefault.CDR_LEVEL="3";
 MessagingGatewayDefault.NAT_PREFIX_LENGTH="1";
 MessagingGatewayDefault.GLOBAL_TITLE_SMS="525549998068";
 MessagingGatewayDefault.GLOBAL_TITLE_USSD="444444444411";
 MessagingGatewayDefault.GLOBAL_TITLE_MS="525549998060";
 MessagingGatewayDefault.SMSGW_APP_HOST="10.32.247.33";
-MessagingGatewayDefault.SMSGW_APP_AVAILABILITY_PATH="9099/handset/fakeservice";
 MessagingGatewayDefault.SMSGW_SMPP_PORT="2777";
 MessagingGatewayDefault.T_POINTCODE="590";
 MessagingGatewayDefault.T_SSN="6";
@@ -3198,16 +3199,20 @@ MessagingGatewayDefault.T_GLOBAL_TITLE="525549998066";
 MessagingGateway.help = function(){
 	return "Messaging Gateway properties:"
 	+ "\n SERVICE_COMPONENT_NAME: the name of the service created on the SEE application server to run MessagingGateway"
+	+ "\n NAT_PREFIX_LENGTH: for MSISDN transformation to international format: length of leading zeros to trim"
+	+ "\n CDR_LEVEL: Defined the verbosity of the CDR: between 0 (disabled) and 5 (maximum verbosity); default: 3"
+	+ "\n SMSGW_PID_SMS_TPDU_FIELD: SMS GSM 03.40 TPDU TP-PID (protocol id) field tuning (for text SMS) Default value: 0"
 	+ "\n Connectivity"
 	+ "\n - Up to three TCAP providers are to be associated to this application SERVICE_COMPONENT_NAME, using the predefined names: USSD-TCAP-Provider SMS-TCAP-Provider MS-TCAP-Provider"
-	+ "\n SMS part of Messaging Gateway"
-	+ "\n - GLOBAL_TITLE_SMS: The Global Title should be a phone number including country code, for example 919845012345 or 33442343445"
-	+ "\n - SMSGW_SMPP_PORT: SMPP Gateway (FDA-SMSC) properties"
-	+ "\n - SMSGW_APP_HOST, SMSGW_APP_AVAILABILITY_PATH: SMS Gateway service parameters from the DSP application"
 	+ "\n USSD part of Messaging Gateway"
-	+ "\n - GLOBAL_TITLE_USSD"
+	+ "\n - GLOBAL_TITLE_USSD: Global Title used by platform for USSD messages"
+	+ "\n SMS part of Messaging Gateway"
+	+ "\n - GLOBAL_TITLE_SMS: Global Title used by the platform for SMS messages."
+	+ "\n - SMSGW_SMPP_PORT: The tcp port on which the SMPP interface listens. Default: 9844"
+	+ "\n - SMSGW_APP_HOST: name or IP address of the server hosting the application"
+	+ "\n - SMSGW_APP_AVAILABILITY_PATH: Used to call the application on an AlertSC, when alertType = HTTP; eg: 9099/handset/service. Default: empty"
 	+ "\n MAP Services part of Messaging Gateway"
-	+ "\n - GLOBAL_TITLE_MS"
+	+ "\n - GLOBAL_TITLE_MS: Global Title used by the platform for MAP Services messages"
 	+ "\n Handset test tool properties"
 	+ "\n - T_POINTCODE"
 	+ "\n - T_SSN"
@@ -3228,20 +3233,22 @@ MessagingGateway.build = function(){
 	if(MessagingGateway.search('Property', 'SERVICE_COMPONENT_NAME')){
 		// Activate Messaging Gateway
 		result += '\nACTIVATE_APPLI_MESSAGING_GATEWAY=yes';
+		
+		var _ussd=MessagingGateway.search('Property', 'GLOBAL_TITLE_USSD');
+		var _ms=MessagingGateway.search('Property', 'GLOBAL_TITLE_MS');
+		var _sms=MessagingGateway.search('Property', 'GLOBAL_TITLE_SMS');
 
 		// Check mandatory parameters
 		if(!MessagingGateway.search('Property', 'INSTANCE_ID'))MessagingGateway.check += "\nMessaging Gateway: INSTANCE_ID is required";
 		if(!MessagingGateway.search('Property', 'POINTCODE'))MessagingGateway.check += "\nMessaging Gateway: POINTCODE is required";
-		if(!MessagingGateway.search('Property', 'GLOBAL_TITLE_SMS'))MessagingGateway.check += "\nMessaging Gateway: GLOBAL_TITLE_SMS is required";
-		if(!MessagingGateway.search('Property', 'GLOBAL_TITLE_USSD'))MessagingGateway.check += "\nMessaging Gateway: GLOBAL_TITLE_USSD is required";
-		if(!MessagingGateway.search('Property', 'GLOBAL_TITLE_MS'))MessagingGateway.check += "\nMessaging Gateway: GLOBAL_TITLE_MS is required";
+		MessagingGateway.check += checkDependency(true, [_ussd, _ms, _sms], "Messaging Gateway: at least one GLOBAL_TITLE is required:", " USSD MS SMS");
 		if(!MessagingGateway.search('Property', 'SMSGW_APP_HOST'))MessagingGateway.check += "\nMessaging Gateway: SMSGW_APP_HOST is required";
-		if(!MessagingGateway.search('Property', 'SMSGW_APP_AVAILABILITY_PATH'))MessagingGateway.check += "\nMessaging Gateway: SMSGW_APP_AVAILABILITY_PATH is required";
 		if(!MessagingGateway.search('Property', 'SMSGW_SMPP_PORT'))MessagingGateway.check += "\nMessaging Gateway: SMSGW_SMPP_PORT is required";
 		
-		// Check mandatory parameters: at least one TCAP provider with the expected names
-		if(!(TCAP.search('Provider name', 'USSD-TCAP-Provider') || TCAP.search('Provider name', 'SMS-TCAP-Provider') || TCAP.search('Provider name', 'MS-TCAP-Provider')))
-			MessagingGateway.check += "\nMessaging Gateway : at least one TCAP provider named USSD-TCAP-Provider or SMS-TCAP-Provider or MS-TCAP-Provider is required";
+		// Check mandatory parameters: at least one TCAP provider with the expected name
+		MessagingGateway.check += checkDependency(_ussd, [TCAP.search('Provider name', 'USSD-TCAP-Provider')], "Messaging Gateway vs TCAP sections:", "USSD-TCAP-Provider required for USSD messages gateway");
+		MessagingGateway.check += checkDependency(_ms, [TCAP.search('Provider name', 'MS-TCAP-Provider')], "Messaging Gateway vs TCAP sections:", "MS-TCAP-Provider required for MAP Services messages gateway");
+		MessagingGateway.check += checkDependency(_sms, [TCAP.search('Provider name', 'SMS-TCAP-Provider')], "Messaging Gateway vs TCAP sections:", "SMS-TCAP-Provider required for SMS messages gateway");
 			
 		// Prevent instantiation on SEE with non USPM back end nodes
 		if(Nodes.seeNodesNonUspmBackEnd != undefined && Nodes.seeNodesNonUspmBackEnd.length > 0)MessagingGateway.check+="\nMessaging Gateway: cannot instantiate on SEE cluster nodes not playing a USPM Back End role: "+Nodes.seeNodesNonUspmBackEnd.join(" ");
@@ -3349,7 +3356,7 @@ MessagingGatewayGroups.build = function(){
 		
 		// Consistency check
 		if(Name == "" || Name == undefined) MessagingGatewayGroups.check += "Messaging Gateway Groups section: name cannot be undefined";
-		MessagingGatewayGroups.check += checkDependency(smpp, [Path == ""], 'Service path ', Path+' not supported for SMPP service '+ Name);
+		MessagingGatewayGroups.check += checkDependency(smpp, [Path == ""], 'Messaging Gateway Groups section: Service path ', Path+' not supported for SMPP service '+ Name);
 		
 		names.push(Name);
 		codes.push(Code);
@@ -8007,7 +8014,7 @@ function buildAnsiblePlaybook(){
 		cook+=n0+"    delay: 10";
 		cook+=n0+"  - name: Add "+name+" Instance to "+nodeGroup+" group";
 		cook+=n0+"    add_host: name="+name+" groups="+nodeGroup+" nick_name="+name+" fqdn="+nonVipNodes[indexNode].fqdn;
-		cook+=n0+"              ansible_ssh_host="+nonVipNodes[indexNode].ipAddress;
+		cook+=n0+"              ansible_ssh_host="+nonVipNodes[indexNode].ipAddress+" ansible_default_ipv4.address="+nonVipNodes[indexNode].ipAddress ;
 		cook+=n0+"";
 		break;
 
