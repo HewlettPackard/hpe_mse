@@ -8014,7 +8014,7 @@ function buildAnsiblePlaybook(){
 		cook+=n0+"    delay: 10";
 		cook+=n0+"  - name: Add "+name+" Instance to "+nodeGroup+" group";
 		cook+=n0+"    add_host: name="+name+" groups="+nodeGroup+" nick_name="+name+" fqdn="+nonVipNodes[indexNode].fqdn;
-		cook+=n0+"              ansible_ssh_host="+nonVipNodes[indexNode].ipAddress+" ansible_default_ipv4.address="+nonVipNodes[indexNode].ipAddress ;
+		cook+=n0+"              ansible_ssh_host="+nonVipNodes[indexNode].ipAddress;
 		cook+=n0+"";
 		break;
 
@@ -8054,7 +8054,7 @@ function buildAnsiblePlaybook(){
 	cook+=n0+"    # From the inventory";
 	cook+=n0+"    theNode: \"{{hostvars[inventory_hostname]['nick_name']}}\"";
 	cook+=n0+"    theNodeHostname: \"{{hostvars[inventory_hostname]['fqdn']}}\"";
-	cook+=n0+"    theNodeIpAddress: \"{{hostvars[inventory_hostname]['ansible_ssh_host']}}\"";
+	cook+=n0+"    theNodeIpAddress: \"{{hostvars[inventory_hostname]['ansible_default_ipv4']['address']}}\"";
 	cook+=n0+"    # MSE constants";
 	cook+=n0+"    isoRepo: '/var/opt/OC/iso/'";
 	cook+=n0+"    isoMountPoint: '/media/cdrom/'";
