@@ -8054,7 +8054,14 @@ function buildAnsiblePlaybook(){
 	cook+=n0+"    # From the inventory";
 	cook+=n0+"    theNode: \"{{hostvars[inventory_hostname]['nick_name']}}\"";
 	cook+=n0+"    theNodeHostname: \"{{hostvars[inventory_hostname]['fqdn']}}\"";
+	switch(infrastructure){
+	case 'aws':
 	cook+=n0+"    theNodeIpAddress: \"{{hostvars[inventory_hostname]['ansible_default_ipv4']['address']}}\"";
+	break;
+	default:
+	cook+=n0+"    theNodeIpAddress: \"{{hostvars[inventory_hostname]['ansible_ssh_host']}}\"";
+	break;
+	}
 	cook+=n0+"    # MSE constants";
 	cook+=n0+"    isoRepo: '/var/opt/OC/iso/'";
 	cook+=n0+"    isoMountPoint: '/media/cdrom/'";
