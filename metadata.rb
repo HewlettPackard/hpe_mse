@@ -15,9 +15,10 @@ installing and starting the automated deployer as Linux services, dropping the M
 on the MSE Element Manager (EMS) instance and eventually collecting the consolidated status 
 on this same node.
 
-Two recipes/roles: 
+Recipes/roles: 
 - base used for all nodes part of the MSE instance, 
 - ems used for the node playing the MSE EMS role, in charge of receiving the MSE Descriptor, and collect the consolidated status of this MSE instance.
+- collectInfo used to collect deployment and configuration status on nodes
 
 The MSE Descriptor Assistant nivr-cluster-nfv.properties.html must be used to depict the MSE instance topology and build 
 the .kitchen.yml/ansible.yml file used to deploy the MSE instance. This file embedds the MSE descriptor template,
@@ -75,7 +76,7 @@ export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 export YUM_EXPLICIT_PACKAGES="['mlocate','omping','perl-Class-MethodMakerOcbu']"
 # Mandatory services to be started
 export MANDATORY_SERVICES="[]"
-# Patched files as a dictionnary of files in MSE_PATCH_URL or variable cachePatch directory and their destination
+# Patched files as a dictionnary of files in MSE_ISO_URL or cache and their destination
 export PATCHED_FILES='{"uspm-nfv-setup.sh": "/opt/OC/sbin/uspm-nfv-setup.sh"}'
 # To force an OS signature as expected by demanding components like USPM, SEE
 export CLOUD_OS_SIGNATURE='Red Hat Enterprise Linux Server release 6.9 (Santiago)'
@@ -106,10 +107,11 @@ export CLOUD_AVAILABILITY_ZONE="nova"
 export CLOUD_NAMESERVER="16.110.135.52"
 # The OpenStack subnet connecting the instances
 export CLOUD_SUBNET="devOps"
-# Additional environment variables set in OpenStack isntances as a json hash
+# Additional environment variables set in OpenStack instances as a json hash
 export CLOUD_ENVIRONMENT='{"http_proxy": "http://x.y.z.t:port", "https_proxy": "http://x.y.z.t:port"}'
 # The OpenStack image flavor used to instantiate the nodes
 export CLOUD_FLAVOR="v4.m8"
+# List of yum repositories to be used during MSE automated deployer installation
 # labdrops is mandatory to enable the labdrops
 export MSE_YUM_REPO='uspm,labdrops,base'
 # Cent OS 7
@@ -124,6 +126,24 @@ export CLOUD_REPOS_URL="ftp://mse4nfv:password@ftp.ext.hpe.com/chef/repos/"
 # The OpenStack image name and default user
 export CLOUD_IMAGE="CentOS 6"
 export CLOUD_REPOS_LIST="['uspm42.repo']"
+# Propagate user and key to ansible engine
+export ANSIBLE_REMOTE_USER=$CLOUD_DEFAULT_USER
+export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
+
+# Static Infrastructure
+##############
+# The ssh public key used to reach the infrastructure
+export CLOUD_SSH_KEY="../sshKeys/luna/id_rsa"
+# Additional environment variables set in instances as a json hash
+export CLOUD_ENVIRONMENT='{}'
+# List of yum repositories to be used during MSE automated deployer installation
+# labdrops is mandatory to enable the labdrops
+export MSE_YUM_REPO='uspm,labdrops'
+# The default user
+export CLOUD_DEFAULT_USER="root"
+# List of yum repositories definitions to add to the nodes retrieved from CLOUD_REPOS_URL
+export CLOUD_REPOS_LIST="['uspm42RP7.private.repo','mysql.private.repo','mongodb.private.repo']"
+export CLOUD_REPOS_URL="http://192.168.66.194/repos/"
 # Propagate user and key to ansible engine
 export ANSIBLE_REMOTE_USER=$CLOUD_DEFAULT_USER
 export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
