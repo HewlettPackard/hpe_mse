@@ -40,11 +40,11 @@ export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/TAS31/'
 # URL providing MSE patches
 export MSE_PATCH_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/TAS31/'
 # ISO image delivering the MSE automated deployer engine in MSE_ISO_URL or directory specified by cacheIso variable
-export MSE_ENGINE='ClusterManager-3.1.3-2.020130.el7.iso'
+export MSE_ENGINE='ClusterManager-3.1.6-3.000381.eab0051.el7.iso'
 # List of ISO images delivering the MSE products in MSE_ISO_URL or directory specified by cacheIso variable
-export MSE_PRODUCT="['TAS-3.1.1-6.020166.el7.iso','USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.0-1.019457.el7.iso']"
+export MSE_PRODUCT="['TAS-3.1.2-1.000932.20190326071942.d587f1d.snap.el7.iso','USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.1-1.000082.e4bc103.el7.iso','HPE-SNF-1.1.1-10.000589.el7.x86_64.iso']"
 # List of lab drops as an array of rpm packages
-export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.3-3.020151.snap.1812211444.el7.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.3-3.020151.snap.1812211444.el7.noarch.rpm']"
+export MSE_LABDROPS="[]"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 # Explicit additional packages to install if available: mlocate as a quick file searcher, omping as mulitcast checker
@@ -65,11 +65,11 @@ export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/MSE30/'
 # URL providing MSE patches
 export MSE_PATCH_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/MSE30/'
 # ISO image delivering the MSE automated deployer engine in MSE_ISO_URL or directory specified by cacheIso variable
-export MSE_ENGINE='ClusterManager-3.1.3-2.020130.el6.iso'
+export MSE_ENGINE='ClusterManager-3.1.6-3.000381.eab0051.el7'
 # List of ISO images delivering the MSE products in MSE_ISO_URL or directory specified by cacheIso variable
 export MSE_PRODUCT="['SEE-4.1.6.4-3.017751.el6.iso','MSE-3.0.5.3-8.020108.el6.iso','HPE-SMSC-2.1.0-1.000764.snap.el6.x86_64.iso','OpenCall-OCMP-4.4.8.bg013842.el6.x86_64.iso','USPM4212_Linux_RHEL6_3931.iso','OpenCall_OCCP_3.0.3_004177.el6.x86_64.iso']"
 # List of lab drops as an array of rpm packages
-export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.3-3.020151.snap.1812201543.el6.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.3-3.020151.snap.1812201543.el6.noarch.rpm']"
+export MSE_LABDROPS="[]"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 # Explicit additional packages to install if available: mlocate as a quick file searcher, omping as mulitcast checker

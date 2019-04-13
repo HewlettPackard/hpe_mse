@@ -101,7 +101,7 @@ bash 'labdropsVersionLock' do
   cwd isoRepo
   code <<-EOH
     test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas
-    find *.rpm -exec rpm -qp {} --qf '%{epoch}:%{name}-%{version}-%{release}.*\\n' \\; > /etc/opt/OC/hpe-install-${_theInstaller}/versionlock.d/hpe-mse-nfv-999-versionlock.list
+    find *.rpm -exec rpm -qp {} --qf '%{epoch}:%{name}-%{version}-%{release}.*\\n' \\; > /etc/opt/OC/hpe-install-${_theInstaller}/versionlock.d/hpe-mse-nfv-999-versionlock.list || echo no lab drops
   EOH
 end
 
