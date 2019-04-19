@@ -6,6 +6,7 @@ mseBinaries=isoImages+mseLabDrops
 isoUrl=node['mse']['install']['isoUrl']
 yumRepo = node['mse']['install']['yumRepo']
 sshKeysUrl=node['mse']['install']['sshKeysUrl']
+mandatoryServices=node['mse']['install']['mandatoryServices']
 
 # MSE constants
 isoRepo='/var/opt/OC/iso/'
@@ -101,7 +102,7 @@ bash 'labdropsVersionLock' do
   cwd isoRepo
   code <<-EOH
     test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas
-    find *.rpm -exec rpm -qp {} --qf '%{epoch}:%{name}-%{version}-%{release}.*\\n' \\; > /etc/opt/OC/hpe-install-${_theInstaller}/versionlock.d/hpe-mse-nfv-999-versionlock.list
+    find *.rpm -exec rpm -qp {} --qf '%{epoch}:%{name}-%{version}-%{release}.*\\n' \\; > /etc/opt/OC/hpe-install-${_theInstaller}/versionlock.d/hpe-mse-nfv-999-versionlock.list || echo no lab drops
   EOH
 end
 
@@ -120,6 +121,13 @@ bash 'upgradeLabDrops' do
     test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas &&
     ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='#{yumRepo}' --iso #{engineIso}
   EOH
+end
+
+log "Start mandatory explicit services #{mandatoryServices}"
+mandatoryServices.each do |aService|
+  service "#{aService}" do
+    action [:enable,:start]
+  end
 end
 
 log "Make sure the host is in /etc/hosts"
