@@ -130,6 +130,24 @@ export CLOUD_REPOS_LIST="['uspm42.repo']"
 export ANSIBLE_REMOTE_USER=$CLOUD_DEFAULT_USER
 export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
 
+# Static Infrastructure
+##############
+# The ssh public key used to reach the infrastructure
+export CLOUD_SSH_KEY="../sshKeys/luna/id_rsa"
+# Additional environment variables set in instances as a json hash
+export CLOUD_ENVIRONMENT='{}'
+# List of yum repositories to be used during MSE automated deployer installation
+# labdrops is mandatory to enable the labdrops
+export MSE_YUM_REPO='uspm,labdrops'
+# The default user
+export CLOUD_DEFAULT_USER="root"
+# List of yum repositories definitions to add to the nodes retrieved from CLOUD_REPOS_URL
+export CLOUD_REPOS_LIST="['uspm42RP7.private.repo','mysql.private.repo','mongodb.private.repo']"
+export CLOUD_REPOS_URL="http://192.168.66.194/repos/"
+# Propagate user and key to ansible engine
+export ANSIBLE_REMOTE_USER=$CLOUD_DEFAULT_USER
+export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
+
 # Azure Infrastructure
 ######################
 # The ssh public key used to reach the infrastructure
