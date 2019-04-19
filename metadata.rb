@@ -15,9 +15,10 @@ installing and starting the automated deployer as Linux services, dropping the M
 on the MSE Element Manager (EMS) instance and eventually collecting the consolidated status 
 on this same node.
 
-Two recipes/roles: 
+Three recipes/roles: 
 - base used for all nodes part of the MSE instance, 
 - ems used for the node playing the MSE EMS role, in charge of receiving the MSE Descriptor, and collect the consolidated status of this MSE instance.
+- collectInfo gathering deployment information from all nodes
 
 The MSE Descriptor Assistant nivr-cluster-nfv.properties.html must be used to depict the MSE instance topology and build 
 the .kitchen.yml/ansible.yml file used to deploy the MSE instance. This file embedds the MSE descriptor template,
@@ -39,11 +40,11 @@ export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/TAS31/'
 # URL providing MSE patches
 export MSE_PATCH_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/TAS31/'
 # ISO image delivering the MSE automated deployer engine in MSE_ISO_URL or directory specified by cacheIso variable
-export MSE_ENGINE='ClusterManager-3.1.3-2.020130.el7.iso'
+export MSE_ENGINE='ClusterManager-3.1.6-3.000381.eab0051.el7.iso'
 # List of ISO images delivering the MSE products in MSE_ISO_URL or directory specified by cacheIso variable
-export MSE_PRODUCT="['TAS-3.1.1-6.020166.el7.iso','USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.0-1.019457.el7.iso']"
-# List of lab drops as an array of rpm packages
-export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.3-3.020151.snap.1812211444.el7.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.3-3.020151.snap.1812211444.el7.noarch.rpm']"
+export MSE_PRODUCT="['TAS-3.1.1-9.020429.el7.iso','USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.1-1.000082.e4bc103.el7.iso','OpenCall-OCMP-4.5.0.iso','HPE-SNF-1.1.1-10.000589.el7.x86_64.iso']"
+# List of lab drops as an array of rpm packages in MSE_ISO_URL or directory specified by cacheIso variable
+export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.8-3.000565.20190415184527.014d039.snap.el7.noarch.rpm','hpoc-nfv-base-1.1.8-2.000279.20190412103724.9a5e3eb.snap.el7.x86_64.rpm','hpoc-nfv-base-selinux-1.1.8-2.000279.20190412103724.9a5e3eb.snap.el7.x86_64.rpm']"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 # Explicit additional packages to install if available: mlocate as a quick file searcher, omping as mulitcast checker
@@ -64,11 +65,11 @@ export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/MSE30/'
 # URL providing MSE patches
 export MSE_PATCH_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/MSE30/'
 # ISO image delivering the MSE automated deployer engine in MSE_ISO_URL or directory specified by cacheIso variable
-export MSE_ENGINE='ClusterManager-3.1.3-2.020130.el6.iso'
+export MSE_ENGINE='ClusterManager-3.1.6-1.000375.6e519a0.el6.iso'
 # List of ISO images delivering the MSE products in MSE_ISO_URL or directory specified by cacheIso variable
-export MSE_PRODUCT="['SEE-4.1.6.4-3.017751.el6.iso','MSE-3.0.5.3-8.020108.el6.iso','HPE-SMSC-2.1.0-1.000764.snap.el6.x86_64.iso','OpenCall-OCMP-4.4.8.bg013842.el6.x86_64.iso','USPM4212_Linux_RHEL6_3931.iso','OpenCall_OCCP_3.0.3_004177.el6.x86_64.iso']"
-# List of lab drops as an array of rpm packages
-export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.3-3.020151.snap.1812201543.el6.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.3-3.020151.snap.1812201543.el6.noarch.rpm']"
+export MSE_PRODUCT="['SEE-4.1.9-1.000223.a8b3309.el6.iso','MSE-3.0.7-1.000576.fc18d3a.el6.iso','simulap_internal_1.9.0-20180528105249git4e4f10f.iso','HPE-SMSC-2.1.1-01.1336.76ec5dc.snap.el6.x86_64.iso','OpenCall-OCMP-4.4.8.bg013842.el6.x86_64.iso','USPM4212_Linux_RHEL6_3931.iso','OpenCall_OCCP_3.0.3_004177.el6.x86_64.iso','HPE-TAS-Apps-1.1.1-001871.el6.iso']"
+# List of lab drops as an array of rpm packages in MSE_ISO_URL or directory specified by cacheIso variable
+export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.8-4.000570.20190412142835.d98fa4a.snap.el6.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.8-4.000570.20190412142835.d98fa4a.snap.el6.noarch.rpm','hpoc-nfv-base-1.1.8-1.000277.20190412142924.8c5cbd6.snap.el6.x86_64.rpm','hpoc-nfv-base-selinux-1.1.8-1.000277.20190412142924.8c5cbd6.snap.el6.x86_64.rpm']"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
 # Explicit additional packages to install if available: mlocate as a quick file searcher, omping as mulitcast checker
@@ -103,25 +104,26 @@ export CLOUD_SECURITY_GROUPS=default
 # The OpenStack availability zone
 export CLOUD_AVAILABILITY_ZONE="nova"
 # The name server used by OpenStack instances
-export CLOUD_NAMESERVER="16.110.135.52"
+export CLOUD_NAMESERVER="x.y.z.t"
 # The OpenStack subnet connecting the instances
 export CLOUD_SUBNET="devOps"
-# Additional environment variables set in OpenStack isntances as a json hash
+# Additional environment variables set in OpenStack instances as a json hash
 export CLOUD_ENVIRONMENT='{"http_proxy": "http://x.y.z.t:port", "https_proxy": "http://x.y.z.t:port"}'
 # The OpenStack image flavor used to instantiate the nodes
 export CLOUD_FLAVOR="v4.m8"
+# List of yum repositories to be used during MSE automated deployer installation
 # labdrops is mandatory to enable the labdrops
 export MSE_YUM_REPO='uspm,labdrops,base'
-# Cent OS 7
+# URL delivering additional yum repositories definitions CLOUD_REPOS_LIST
+export CLOUD_REPOS_URL="ftp://mse4nfv:password@ftp.ext.hpe.com/chef/repos/"
 # The OpenStack image name and default user
+# Cent OS 7
 export CLOUD_IMAGE="Centos 7"
 export CLOUD_DEFAULT_USER="centos"
 # List of yum repositories definitions to add to the nodes retrieved from CLOUD_REPOS_URL
 export CLOUD_REPOS_LIST="['uspm43.repo']"
-export CLOUD_REPOS_URL="ftp://mse4nfv:password@ftp.ext.hpe.com/chef/repos/"
 # List of yum repositories to be used during MSE automated deployer installation
 # RHEL 6
-# The OpenStack image name and default user
 export CLOUD_IMAGE="CentOS 6"
 export CLOUD_REPOS_LIST="['uspm42.repo']"
 # Propagate user and key to ansible engine
@@ -132,8 +134,8 @@ export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
 ######################
 # The ssh public key used to reach the infrastructure
 export CLOUD_SSH_KEY="~/.ssh/id_rsa"
-# The Azure subscription ID and location
-export AZURE_SUBSCRIPTION_ID="bfe94c07-338d-47cf-aded-e8015d247694"
+export CLOUD_SSH_KEY_PUBLIC_DATA="$(eval cat ${CLOUD_SSH_KEY}.pub)"
+# The Azure location
 export CLOUD_LOCATION="North Europe"
 # The Azure distribution image
 export CLOUD_DISTRO="centos"
@@ -141,14 +143,27 @@ export CLOUD_DISTRO="centos"
 export CLOUD_FLAVOR="Standard_D3"
 # List of yum repositories to be used during MSE automated deployer installation
 export MSE_YUM_REPO='labdrops,centos*,updates*,base*'
+# Additional environment variables set in instances as a json hash
+export CLOUD_ENVIRONMENT='{}'
+# URL delivering additional yum repositories definitions CLOUD_REPOS_LIST
+export CLOUD_REPOS_URL="ftp://mse4nfv:password@ftp.ext.hpe.com/chef/repos/"
+# The default user
+export CLOUD_DEFAULT_USER="azureuser"
 # Propagate user and key to ansible engine
 export ANSIBLE_REMOTE_USER=$CLOUD_DEFAULT_USER
 export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
-# The Azure image name
+# The OpenStack image name
+export CLOUD_IMAGE_OFFER="CentOS"
+export CLOUD_IMAGE_PUBLISHER="OpenLogic"
+export CLOUD_IMAGE_VERSION="latest"
 # Cent OS 7
-export CLOUD_IMAGE="OpenLogic:CentOS:7.4:latest"
+export CLOUD_IMAGE_SKU="7.5"
+# List of yum repositories definitions to add to the nodes retrieved from CLOUD_REPOS_URL
+export CLOUD_REPOS_LIST="['uspm43public.repo']"
 # Cent OS 6
-export CLOUD_IMAGE="OpenLogic:CentOS:6.9:latest"
+export CLOUD_IMAGE_SKU="6.9"
+export CLOUD_REPOS_LIST="['uspm42public.repo']"
+export CLOUD_IMAGE="${CLOUD_IMAGE_PUBLISHER}:${CLOUD_IMAGE_OFFER}:${CLOUD_IMAGE_SKU}:${CLOUD_IMAGE_VERSION}"
 
 # Amazon Infrastructure
 #######################
@@ -168,8 +183,11 @@ export CLOUD_LOCATION="eu-west-1"
 export CLOUD_FLAVOR="t2.micro"
 # List of yum repositories to be used during MSE automated deployer installation
 export MSE_YUM_REPO='labdrops,centos*,updates*,base*'
+# Additional environment variables set in instances as a json hash
 export CLOUD_ENVIRONMENT='{}'
-export CLOUD_REPOS_LIST="[]"
+# List of yum repositories definitions to add to the nodes retrieved from CLOUD_REPOS_URL
+export CLOUD_REPOS_LIST="['uspm43public.repo']"
+export CLOUD_REPOS_URL="ftp://mse4nfv:password@ftp.ext.hpe.com/chef/repos/"
 # Propagate user and key to ansible engine
 export ANSIBLE_REMOTE_USER=$CLOUD_DEFAULT_USER
 export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
@@ -179,9 +197,9 @@ export CLOUD_IMAGE="ami-3548444c"
 # Cent OS 6
 export CLOUD_IMAGE="ami-404f4339"
 
-# (C) Copyright 2018 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
 EOH
-version '0.4.3'
+version '0.4.4'
 chef_version '>= 12.14' if respond_to?(:chef_version)
 
 # The `issues_url` points to the location where issues for this cookbook are
@@ -194,4 +212,4 @@ chef_version '>= 12.14' if respond_to?(:chef_version)
 # `View Source` link will be displayed on this cookbook's page when uploaded to
 # a Supermarket.
 #
-# source_url 'https://github.com/<insert_org_here>/hpe_mse'
+# source_url 'https://github.com/HewlettPackard/hpe_mse'
