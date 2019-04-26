@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-04-09 Version 3.22</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-04-26 Version 3.23</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -108,6 +108,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-04-26 3.23	Align Chef deployments with Ansible ones on Azure: add explicit packages, additional yum repositories definitions, mandatory services startup, OS signature setup"+
 	"\n2019-04-09 3.22	Enable SEE5 and Linux HA co-location; support Azure deployment with Ansible"+
 	"\n2019-04-05 3.21	Messaging Gateway: on-line help update, adding CDR_LEVEL property, turning GLOBAL_TITLE as optional; restore ansible deployment on aws."+
 	"\n2019-04-02 3.2	DevOps support for deployment on static nodes, bare metal or pre-allocated VMs"+
@@ -7856,6 +7857,7 @@ function buildChefCookbook(){
     // For each non EMS node: create the instance
     nonEmsNodesNames.forEach(function(name, indexNode){
 	cook+=n0+"  - name: "+name;
+	cook+=n0+"    machine_size: <%= ENV['CLOUD_FLAVOR'] %>";
 	cook+=n0+"    run_list:";
 	cook+=n0+"      - recipe[hpe_mse::base]";
 	cook+=n0+"    driver_config:";
@@ -7893,6 +7895,14 @@ function buildChefCookbook(){
 	cook+=n0+"          yumRepo: <%= ENV['MSE_YUM_REPO'] %>";
 	cook+=n0+"          # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files";
 	cook+=n0+"          sshKeysUrl: <%= ENV['MSE_SSH_KEYS_URL'] %>";
+	cook+=n0+"          yumExplicitPackages: <%= ENV['YUM_EXPLICIT_PACKAGES'] %>";
+	cook+=n0+"          # Mandatory services to be started";
+	cook+=n0+"          mandatoryServices: <%= ENV['MANDATORY_SERVICES'] %>";
+	cook+=n0+"          yumReposDefUrl: <%= ENV['CLOUD_REPOS_URL'] %>";
+	cook+=n0+"          yumReposDef: <%= ENV['CLOUD_REPOS_LIST'] %>";
+	cook+=n0+"          osSignature: <%= ENV['CLOUD_OS_SIGNATURE'] %>";
+	cook+=n0+"          yum_exclude: <%= ENV['YUM_EXCLUDE'] %>";
+
 
 	// Append the descriptor as a 'deploy' attribute
 	cook+=n0+"        deploy:";

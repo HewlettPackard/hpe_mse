@@ -47,7 +47,7 @@ export MSE_PRODUCT="['TAS-3.1.1-9.020429.el7.iso','USPM433_Linux_RHEL7_4654.iso'
 export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.8-3.000565.20190415184527.014d039.snap.el7.noarch.rpm','hpoc-nfv-base-1.1.8-2.000279.20190412103724.9a5e3eb.snap.el7.x86_64.rpm','hpoc-nfv-base-selinux-1.1.8-2.000279.20190412103724.9a5e3eb.snap.el7.x86_64.rpm']"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
-# Explicit additional packages to install if available: mlocate as a quick file searcher, omping as mulitcast checker
+# Explicit additional packages to install if available: mlocate as a quick file searcher, omping as multicast checker
 export YUM_EXPLICIT_PACKAGES="['mlocate','firewalld','iptables-services']"
 # Mandatory services to be started
 export MANDATORY_SERVICES="['firewalld']"
@@ -72,7 +72,7 @@ export MSE_PRODUCT="['SEE-4.1.9-1.000223.a8b3309.el6.iso','MSE-3.0.7-1.000576.fc
 export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.8-4.000570.20190412142835.d98fa4a.snap.el6.noarch.rpm','hpoc-nivr-nfv-ocmp-3.1.8-4.000570.20190412142835.d98fa4a.snap.el6.noarch.rpm','hpoc-nfv-base-1.1.8-1.000277.20190412142924.8c5cbd6.snap.el6.x86_64.rpm','hpoc-nfv-base-selinux-1.1.8-1.000277.20190412142924.8c5cbd6.snap.el6.x86_64.rpm']"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
-# Explicit additional packages to install if available: mlocate as a quick file searcher, omping as mulitcast checker
+# Explicit additional packages to install if available: mlocate as a quick file searcher, omping as multicast checker
 export YUM_EXPLICIT_PACKAGES="['mlocate','omping','perl-Class-MethodMakerOcbu']"
 # Mandatory services to be started
 export MANDATORY_SERVICES="[]"
@@ -150,8 +150,9 @@ export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
 
 # Azure Infrastructure
 ######################
-# The ssh public key used to reach the infrastructure
+# The path to the ssh public key used to reach the infrastructure
 export CLOUD_SSH_KEY="~/.ssh/id_rsa"
+# Ansible only: the actual public key data
 export CLOUD_SSH_KEY_PUBLIC_DATA="$(eval cat ${CLOUD_SSH_KEY}.pub)"
 # The Azure location
 export CLOUD_LOCATION="North Europe"
@@ -167,30 +168,33 @@ export CLOUD_ENVIRONMENT='{}'
 export CLOUD_REPOS_URL="ftp://mse4nfv:password@ftp.ext.hpe.com/chef/repos/"
 # The default user
 export CLOUD_DEFAULT_USER="azureuser"
-# Propagate user and key to ansible engine
+# Ansible only: Propagate user and key to ansible engine
 export ANSIBLE_REMOTE_USER=$CLOUD_DEFAULT_USER
 export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
-# The OpenStack image name
+# Chef only: the subscription ID (duplicated from ~/.azure/credentials)
+export AZURE_SUBSCRIPTION_ID="bfe94c07-338d-47cf-aded-e8015d247694"
+# The image definition
 export CLOUD_IMAGE_OFFER="CentOS"
 export CLOUD_IMAGE_PUBLISHER="OpenLogic"
 export CLOUD_IMAGE_VERSION="latest"
 # Cent OS 7
 export CLOUD_IMAGE_SKU="7.5"
+export CLOUD_IMAGE="OpenLogic:CentOS:7.5:latest"
 # List of yum repositories definitions to add to the nodes retrieved from CLOUD_REPOS_URL
 export CLOUD_REPOS_LIST="['uspm43public.repo']"
 # Cent OS 6
 export CLOUD_IMAGE_SKU="6.9"
 export CLOUD_REPOS_LIST="['uspm42public.repo']"
-export CLOUD_IMAGE="${CLOUD_IMAGE_PUBLISHER}:${CLOUD_IMAGE_OFFER}:${CLOUD_IMAGE_SKU}:${CLOUD_IMAGE_VERSION}"
+export CLOUD_IMAGE="OpenLogic:CentOS:6.9:latest"
 
 # Amazon Infrastructure
 #######################
 # The ssh public key used to reach the infrastructure
-export CLOUD_SSH_KEY=~/.aws/mse.pem
+export CLOUD_SSH_KEY="~/.aws/mse.pem"
 # The ssh key pair used by resources in the infrastructure
 export CLOUD_SSH_KEY_PAIR="mse"
 # The Amazon security groups
-export CLOUD_SECURITY_GROUPS=["sg-03527e0d7d4232a2f"]
+export CLOUD_SECURITY_GROUPS="['sg-03527e0d7d4232a2f']"
 # The Amazon availability zone
 export CLOUD_AVAILABILITY_ZONE="b"
 # The Amazon subnet
