@@ -16,6 +16,8 @@
     until: mse_stack is success
     retries: 5
     delay: 30
+  - meta: end_play
+    when: the_state is defined and the_state == "absent"
 
   - name: set facts from stack outputs descriptions discarding verbose logs
     with_items: "{{mse_stack.stack.outputs}}"
