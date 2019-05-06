@@ -147,13 +147,15 @@
   retries: 3
   delay: 10
 
-- name: Install the MSE Automated Deployment engine
+- name: Install the MSE Automated Deployment engine with-hpe-mse-nfv with-hpoc-uspm-nfv and with-hpocmp-nfv-ocmp if available
   shell: |
     > /etc/yum/pluginconf.d/versionlock.list
     cd {{isoRepo}} &&
+    _capabilities="--with-hpe-mse-nfv --with-hpoc-uspm-nfv "
     if test -f install-cluster-manager.sh ; then _theInstaller=cluster-manager && _theIso=ClusterManager*.iso  ; else _theInstaller=tas && _theIso=TAS*.iso ; fi 
     ./install-${_theInstaller}.sh --yes --install hpe-install-${_theInstaller} --disableplugin=yum-plugin-versionlock --iso ${_theIso} && 
-    ./install-${_theInstaller}.sh --yes --install --with-hpoc-tls-certificates --with-hpe-mse-nfv --with-hpoc-uspm-nfv --enablerepo='{{yumRepo}}' --iso ${_theIso}
+    if ./install-${_theInstaller}.sh --help --with-hpocmp-nfv-ocmp &> /dev/null ; then _capabilities+="--with-hpocmp-nfv-ocmp" ; fi &&
+    ./install-${_theInstaller}.sh --yes --install --with-hpoc-tls-certificates ${_capabilities} --enablerepo='{{yumRepo}}' --iso ${_theIso}
 
 - name: Create a labdrops yum repository for rpm packages in {{isoRepo}} with labdrops {{mseLabDrops }}
   shell: |
