@@ -20,7 +20,7 @@
     path: /etc/resolv.conf
     insertbefore: '^search.*'
     line: "nameserver  {{nameserver}}"
-  when: nameserver is defined
+  when: nameserver is defined and nameserver!=""
 
 - name: Set hostname
   hostname: 
@@ -253,6 +253,12 @@
     sed -i "s/#PasswordAuthentication.*/PasswordAuthentication yes/" /etc/ssh/sshd_config &&
     sed -i "/^PermitRootLogin.*no/d" /etc/ssh/sshd_config &&
     sed -i "s/#PermitRootLogin.*/PermitRootLogin yes/" /etc/ssh/sshd_config
+- name: root ssh directory
+  file: 
+    path: '/root/.ssh'
+    state: directory
+    recurse: yes
+    owner: 'root'
 - name: ocadmin ssh directory
   file: 
     path: '/home/ocadmin/.ssh'

@@ -6,6 +6,12 @@ mseBinaries=isoImages+mseLabDrops
 isoUrl=node['mse']['install']['isoUrl']
 yumRepo = node['mse']['install']['yumRepo']
 sshKeysUrl=node['mse']['install']['sshKeysUrl']
+mandatoryServices=node['mse']['install']['mandatoryServices']
+yumExplicitPackages=node['mse']['install']['yumExplicitPackages']
+yumReposDef=node['mse']['install']['yumReposDef']
+yumReposDefUrl=node['mse']['install']['yumReposDefUrl']
+osSignature=node['mse']['install']['osSignature']
+yum_exclude=node['mse']['install']['yum_exclude']
 
 # MSE constants
 isoRepo='/var/opt/OC/iso/'
@@ -24,6 +30,14 @@ log "MSE node:"+theNode+" at ipAddress:"+theNodeIpAddress+" is named:"+theNodeHo
 log "Enable root at the console prompt"
 execute "echo 'root:hwroot' | chpasswd"
 
+if ! osSignature.nil?
+  log "Set OS signature #{osSignature} in redhat-release"
+  file '/etc/redhat-release' do
+    owner'root'
+    content "#{osSignature}"
+  end
+end
+
 log "Enforce name resolution to *not* use myhostname in /etc/nsswitch.conf for getent"
 execute "sed -i -e 's%myhostname%%' /etc/nsswitch.conf"
 
@@ -33,6 +47,14 @@ log "Create the MSE directories"
     recursive true
   end
 end
+
+log "Get additional YUM repositories definitions"
+yumReposDef.each do |aRepo|
+  remote_file '/etc/yum.repos.d/'+"#{aRepo}" do
+    source yumReposDefUrl+"#{aRepo}"
+  end
+end
+
 
 # Resource used to trigger a refresh on the EMS node, in case of ISO image(s) change
 # Defined to no-operation on a base node, overridden on ems node, see ems.rb
@@ -67,7 +89,7 @@ mount isoMountPoint do
   action [:mount]
 end
 
-['cluster-manager','tas'].each do |theInstaller|
+['cluster-manager'].each do |theInstaller|
   remote_file isoRepo+"install-#{theInstaller}.sh" do
     source "file://"+isoMountPoint+"utils/install-#{theInstaller}.sh"
     mode 0755
@@ -101,7 +123,7 @@ bash 'labdropsVersionLock' do
   cwd isoRepo
   code <<-EOH
     test -f install-cluster-manager.sh && _theInstaller=cluster-manager || _theInstaller=tas
-    find *.rpm -exec rpm -qp {} --qf '%{epoch}:%{name}-%{version}-%{release}.*\\n' \\; > /etc/opt/OC/hpe-install-${_theInstaller}/versionlock.d/hpe-mse-nfv-999-versionlock.list
+    find *.rpm -exec rpm -qp {} --qf '%{epoch}:%{name}-%{version}-%{release}.*\\n' \\; > /etc/opt/OC/hpe-install-${_theInstaller}/versionlock.d/hpe-mse-nfv-999-versionlock.list || echo no lab drops
   EOH
 end
 
@@ -121,6 +143,23 @@ bash 'upgradeLabDrops' do
     ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='#{yumRepo}' --iso #{engineIso}
   EOH
 end
+
+log "Install additional explicit packages #{yumExplicitPackages}"
+yumExplicitPackages.each do |aPackage|
+  package "#{aPackage}"
+end
+
+log "Start mandatory explicit services #{mandatoryServices}"
+mandatoryServices.each do |aService|
+  service "#{aService}" do
+    action [:enable,:start]
+  end
+end
+
+log "Define YUM exclude list #{yum_exclude} in /etc/yum.conf"
+if ! yum_exclude.nil?
+  execute "grep -q -e exclude /etc/yum.conf || sed -i \'/logfile/a exclude: #{yum_exclude}\' /etc/yum.conf"
+end 
 
 log "Make sure the host is in /etc/hosts"
 execute 'updateHosts' do 

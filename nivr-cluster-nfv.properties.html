@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-04-02 Version 3.21</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-04-26 Version 3.23</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -108,6 +108,8 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-04-26 3.23	Align Chef deployments with Ansible ones on Azure: add explicit packages, additional yum repositories definitions, mandatory services startup, OS signature setup"+
+	"\n2019-04-09 3.22	Enable SEE5 and Linux HA co-location; support Azure deployment with Ansible"+
 	"\n2019-04-05 3.21	Messaging Gateway: on-line help update, adding CDR_LEVEL property, turning GLOBAL_TITLE as optional; restore ansible deployment on aws."+
 	"\n2019-04-02 3.2	DevOps support for deployment on static nodes, bare metal or pre-allocated VMs"+
 	"\n2019-03-29 3.17	Messaging Gateway: new MessagingGatewayGroups section offers more flexibility to define Service Groups in addition to the built-in DSP and SMPPGrp"+
@@ -323,7 +325,7 @@ function compatibilityMatrix(){
 	devopsMatrix.matrix.appendChild(tr);
 	
 	new compatibleFeature(devopsMatrix, "Openstack",['Ansible'], "Deploy a full Heat stack or a set of instances on a single network. Tested on CentOS 6 and 7 images");
-	new compatibleFeature(devopsMatrix, "Azure",	['Chef'], "Single network interface. Tested on CentOS 6.10 and 7 images");
+	new compatibleFeature(devopsMatrix, "Azure",	['Chef', 'Ansible'], "Single network interface. Tested on CentOS 6.10 and 7 images");
 	new compatibleFeature(devopsMatrix, "Aws",		['Chef', 'Ansible'], "Single network interface. Tested on CentOS 6 and 7 images");
 	new compatibleFeature(devopsMatrix, "TOSCA",	[], "Experimental");
 	new compatibleFeature(devopsMatrix, "Static",	['Ansible'], "Deploy on pre-allocated VMs or bare metal configured with static IP addresses");
@@ -1028,7 +1030,7 @@ Networks.help = function(){
 	"\n\t- recommended: 255.255.255.224: width: 5, 8 networks, 32 nodes";
 }
 	
-Networks.build = function(target){
+Networks.build = function(target, engine){
 	var nameIndexes = Networks.nameIndexes;
 	var result = '\n';
 	Networks.check = "";
@@ -1044,7 +1046,6 @@ Networks.build = function(target){
 	['APP', 'SIP', 'LBNAT', 'PUBLIC', 'HA', 'DATA', 'M3UA1', 'M3UA2'].forEach(function(name){
 		if(Networks.count('network', name) > 1)Networks.check += "\nNetworks: concurrent definitions of "+name+" detected";
 	});
-	Networks.check += checkDependency(target == 'azure' || target == 'aws', [Networks.count('network') <= 1], "Networks: azure and aws infrastructure are limited to one single network; found ", Networks.count('network'));
 
 	result += '\n# ------------------------------- #';
 	result += '\n# Network interfaces definition   #';
@@ -1066,7 +1067,7 @@ Networks.build = function(target){
 			result += '\n'+networkName+'_DEVICE='+networkDevice;
 			result += '\n'+networkName+'_NETMASK='+networkMask;
 			
-			if(target == 'Heat'){
+			if(target == 'azure' && engine == 'ansible' || target == 'Heat'){
 				// Heat deployments: all networks have the same width: guess it from the first netmask proposed 
 				if(Networks.heatWidth ==  undefined){
 					// Use the 4th byte of the mask as the source for network width
@@ -1081,7 +1082,7 @@ Networks.build = function(target){
 				}
 				// Heat networks should be named ethN, N integer
 				var prefix='eth';
-				if(!networkDevice.startsWith(prefix))Networks.check += "\nNetworks: unsupported interface name for Heat target " + networkDevice + ": prefix " + prefix +" required";
+				if(!networkDevice.startsWith(prefix))Networks.check += "\nNetworks: unsupported interface name for "+target+" target " + networkDevice + ": prefix " + prefix +" required";
 				var candidate = networkDevice.substr(prefix.length);
 				var interfaceNumber = Number(candidate);
 				if(Number.isNaN(interfaceNumber)){
@@ -1090,10 +1091,12 @@ Networks.build = function(target){
 				} 
 				Networks.heatNetworks[networkName] = interfaceNumber;
 				Networks.heatMaxNetwork = Math.max(Networks.heatMaxNetwork,interfaceNumber);
-				if(networkMask !== Networks.heatMask)Networks.check += "\nNetworks: netmask for Heat target is enforced to " + Networks.heatMask + ": found " + networkMask + " on interface " + networkName;
+				if(networkMask !== Networks.heatMask)Networks.check += "\nNetworks: netmask for "+target+" target is enforced to " + Networks.heatMask + ": found " + networkMask + " on interface " + networkName;
 			}
 		}
 	}
+	
+	Networks.check += checkDependency(target == 'azure' || target == 'aws', [Networks.heatMaxNetwork == 0], "Networks: azure and aws infrastructure are limited to one single network; found ", Networks.heatMaxNetwork + 1);
 
 	// update visible networks in the nodes table
 	Nodes.hideUnused();
@@ -1410,13 +1413,23 @@ Nodes.build = function(target, engine){
 		      case 'ansible': nodeName="_%_"+shortName+"_hostname_%_"; break;
 		      } 
 		  case 'azure':
-			// IP addresses will be known at instantiation time: 
+		  	// IP addresses will be known at instantiation time: 
 			// Replace undefined values with place holders resolved later
 			// Push the network interface number in the interfaces list for this node
 			if(nodeIpAddr == "?"){
 			  switch(engine){
 			    case 'chef': nodeIpAddr="<_%_= node['mse']['map']['"+shortName+"']['ipaddress'] _%_>";	break;
 			    case 'ansible': nodeIpAddr="_%_"+shortName+"_ipaddress_%_";	break;
+			  }
+			  // Only one interface supported so far: MGMT, can be shared on multiple networks however
+			  {
+				if(nodeAppIpAddr == "?" && Networks.heatNetworks['APP'] == Networks.heatNetworks['MGMT'])nodeAppIpAddr=nodeIpAddr;
+				if(nodeSipIpAddr == "?" && Networks.heatNetworks['SIP'] == Networks.heatNetworks['MGMT'])nodeSipIpAddr=nodeIpAddr;
+				if(nodeNatIpAddr == "?" && Networks.heatNetworks['LBNAT'] == Networks.heatNetworks['MGMT'])nodeNatIpAddr=nodeIpAddr;
+				if(nodeHaIpAddr == "?" && Networks.heatNetworks['HA'] == Networks.heatNetworks['MGMT'])nodeHaIpAddr=nodeIpAddr;
+				if(nodeDataIpAddr == "?" && Networks.heatNetworks['DATA'] == Networks.heatNetworks['MGMT'])nodeDataIpAddr=nodeIpAddr;
+				if(nodeM3ua1IpAddr == "?" && Networks.heatNetworks['M3UA1'] == Networks.heatNetworks['MGMT'])nodeM3ua1IpAddr=nodeIpAddr;
+				if(nodeM3ua2IpAddr == "?" && Networks.heatNetworks['M3UA2'] == Networks.heatNetworks['MGMT'])nodeM3ua2IpAddr=nodeIpAddr;
 			  }
 			  theCloudNode.interfaces.push(Networks.heatNetworks['MGMT']);
 			} 
@@ -1494,10 +1507,6 @@ Nodes.build = function(target, engine){
 		Nodes.check += checkUnicity([httpLbRole == "Pri" , httpLbPrimaryIpAddr['MGMT'][VNFCindex] != undefined], "Nodes: "+nodeName + ": httpLb primary role on " + VNFdisplayName, " is duplicated.");
 		Nodes.check += checkUnicity([httpLbRole == "Sec" , httpLbSecondaryIpAddr['MGMT'][VNFCindex] != undefined], "Nodes: "+nodeName + ": httpLb secondary role on " + VNFdisplayName, " is duplicated.");
 		Nodes.check += checkUnicity([httpLbRole == "VIP" , httpLbVipIpAddr['MGMT'][VNFCindex] != undefined], nodeName + ": httpLb Vip role on  " + VNFdisplayName, " is duplicated.");
-		Nodes.check += checkUnicity([linuxHaRole != "" , seeRole != ""], nodeName + ": Linux HA and SEE roles", " are mutually exclusive.");
-		Nodes.check += checkUnicity([redisHaRole  == "Pri" || redisHaRole  == "Sec", seeRole != ""], nodeName + ": Redis Linux HA and SEE roles", " are mutually exclusive.");
-		Nodes.check += checkUnicity([pgsqlHaRole == "Pri" || pgsqlHaRole == "Sec", seeRole != ""], nodeName + ": Pgsql HA and SEE roles", " are mutually exclusive.");
-		Nodes.check += checkUnicity([sipLbRole == "Pri" || sipLbRole == "Sec", seeRole != ""], nodeName + ": OC SNF HA and SEE roles", " are mutually exclusive.");
 		Nodes.check += checkDependency(VNFCindex != 0, [linuxHaRole == "", seeRole != "", httpLbRole != "" ],"Nodes: "+nodeName + " on " + VNFdisplayName + ": linuxHaRole not supported on a VNFC", " (SEE cluster and HTTP LB roles only)");
 		Nodes.check += checkDependency(VNFCindex != 0, [sipLbRole == "", seeRole != "", httpLbRole != "" ], 	"Nodes: "+nodeName + " on " + VNFdisplayName + ": sipLbRole not supported on a VNFC", " (SEE cluster and HTTP LB roles only)");
 		Nodes.check += checkDependency(VNFCindex != 0, [pgsqlHaRole == "", seeRole != "", httpLbRole != ""], "Nodes: "+nodeName + " on " + VNFdisplayName + ": pgsqlHaRole not supported on a VNFC", " (SEE cluster and HTTP LB roles only)");
@@ -1516,9 +1525,11 @@ Nodes.build = function(target, engine){
 			Licensing.search('Feature', 'OCMP_BRE_LIC_ASR_INSTANCES') && 
 			Licensing.search('Feature', 'OCMP_BRE_LIC_TTS_INSTANCES') && 
 			Licensing.search('Feature', 'OCMP_BRE_LIC_FEATURE_NAME') && 
-			Licensing.search('Feature', 'OCMP_BRE_LIC_FEATURE_INSTANCES')], 
+			Licensing.search('Feature', 'OCMP_BRE_LIC_FEATURE_INSTANCES'),
+			OCMPsettings != undefined && OCMPsettings.count('License file') != 0
+			], 
 			nodeName + ": OCMP SIP and BRE licensing: SEE_SIP_SERIAL SEE_SIP_CODEWORD OCMP_BRE_LIC_KEY OCMP_BRE_LIC_EXPIRES OCMP_BRE_LIC_DESCRIPTION OCMP_BRE_LIC_VXML_INSTANCES OCMP_BRE_LIC_ASR_INSTANCES OCMP_BRE_LIC_TTS_INSTANCES OCMP_BRE_LIC_FEATURE_NAME OCMP_BRE_LIC_FEATURE_INSTANCES",
-			" are required in the Licensing section");
+			" are required in the Licensing section or an OCMP license file must be defined and imported in the OCMPsettings section");
 		Nodes.check += checkDependency(nbVNFC > 0 && dbRole != "", [seeRole == "" && httpLbRole == "", seeRole == 'Spx' ], 
 			"Nodes: "+nodeName + " cannot play a " + dbRole+" DB role concurrently with "+seeRole+" SEE role and "+httpLbRole+" HTTP LB role because databases are shared across the composed VNF and ", nbVNFC + " VNFC(s)");
 		Nodes.check += checkDependency(dbRole.startsWith("redis") || redisHaRole.endsWith("Sentinel"), [Security.search('Property','NIVRDB_LINUXHA_PASSWORD')], 
@@ -2381,7 +2392,7 @@ var Misc = new vnfResource("Misc", [
 		'DEFAULT_GATEWAY_IP_ADDR', 'SIP_DEFAULT_GATEWAY_IP_ADDR', 
 		'NIVR_OTHER_HOSTS', 'REDIS_SENTINEL_PORT_OFFSET', 'REDIS_DOWNAFTER', 'REDIS_PARALLEL_SYNCS', 'REDIS_FAILOVER_TIMEOUT',
 		'ORACLE_SERVICE', 'ORACLE_CONSOLE_PORT', 'ORACLE_PATH',
-		'YUM_REPO_LIST', 'HA_PING_IP_ADDR', 'MULTICAST_MTU',
+		'YUM_REPO_LIST', 'HA_PING_IP_ADDR', 'MULTICAST_MTU', 'SEE_SWAGGER',
 		'NFVD_ADDR', 'NFVD_TENANT_NAME', 'NFVD_APPLICATION', 'NFVD_DATACENTER',
 		'NFVD_USERNAME', 'NFVD_PASSWORD', 'NFVD_STACK_NAME', 'NFVD_REST_ADDR', 'NFVD_SCALING_TEMPLATE',
 		'NIVR_SCALING_ROLE','VNF_RETRY_POLICY_MAX_TIMEOUT'
@@ -2401,6 +2412,7 @@ MiscDefault.ORACLE_CONSOLE_PORT="5500";
 MiscDefault.VNF_CONFIG_DATA_FILE="/etc/opt/OC/hpoc-nivr-nfv/uspm-nfv-app.properties";
 MiscDefault.APP_CONFIG_DATA_FILE="/etc/opt/OC/hpoc-nivr-nfv/appConfig.json";
 MiscDefault.MULTICAST_MTU="1200";
+MiscDefault.SEE_SWAGGER="false";
 MiscDefault.YUM_REPO_LIST="yum_repos";
 MiscDefault.NFVD_REST_ADDR="${NFVD_ADDR}:5000/v2.0";
 MiscDefault.REDIS_SENTINEL_PORT_OFFSET="20000";
@@ -2435,6 +2447,7 @@ MiscComment.REDIS_DOWNAFTER="Number of milliseconds the master (or any attached 
 MiscComment.REDIS_PARALLEL_SYNCS="How many slaves we can reconfigure to point to the new slave simultaneously during the failover (default 1)";
 MiscComment.REDIS_FAILOVER_TIMEOUT="Specifies the failover timeout in milliseconds. It is used in many ways, for instance: the maximum time a failover in progress waits for all the slaves to be reconfigured as slaves of the new master (default 60000).";
 MiscComment.MULTICAST_MTU="the maximum transmission unit (MTU) of UDP packets used for SEE cluster management. The value has to prevent fragmentation while accomodating the SEE requirements: minimum is 968 for SEE IMMS clustering. A value greater than 1500 requires end to end support of jumbo frames. Most infrastructures support up to 1500 bytes, but OpenStack introduces an overhead: 1200 is recommended on OpenStack.";
+MiscComment.SEE_SWAGGER="Boolean enabling Swagger on the SEE EMS server: Swagger is a Framework backed by a large ecosystem of tools that helps developers design, build, document, and consume RESTful Web services. Default is false; true to enable.";
 MiscComment.VNF_RETRY_POLICY_MAX_TIMEOUT="Max timeout applied to all actions in the VNF; default 900s";
 
 Misc.help = function(){
@@ -2459,8 +2472,9 @@ Misc.help = function(){
 	"\n\tNOTE: declaration is mandatory on OpenStack deployments using multiple network interfaces to enable remote access; use a question mark ? to let the infrastructure set the appropriate address." +
 	"\n\tDEFAULT_GATEWAY_IP_ADDR: Default gateway IP address: useful for topologies using multiple interfaces to set the gateway on the interface offering a public access" +
 	"\n\tSIP_DEFAULT_GATEWAY_IP_ADDR: Default gateway IP address used on nodes connected to a public SIP/RTP network: useful to enable SIP calls from an external public network" +
-	"\n\nSEE multicast mangement:"+
+	"\n\nSEE:"+
 	"\n\tMULTICAST_MTU: " +MiscComment.MULTICAST_MTU+
+	"\n\tSEE_SWAGGER: " +MiscComment.SEE_SWAGGER+
 	"\n\nDatabase for MSE applications" +
 	"\nORACLE_SERVICE: " +MiscComment.ORACLE_SERVICE+
 	"\nORACLE_PATH: " +MiscComment.ORACLE_PATH+
@@ -7409,11 +7423,9 @@ function buildHeatTemplate(){
 	if(ocmpLicense.isDefined()){
    	heat+=n0+"  ocmp_license:";
     heat+=n0+"    description: "+ocmpLicense.path;
-    heat+=n0+"    value:";
-    heat+=n0+"      str_replace:";
-    heat+=n0+"        template: |";
-    heat+=n0+"          "+ocmpLicense.content.replace(/\n/g, "\n"+  
-		     "          ");	// fix the descriptor indentation as expected by Heat
+    heat+=n0+"    value: |";
+    heat+=n0+"      "+ocmpLicense.content.replace(/\n/g, "\n"+  
+		     "      ");	// fix the descriptor indentation as expected by Heat
     }
     
     // Show to the user and save to nivr-cluster-nfv.yaml
@@ -7738,8 +7750,12 @@ function chefDeploymentHelp(){userOutput(
 "\n\t- install the pre requisite gem: chef gem install kitchen-nodes"+
 "\nAnsible engine:"+
 "\n\t- prepare a workstation by installing an ansible engine from epel repository: 'yum install epel-release; yum install ansible'"+
-"\n\t- the playbook built is a ansible.yml file. It relies on two provided roles: ems and base and is invoked as 'ansible-playbook ansible.yml' on a work station"+
+"\n\t- For Azure target, install ansible[azure]"+
+"\n\t\t- sudo yum install -y gcc libffi-devel python-devel openssl-devel python-pip python-wheel"+
+"\n\t\t- sudo pip install ansible[azure]"+
+"\n\t- the playbook built is a ansible.yml file. It relies on the provided roles ems, base, collectInfo and is invoked as 'ansible-playbook ansible.yml' on a work station"+
 "\n\t- if a cache is locally available on the Ansible console, set extra vars to point to as --extra-vars 'cacheIso=<path to ISOs> cachePatch=<path to patches> cacheSshKeys=<path to ssh keys>'"+
+"\n\t- to delete the deployed VNF, define an extra variable 'the_state=absent' or 'the_count=0' on aws infrastructure"+
 "\nFor static target:"+
 "\n\t- configure all nodes fully qualified domain names and static IP addresses on the MGMT network"+
 "\n\t- install the ssh key used by Ansible on all the nodes, consistently with the environment variable CLOUD_SSH_KEY from metadata.rb"+
@@ -7841,6 +7857,7 @@ function buildChefCookbook(){
     // For each non EMS node: create the instance
     nonEmsNodesNames.forEach(function(name, indexNode){
 	cook+=n0+"  - name: "+name;
+	cook+=n0+"    machine_size: <%= ENV['CLOUD_FLAVOR'] %>";
 	cook+=n0+"    run_list:";
 	cook+=n0+"      - recipe[hpe_mse::base]";
 	cook+=n0+"    driver_config:";
@@ -7878,6 +7895,14 @@ function buildChefCookbook(){
 	cook+=n0+"          yumRepo: <%= ENV['MSE_YUM_REPO'] %>";
 	cook+=n0+"          # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files";
 	cook+=n0+"          sshKeysUrl: <%= ENV['MSE_SSH_KEYS_URL'] %>";
+	cook+=n0+"          yumExplicitPackages: <%= ENV['YUM_EXPLICIT_PACKAGES'] %>";
+	cook+=n0+"          # Mandatory services to be started";
+	cook+=n0+"          mandatoryServices: <%= ENV['MANDATORY_SERVICES'] %>";
+	cook+=n0+"          yumReposDefUrl: <%= ENV['CLOUD_REPOS_URL'] %>";
+	cook+=n0+"          yumReposDef: <%= ENV['CLOUD_REPOS_LIST'] %>";
+	cook+=n0+"          osSignature: <%= ENV['CLOUD_OS_SIGNATURE'] %>";
+	cook+=n0+"          yum_exclude: <%= ENV['YUM_EXCLUDE'] %>";
+
 
 	// Append the descriptor as a 'deploy' attribute
 	cook+=n0+"        deploy:";
@@ -7912,6 +7937,50 @@ function buildAnsiblePlaybook(){
 	var cook="---"
 	cook+=n0+"# '"+quickDescription.value+"'";
 	switch(infrastructure){
+	  case 'azure':
+		cook+=n0+"- name: Create a stack on Azure";
+		cook+=n0+"  hosts: localhost";
+		cook+=n0+"  connection: local";
+		cook+=n0+"  vars:";
+		cook+=n0+"    the_stack: mse_stack";
+		cook+=n0+"    the_network: 10.0.0"; 
+		cook+=n0+"  tasks:";
+		cook+=n0+"  - name: Force delete resource group {{the_stack}} if the_state is defined as absent";
+		cook+=n0+"    azure_rm_resourcegroup:";
+		cook+=n0+'      name: "{{the_stack}}"';
+		cook+=n0+'      location: "{{ lookup(\'env\',\'CLOUD_LOCATION\') }}"';
+		cook+=n0+'      state: absent';
+		cook+=n0+'      force: true';
+		cook+=n0+'    when: the_state is defined and the_state == "absent"';
+		cook+=n0+'  - meta: end_play';
+		cook+=n0+'    when: the_state is defined and the_state == "absent"';
+		cook+=n0+'  - name: Create resource group {{the_stack}}';
+		cook+=n0+'    azure_rm_resourcegroup:';
+		cook+=n0+'      name: "{{the_stack}}"';
+		cook+=n0+'      location: "{{ lookup(\'env\',\'CLOUD_LOCATION\') }}"';
+		cook+=n0+'  - name: Create Network Security Group {{the_stack}}_security_group that allows SSH';
+		cook+=n0+'    azure_rm_securitygroup:';
+		cook+=n0+'      resource_group: "{{the_stack}}"';
+		cook+=n0+'      name: "{{the_stack}}_security_group"';
+		cook+=n0+'      rules:';
+		cook+=n0+'        - name: SSH';
+		cook+=n0+'          protocol: Tcp';
+		cook+=n0+'          destination_port_range: 22';
+		cook+=n0+'          access: Allow';
+		cook+=n0+'          priority: 1001';
+		cook+=n0+'          direction: Inbound';
+		cook+=n0+'  - name: Create virtual network {{the_stack}}_network {{the_network}}.0/'+Networks.heatCidrLength;
+		cook+=n0+'    azure_rm_virtualnetwork:';
+		cook+=n0+'      resource_group: "{{the_stack}}"';
+		cook+=n0+'      name: "{{the_stack}}_network"';
+		cook+=n0+'      address_prefixes: "{{the_network}}.0/24"';
+		cook+=n0+'  - name: Add subnet {{the_stack}}_mgmt {{the_network}}.0/'+Networks.heatCidrLength;
+		cook+=n0+'    azure_rm_subnet:';
+		cook+=n0+'      resource_group: "{{the_stack}}"';
+		cook+=n0+'      name: "{{the_stack}}_mgmt"';
+		cook+=n0+'      address_prefix: "{{the_network}}.0/24"';
+		cook+=n0+'      virtual_network: "{{the_stack}}_network"';
+	  	break;
 	  case 'aws':
 		cook+=n0+"- name: create the instance(s)";
 		cook+=n0+"  hosts: localhost";
@@ -7920,16 +7989,25 @@ function buildAnsiblePlaybook(){
 		cook+=n0+"    instance_type: \"{{ lookup('env','CLOUD_FLAVOR') }}\"";
 		cook+=n0+"    image: \"{{ lookup('env','CLOUD_IMAGE') }}\"";
 		cook+=n0+"    ssh_key: \"{{ lookup('env','CLOUD_SSH_KEY_PAIR') }}\"";
+		cook+=n0+"    the_count: 1";
+		cook+=n0+"";
+		cook+=n0+"  tasks:";
 		break;
 	  case 'openstack':
 		cook+=n0+"- name: create the instance(s)";
 		cook+=n0+"  hosts: localhost";
+		cook+=n0+"  vars:";
+		cook+=n0+"    the_state: present";
 		cook+=n0+"  gather_facts: false";
+		cook+=n0+"";
+		cook+=n0+"  tasks:";
 		break;
 	  case 'static':
 		cook+=n0+"- name: deploy the instance(s) with static IP addresses";
 		cook+=n0+"  hosts: localhost";
 		cook+=n0+"  gather_facts: false";
+		cook+=n0+"";
+		cook+=n0+"  tasks:";
 		break;	  
 	  default: 
 	  	userOutput('DevOps Ansible is not supported on '+infrastructure); return;
@@ -7939,10 +8017,7 @@ function buildAnsiblePlaybook(){
     // build the list of non VIP nodes
     var nonVipNodes = Nodes.cloudNodes.filter(function(e){return !e.isVIP;});
     var emsNode = Nodes.cloudNodes[Nodes.cloudNodes.length - 1];
-        
-	cook+=n0+"";
-	cook+=n0+"  tasks:";
-	
+      
     // For each non VIP node: create the instance
     // The EMS is the last node in Nodes.cloudNodes: it must be part of the ems group in addition to the base group
     var nodeGroup='base';
@@ -7951,7 +8026,7 @@ function buildAnsiblePlaybook(){
     if(name == emsNode.name)nodeGroup+=',ems'
 	switch(infrastructure){
 	  case 'aws':
-		cook+=n0+"  - name: start the instance "+name;
+		cook+=n0+"  - name: set the instance "+name+" to count {{the_count}}";
 		cook+=n0+"    ec2:";
 		cook+=n0+"      image: '{{ image }}'";
 		cook+=n0+"      region: '{{ region }}'";
@@ -7959,24 +8034,67 @@ function buildAnsiblePlaybook(){
 		cook+=n0+"      key_name: '{{ ssh_key }}'";
 		cook+=n0+"      group: [mse]";
 		cook+=n0+"      instance_tags: { Name: "+name+", type: base }";
-		cook+=n0+"      exact_count: 1";
 		cook+=n0+"      count_tag: { Name: "+name+" }";
 		cook+=n0+"      wait: yes";
+		cook+=n0+'      exact_count: "{{the_count}}"';
 		cook+=n0+"    register: ec2";
 		cook+=n0+"  - name: add instance to the "+nodeGroup+" group";
 		cook+=n0+"    add_host: hostname={{ item.public_dns_name }} groups="+nodeGroup+" nick_name="+name+" fqdn={{ item.private_dns_name }}";
 		cook+=n0+"    with_items: '{{ ec2.tagged_instances }}'";
-		cook+=n0+"    when: item.public_dns_name is defined";
+		cook+=n0+'    when: item.public_dns_name is defined and the_count!="0"';
 		cook+=n0+"  - name: wait for ssh";
 		cook+=n0+"    wait_for: host={{ item.public_dns_name }} port=22 search_regex=OpenSSH";
 		cook+=n0+"    with_items: '{{ ec2.instances }}'";
-		cook+=n0+"    when: item.public_dns_name is defined";
+		cook+=n0+'    when: item.public_dns_name is defined and the_count!="0"';
 		cook+=n0+"";
 		break;
+	  case 'azure':
+		cook+=n0+'  - name: Create public IP address for '+name;
+		cook+=n0+'    azure_rm_publicipaddress:';
+		cook+=n0+'      resource_group: "{{the_stack}}"';
+		cook+=n0+'      allocation_method: Static';
+		cook+=n0+'      name: '+name+'Public';
+		cook+=n0+'    register: output_ip_address';
+		cook+=n0+'  - name: Create virtual network interface card '+name+'_mgmt';
+		cook+=n0+'    azure_rm_networkinterface:';
+		cook+=n0+'      resource_group: "{{the_stack}}"';
+		cook+=n0+'      name: '+name+'_mgmt';
+		cook+=n0+'      virtual_network: "{{the_stack}}_network"';
+		cook+=n0+'      subnet: "{{the_stack}}_mgmt"';
+		cook+=n0+'      public_ip_name: '+name+'Public';
+		cook+=n0+'      security_group: "{{the_stack}}_security_group"';
+		cook+=n0+'    register: private_ip_address';
+		cook+=n0+'  - name: Create VM '+name;
+		cook+=n0+'    azure_rm_virtualmachine:';
+		cook+=n0+'      resource_group: "{{the_stack}}"';
+		cook+=n0+'      name: '+name;
+		cook+=n0+'      vm_size: "{{ lookup(\'env\',\'CLOUD_FLAVOR\') }}"';
+		cook+=n0+'      admin_username: azureuser';
+		cook+=n0+'      ssh_password_enabled: false';
+		cook+=n0+'      ssh_public_keys:';
+		cook+=n0+'        - path: /home/azureuser/.ssh/authorized_keys';
+		cook+=n0+'          key_data: "{{ lookup(\'env\',\'CLOUD_SSH_KEY_PUBLIC_DATA\') }}"';
+		cook+=n0+'      network_interfaces:';
+		cook+=n0+'        - '+name+'_mgmt';
+		cook+=n0+'      image:';
+		cook+=n0+'        offer: "{{ lookup(\'env\',\'CLOUD_IMAGE_OFFER\') }}"';
+		cook+=n0+'        publisher: "{{ lookup(\'env\',\'CLOUD_IMAGE_PUBLISHER\') }}"';
+		cook+=n0+'        sku: "{{ lookup(\'env\',\'CLOUD_IMAGE_SKU\') }}"';
+		cook+=n0+'        version: "{{ lookup(\'env\',\'CLOUD_IMAGE_VERSION\') }}"';
+		cook+=n0+'  - name: add host '+name+' {{ output_ip_address.state.ip_address }} to the ansible dynamic inventory';
+		cook+=n0+'    add_host:';
+		cook+=n0+'      name: "'+name+'"';
+		cook+=n0+'      nick_name: "'+name+'"';
+		cook+=n0+'      fqdn: "'+Nodes.cloudNodes[indexNode].fqdn+'"';
+		cook+=n0+'      groups: "'+nodeGroup+'"';
+		cook+=n0+'      ansible_ssh_host: "{{ output_ip_address.state.ip_address }}"';
+		cook+=n0+'      mgmt_ip_address: "{{ private_ip_address.state.ip_configurations[0].private_ip_address }}"';
+		cook+=n0;
+		break;
 	  case 'openstack':
-		cook+=n0+"  - name: start the instance "+name;
+		cook+=n0+"  - name: set the instance "+name+" to state {{the_state}}";
 		cook+=n0+"    os_server:";
-		cook+=n0+"      state: present";
+		cook+=n0+'      state: "{{the_state}}"';
 		cook+=n0+"      name: "+name;
 		cook+=n0+"      image: \"{{ lookup('env','CLOUD_IMAGE') }}\"";
 		cook+=n0+"      key_name: \"{{ lookup('env','CLOUD_SSH_KEY_PAIR') }}\"";
@@ -7998,9 +8116,16 @@ function buildAnsiblePlaybook(){
 		cook+=n0+"    until: result is success";
 		cook+=n0+"    retries: 30";
 		cook+=n0+"    delay: 10";
+		cook+=n0+'    when: the_state!="absent"';
 		cook+=n0+"  - name: Add "+name+" Instance to "+nodeGroup+" group";
-		cook+=n0+"    add_host: name="+name+" groups="+nodeGroup+" nick_name="+name+" fqdn="+Nodes.cloudNodes[indexNode].fqdn;
-		cook+=n0+"              ansible_ssh_host={{ "+name+".server.public_v4 }}";
+		cook+=n0+'    add_host:';
+		cook+=n0+'      name: '+name;
+		cook+=n0+'      nick_name: '+name;
+		cook+=n0+'      fqdn: '+Nodes.cloudNodes[indexNode].fqdn;
+		cook+=n0+'      groups: '+nodeGroup;
+		cook+=n0+'      ansible_ssh_host: "{{ '+name+'.server.public_v4 }}"';
+		cook+=n0+'      mgmt_ip_address: "{{ '+name+'.server.private_v4 }}"';
+		cook+=n0+'    when: the_state!="absent"';
 		cook+=n0+"";
 		break;
 	case 'static':
@@ -8020,6 +8145,16 @@ function buildAnsiblePlaybook(){
 
 	  }
 	});
+	switch(infrastructure){
+	case 'openstack':
+	cook+=n0+'  - meta: end_play';
+	cook+=n0+'    when: the_state is defined and the_state=="absent"';
+	break;
+	case 'aws':
+	cook+=n0+'  - meta: end_play';
+	cook+=n0+'    when: the_count is defined and the_count=="0"';
+	break;
+	}
 	
 	// Define the MSE attributes from the environment and push the descriptor
 	cook+=n0+"";
@@ -8057,6 +8192,10 @@ function buildAnsiblePlaybook(){
 	switch(infrastructure){
 	case 'aws':
 	cook+=n0+"    theNodeIpAddress: \"{{hostvars[inventory_hostname]['ansible_default_ipv4']['address']}}\"";
+	break;
+	case 'azure':
+	case 'openstack':
+	cook+=n0+"    theNodeIpAddress: \"{{hostvars[inventory_hostname]['mgmt_ip_address']}}\"";
 	break;
 	default:
 	cook+=n0+"    theNodeIpAddress: \"{{hostvars[inventory_hostname]['ansible_ssh_host']}}\"";
