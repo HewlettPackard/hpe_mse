@@ -3,6 +3,10 @@
   debug: 
     var=theNodeIpAddress
 
+- name: Install libselinux-python for Ansible to work with selinux on the target nodes
+  yum:
+    name: libselinux-python
+
 - name: Enable root at the console prompt
   shell: echo "root:hwroot" | chpasswd
 
