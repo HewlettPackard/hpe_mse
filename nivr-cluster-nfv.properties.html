@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-04-26 Version 3.23</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-05-17 Version 3.3</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -30,12 +30,13 @@
 <tr>
 <td valign="top">Build the MSE Descriptor</td><td valign="top"><input class="buildButton" type="button" value="Build" onclick="buildVNFDescriptor()"></td>
 </tr><tr>
-<td valign="top">Build the 
+<td valign="top">Deploy on 
 <select id="deployer">
 <option name="Heat" selected>Heat</option>
 <option name="Tosca">Tosca</option>
+<option name="Kubernetes">Kubernetes</option>
 </select>
-template</td>
+</td>
 <td valign="top"><input class="buildButton" type="button" value="Deploy" onclick="deploy()"> Volumes
 <select id="useHeatVolumes">
 <option name="none" selected>none</option>
@@ -108,6 +109,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-05-17 3.3	Orchestration: support docker images deployment on kubernetes cluster"+ 
 	"\n2019-04-26 3.23	Align Chef deployments with Ansible ones on Azure: add explicit packages, additional yum repositories definitions, mandatory services startup, OS signature setup"+
 	"\n2019-04-09 3.22	Enable SEE5 and Linux HA co-location; support Azure deployment with Ansible"+
 	"\n2019-04-05 3.21	Messaging Gateway: on-line help update, adding CDR_LEVEL property, turning GLOBAL_TITLE as optional; restore ansible deployment on aws."+
@@ -329,6 +331,7 @@ function compatibilityMatrix(){
 	new compatibleFeature(devopsMatrix, "Aws",		['Chef', 'Ansible'], "Single network interface. Tested on CentOS 6 and 7 images");
 	new compatibleFeature(devopsMatrix, "TOSCA",	[], "Experimental");
 	new compatibleFeature(devopsMatrix, "Static",	['Ansible'], "Deploy on pre-allocated VMs or bare metal configured with static IP addresses");
+	new compatibleFeature(devopsMatrix, "Kubernetes",[], "Deploy docker images on a kubernetes cluster; limited to a single network interface. Tested on CentOS 7 on Azure");
 	
 	return true;
 }
@@ -1067,7 +1070,7 @@ Networks.build = function(target, engine){
 			result += '\n'+networkName+'_DEVICE='+networkDevice;
 			result += '\n'+networkName+'_NETMASK='+networkMask;
 			
-			if(target == 'azure' && engine == 'ansible' || target == 'Heat'){
+			if(target == 'azure' && engine == 'ansible' || target == 'Heat' || target == 'kubernetes'){
 				// Heat deployments: all networks have the same width: guess it from the first netmask proposed 
 				if(Networks.heatWidth ==  undefined){
 					// Use the 4th byte of the mask as the source for network width
@@ -1096,7 +1099,7 @@ Networks.build = function(target, engine){
 		}
 	}
 	
-	Networks.check += checkDependency(target == 'azure' || target == 'aws', [Networks.heatMaxNetwork == 0], "Networks: azure and aws infrastructure are limited to one single network; found ", Networks.heatMaxNetwork + 1);
+	Networks.check += checkDependency(target == 'kubernetes' || target == 'azure' || target == 'aws', [Networks.heatMaxNetwork == 0], "Networks: "+target+" infrastructure is limited to one single network; found ", Networks.heatMaxNetwork + 1);
 
 	// update visible networks in the nodes table
 	Nodes.hideUnused();
@@ -1412,14 +1415,14 @@ Nodes.build = function(target, engine){
 		      case 'chef': nodeName="<_%_= node['mse']['map']['"+shortName+"']['hostname'] _%_>"; break;
 		      case 'ansible': nodeName="_%_"+shortName+"_hostname_%_"; break;
 		      } 
-		  case 'azure':
+		  case 'azure': case 'kubernetes':
 		  	// IP addresses will be known at instantiation time: 
 			// Replace undefined values with place holders resolved later
 			// Push the network interface number in the interfaces list for this node
 			if(nodeIpAddr == "?"){
 			  switch(engine){
 			    case 'chef': nodeIpAddr="<_%_= node['mse']['map']['"+shortName+"']['ipaddress'] _%_>";	break;
-			    case 'ansible': nodeIpAddr="_%_"+shortName+"_ipaddress_%_";	break;
+			    default: nodeIpAddr="_%_"+shortName+"_ipaddress_%_";	break;
 			  }
 			  // Only one interface supported so far: MGMT, can be shared on multiple networks however
 			  {
@@ -2393,7 +2396,7 @@ var Misc = new vnfResource("Misc", [
 		'NIVR_OTHER_HOSTS', 'REDIS_SENTINEL_PORT_OFFSET', 'REDIS_DOWNAFTER', 'REDIS_PARALLEL_SYNCS', 'REDIS_FAILOVER_TIMEOUT',
 		'ORACLE_SERVICE', 'ORACLE_CONSOLE_PORT', 'ORACLE_PATH',
 		'YUM_REPO_LIST', 'HA_PING_IP_ADDR', 'MULTICAST_MTU', 'SEE_SWAGGER',
-		'NFVD_ADDR', 'NFVD_TENANT_NAME', 'NFVD_APPLICATION', 'NFVD_DATACENTER',
+		'DOCKER_IMAGE', 'NFVD_ADDR', 'NFVD_TENANT_NAME', 'NFVD_APPLICATION', 'NFVD_DATACENTER',
 		'NFVD_USERNAME', 'NFVD_PASSWORD', 'NFVD_STACK_NAME', 'NFVD_REST_ADDR', 'NFVD_SCALING_TEMPLATE',
 		'NIVR_SCALING_ROLE','VNF_RETRY_POLICY_MAX_TIMEOUT'
 		]},
@@ -2415,6 +2418,7 @@ MiscDefault.MULTICAST_MTU="1200";
 MiscDefault.SEE_SWAGGER="false";
 MiscDefault.YUM_REPO_LIST="yum_repos";
 MiscDefault.NFVD_REST_ADDR="${NFVD_ADDR}:5000/v2.0";
+MiscDefault.DOCKER_IMAGE="ndsna.azurecr.io/tas:v11";
 MiscDefault.REDIS_SENTINEL_PORT_OFFSET="20000";
 MiscDefault.REDIS_PARALLEL_SYNCS="1";
 MiscDefault.REDIS_FAILOVER_TIMEOUT="60000";
@@ -2430,6 +2434,7 @@ MiscComment.ORACLE_SERVICE="Oracle instance name(TNS_NAME)";
 MiscComment.ORACLE_PATH="Absolute path to the Oracle instance on the Oracle server; default: "+MiscDefault.ORACLE_PATH;
 MiscComment.ORACLE_CONSOLE_PORT="Port assigned to the Oracle console";
 MiscComment.YUM_REPO_LIST="list of YUM repositories used as an alternative to ISO images for products installation";
+MiscComment.DOCKER_IMAGE="Full name of the Docker container image used for kubernetes deployments";
 MiscComment.NFVD_ADDR="SNMP Traps destination outside the VNF";
 MiscComment.NFVD_TENANT_NAME="SNMP Traps attribute tenantId";
 MiscComment.NFVD_APPLICATION="SNMP Traps attribute applicationId";
@@ -2603,6 +2608,8 @@ Misc.build = function(target){
 	Misc.check+=checkDependency(target != undefined, [AppAuxDescInput.isConsistent()], 'Misc section: APPs descriptor path APP_CONFIG_DATA_FILE and imported content consistency: ', 'both or none should be defined.');
 	Misc.check+=checkDependency(target != undefined, [uspmAuxDescInput.isConsistent()], 'Misc section: USPM descriptor path VNF_CONFIG_DATA_FILE and imported content consistency: ', 'both or none should be defined.');
 	
+	// Make sure a docker image is defined for kubernetes target
+	Misc.check+=checkDependency(target == 'kubernetes', [Misc.search('Property','DOCKER_IMAGE')], 'Misc section: Kubernetes target infrastructure', ' requires DOCKER_IMAGE definition.');
 
 	if(Misc.check != "")return Misc.check;
 	return result;
@@ -6919,6 +6926,11 @@ function buildVNFDescriptor(target, engine){
 	desc += "\n# 3.2 YUM repositories listed in YUM_REPO_LIST and IS_YUM_REPO=yes";
 	desc += "\n# -------------------------------------------------------------";
 	desc += "\n";
+	
+	if(target == 'kubernetes'){
+	desc += "\n# Allow any memory size on Docker, control is delegated to kubernetes";
+	desc += "\nfunction _check_memory_size() { return 0 ; }";
+	}
 
 	vnfResources.forEach(function(e,i,t){
 		desc += e.build(target, engine);
@@ -7089,9 +7101,19 @@ function deploymentHelp(){userOutput(
 "\n\t- from image: create one volume per instance from a qcow2 image which name is passed as parameter Image"+
 "\n\t- from master: create one volume per instance from a master volume which id is passed as parameter Image"+
 "\n\t- none: use local storage on compute node, no volume creation"+
-"\nTemplate output format: two options available "+
+"\nTemplate output format: three options available "+
 "\n\t- Heat: builds a HOT format (Heat Orchestration Template) to be deployed on top of OpenStack"+
 "\n\t- Tosca: builds a TOSCA format (Topology and Orchestration Specification for Cloud Applications) to be deployed on top of normalized orchestrators"+
+"\n\t- Kubernetes: builds a shell script to be invoked on the kubernetes console"+
+"\n\t\t- install docker and kubernetes on a Linux devops console"+
+"\n\t\t- clone the hpe_mse project from github: 'git clone https://github.com/HewlettPackard/hpe_mse.git'"+
+"\n\t\t- drop all RPM packages and installers in ./hpe_mse/docker/bits"+
+"\n\t\t- drop ssh keys (private, public, hosts) in ./hpe_mse/docker/keys"+
+"\n\t\t- build the docker image: 'cd hpe_mse/docker ; sudo docker build  -t ndsna/tas:latest .'"+
+"\n\t\t- publish the docker image to the repository: example on azure for pushing the image tas version v11 in the ndsna private repository:"+
+"\n\t\t  'sudo az acr login --name ndsna ; sudo docker tag ndsna/tas ndsna.azurecr.io/tas:v11 ; sudo docker push ndsna.azurecr.io/tas:v11'"+
+"\n\t\t- define the topology in the assistant; include 'base*,hpe,updates' in the YUM_REPO_LIST definition"+
+"\n\t\t- select the kubernetes target and click 'Deploy'; run the resulting shell script in the devops console"+
 "\nAnsible deployment of a Heat stack:"+
 "\n\t- prepare the Ansible console as per the DevOps Help section"+
 "\n\t- select the Heat output format in the drop down list besides the Deploy button, then click Deploy"+
@@ -7103,9 +7125,11 @@ function deploymentHelp(){userOutput(
 function deploy(){
 	switch(document.getElementById("deployer").value){
 		case 'Heat': buildHeatTemplate(); break;
+		case 'Kubernetes': buildKubernetesScript(); break;
 		case 'Tosca': buildToscaTemplate(); break;
 	}
 }
+
 // ===========================
 // MSE Heat template build
 // ===========================
@@ -7435,6 +7459,135 @@ function buildHeatTemplate(){
 	var a = document.createElement('a');
 	a.href = window.URL.createObjectURL(blobHeat);
     a.download = "nivr-cluster-nfv.yaml";
+    document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+}
+
+// ===========================
+// MSE Kubernetes script build
+// ===========================
+function buildKubernetesScript(){
+	var n0="\n";
+	var quickDescription = document.getElementById("quickDescription");
+	var kube="#!/bin/bash"
+	
+	// Build the descriptor for Heat (or get the errors) and do not publish
+	// Required soon enough to get Heat specific variables properly setup
+    var desc = buildVNFDescriptor('kubernetes');
+    
+	// if the enf of descriptor is not found, show the error and quit
+    if(desc.indexOf(endOfDescriptor) == -1)return; 
+    
+    var nodesNames = Nodes.cloudNodes.map(function(e){return e.name;});
+    // The EMS is the last node in Nodes.cloudNodes: remove it to build the list of non EMS nodes,then filter the nodes playing a VIP role
+    var nonEmsNodesNames = Nodes.cloudNodes.slice(0, Nodes.cloudNodes.length - 1).filter(function(e){return !e.isVIP;}).map(function(e){return e.name;});  
+    
+    kube+=n0+'# The list of pods to deploy';
+    kube+=n0+'_theEMS='+nodesNames[Nodes.cloudNodes.length - 1];
+    kube+=n0+'_podsList="'+nonEmsNodesNames.join(" ")+' $_theEMS"';
+    kube+=n0+'# The descriptors';
+    kube+=n0+'_template_nivr_properties=nivr-cluster-nfv.properties.erb';
+    kube+=n0+'_nivr_properties=nivr-cluster-nfv.properties';
+    kube+=n0+'_uspm_properties=uspm-app-nfv.properties';
+    kube+=n0+'_app_properties=app-aux-nfv.properties';
+    kube+=n0+'_ocmp_license=ocmp-license.properties';
+    kube+=n0+'cat > $_template_nivr_properties << "EOFILE"';
+	kube+=n0+desc;
+	kube+=n0+'EOFILE';
+    kube+=n0+'source $_template_nivr_properties';
+    
+    // If a USPM descriptor is defined, push its auxiliary descriptor
+	if(uspmAuxDescInput.isDefined()){
+	kube+=n0+'cat > $_uspm_properties << "EOFILE"';
+	kube+=n0+uspmAuxDescInput.content;  
+	kube+=n0+'EOFILE';
+	}
+	if(AppAuxDescInput.isDefined()){
+	kube+=n0+'cat > $_app_properties << "EOFILE"';
+	kube+=n0+AppAuxDescInput.content;
+	kube+=n0+'EOFILE';
+	}
+	if(ocmpLicense.path != undefined && ocmpLicense.isDefined()){
+   	kube+=n0+'cat > $_ocmp_license << "EOFILE"';
+    kube+=n0+ocmpLicense.content;
+	kube+=n0+'EOFILE';
+    }
+    
+	
+	kube+=n0;
+	kube+=n0+'echo "Kubernetes customization file ./kustomization.yaml deploying the pod(s) $_podsList with image $DOCKER_IMAGE: '+quickDescription.value+'"';
+	kube+=n0+'echo "resources:" >./kustomization.yaml';
+	kube+=n0+'# Pods description';
+	kube+=n0+'for _pod in $_podsList ; do';
+	kube+=n0+'echo "Building the pod description ${_pod}.yaml"';
+	kube+=n0+'echo "- ${_pod}.yaml" >>./kustomization.yaml';
+	kube+=n0+'cat <<EOF >./${_pod}.yaml';
+	kube+=n0+'apiVersion: v1';
+	kube+=n0+'kind: Pod';
+	kube+=n0+'metadata:';
+	kube+=n0+'  name: ${_pod}';
+	kube+=n0+'spec:';
+	kube+=n0+'  subdomain: localdomain';
+	kube+=n0+'  volumes:';
+	kube+=n0+'  - name: cgroup';
+	kube+=n0+'    hostPath:';
+	kube+=n0+'      path: /sys/fs/cgroup';
+	kube+=n0+'  containers:';
+	kube+=n0+'  - name: ${_pod}';
+	kube+=n0+'    image: ${DOCKER_IMAGE}';
+	kube+=n0+'    volumeMounts:';
+	kube+=n0+'    - name: cgroup';
+	kube+=n0+'      mountPath: /sys/fs/cgroup';
+	kube+=n0+'      readOnly: true';
+	kube+=n0+'    command: ["/usr/sbin/init"]';
+	kube+=n0+'    imagePullPolicy: IfNotPresent';
+	kube+=n0+'    securityContext:';
+	kube+=n0+'      privileged: true';
+	kube+=n0+'EOF';
+	kube+=n0+'done';
+
+	kube+=n0+'echo "Deploying the stack from ./kustomization.yaml"';
+	kube+=n0+'kubectl apply --kustomize . || exit 1';
+	kube+=n0+'# Retrieve pod\'s IP addresses';
+	kube+=n0+'echo "Building ${_nivr_properties} from ${_template_nivr_properties} with actual IP addresses"';
+	kube+=n0+'if ! test -f ${_template_nivr_properties} ; then echo "Template ${_template_nivr_properties} not found" && exit 1 ; fi';
+	kube+=n0+'cp -f ${_template_nivr_properties} ${_nivr_properties}';
+	kube+=n0+'for _pod in $_podsList ; do';
+	kube+=n0+'until [ "$(kubectl get pods $_pod -o jsonpath --template={.status.phase})" == "Running" ] ; do echo "Waiting 5s status Running on pod $_pod" && sleep 5s ; done';
+	kube+=n0+'_ip=$(kubectl get pods $_pod -o jsonpath --template={.status.podIP})';
+	kube+=n0+'if ! test -n "${_ip}" ; then echo "IP address undefined on pod $_pod" && exit 1 ; fi';
+	kube+=n0+'echo "Pod ${_pod} IP address is ${_ip}"';
+	kube+=n0+'sed -i "s/_%_${_pod}_ipaddress_%_/${_ip}/" ${_nivr_properties}';
+	kube+=n0+'done';
+
+	if(uspmAuxDescInput.isDefined()){
+	kube+=n0+'echo "Copying the USPM auxiliary descriptor $_uspm_properties to the EMS node $_theEMS as $VNF_CONFIG_DATA_FILE "';
+	kube+=n0+'kubectl cp $_uspm_properties $_theEMS:$VNF_CONFIG_DATA_FILE || exit 1';
+	}
+	if(AppAuxDescInput.isDefined()){
+	kube+=n0+'echo "Copying the Applications auxiliary descriptor $_app_properties to the EMS node $_theEMS as $APP_CONFIG_DATA_FILE"';
+	kube+=n0+'kubectl cp $_app_properties $_theEMS:$APP_CONFIG_DATA_FILE || exit 1';
+	}
+	if(ocmpLicense.path != undefined && ocmpLicense.isDefined()){
+	kube+=n0+'echo "Copying the OCMP license file $_ocmp_license to the EMS node $_theEMS as $OCMP_LIC_FILE"';
+	kube+=n0+'kubectl cp $_ocmp_license $_theEMS:$OCMP_LIC_FILE || exit 1';
+	}
+	
+	kube+=n0+'echo "Copying the VNF descriptor $_nivr_properties to the EMS node $_theEMS as /etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties"';
+	kube+=n0+'kubectl cp $_nivr_properties $_theEMS:/etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties';
+	kube+=n0;
+	kube+=n0+'echo "Deployment started: checking the consolidated status on the EMS node: kubectl exec $_theEMS -- service nivr-nfv consolidated-status"';
+	kube+=n0+'sleep 2m && until kubectl exec $_theEMS -- service nivr-nfv consolidated-status || (( $? > 127 )) ; do sleep 20s ; done';
+	kube+=n0+'echo "Done: to delete the stack: kubectl delete --kustomize ."';
+	
+	// Show to the user and save to nivr-cluster-nfv.yaml
+    userOutput(kube);
+	
+	var blobKube = new Blob([kube], {type: "text/plain;charset=utf-8"});
+	var a = document.createElement('a');
+	a.href = window.URL.createObjectURL(blobKube);
+    a.download = "kubestack.sh";
     document.body.appendChild(a);
 	a.click();
 	document.body.removeChild(a);
