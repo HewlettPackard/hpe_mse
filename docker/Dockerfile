@@ -39,6 +39,7 @@ RUN /usr/bin/yum reinstall --assumeyes glibc-common
 
 # Add installers scripts known in the path
 ADD ./$bits/*.sh $ISO_REPO
+RUN /usr/bin/chmod a+x $ISO_REPO/*.sh
 RUN echo PATH=$PATH:$ISO_REPO >> ~/.bash_profile
 RUN echo export PATH >> ~/.bash_profile
 # Start mandatory services
@@ -51,7 +52,7 @@ RUN echo /usr/bin/rm --force /var/run/nologin >> ~/.bash_profile
 RUN echo '[ "$(hostname)" == "$(hostname --fqdn)" ] || hostname $(hostname --fqdn)' >> ~/.bash_profile
 
 # Install deployment engines 
-RUN /usr/bin/yum install --assumeyes hpoc-nivr-nfv  hpoc-uspm-nfv-config hpoc-uspm-nfv-ems hpocmp-nfv-ocmp hpoc-tls-certificates openssl
+RUN /usr/bin/yum install --assumeyes hpoc-ocadmin-user hpoc-nivr-nfv  hpoc-uspm-nfv-config hpoc-uspm-nfv-ems hpocmp-nfv-ocmp hpoc-tls-certificates openssl
 
 # Enable promptless root ssh by dropping keys
 RUN /usr/bin/mkdir --parents /root/.ssh/
