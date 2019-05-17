@@ -25,6 +25,9 @@ the .kitchen.yml/ansible.yml file used to deploy the MSE instance. This file emb
 dynamically turned to the actual MSE Descriptor at run time based on the instantiated nodes IP addresses and names.
 Refer to the on-line help in this assistant for details on Ansible/Chef invocation.
 
+Alternatively to Chef and Ansible scripts, this same assistant offers a deployment on a Kubernetes cluster of Docker containers.
+Refer to the assistant on-line help for details.
+
 = REQUIREMENTS:
 
 CentOS/RedHat >= 6.3 on OpenStack, Azure or Amazon infrastructure
