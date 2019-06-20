@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-05-17 Version 3.3</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-06-20 Version 3.31</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -33,6 +33,7 @@
 <td valign="top">Deploy on 
 <select id="deployer">
 <option name="Heat" selected>Heat</option>
+<option name="OVFapp">OVFapp</option>
 <option name="Tosca">Tosca</option>
 <option name="Kubernetes">Kubernetes</option>
 </select>
@@ -57,6 +58,7 @@ on
 <select id="devopsInfrastructure">
 <option name="static" selected>static</option>
 <option name="openstack">openstack</option>
+<option name="openstack">vmware</option>
 <option name="aws">aws</option>
 <option name="azure">azure</option>
 </select></td>
@@ -109,6 +111,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-06-20 3.31	support vmware infrastructure target; OCMP VNF on RHEL7: support for a secondary element manager; Messaging Gateway consistency check vs TCAP refined; restore compatibility with Microsoft browsers"+
 	"\n2019-05-17 3.3	Orchestration: support docker images deployment on kubernetes cluster"+ 
 	"\n2019-04-26 3.23	Align Chef deployments with Ansible ones on Azure: add explicit packages, additional yum repositories definitions, mandatory services startup, OS signature setup"+
 	"\n2019-04-09 3.22	Enable SEE5 and Linux HA co-location; support Azure deployment with Ansible"+
@@ -331,7 +334,8 @@ function compatibilityMatrix(){
 	new compatibleFeature(devopsMatrix, "Aws",		['Chef', 'Ansible'], "Single network interface. Tested on CentOS 6 and 7 images");
 	new compatibleFeature(devopsMatrix, "TOSCA",	[], "Experimental");
 	new compatibleFeature(devopsMatrix, "Static",	['Ansible'], "Deploy on pre-allocated VMs or bare metal configured with static IP addresses");
-	new compatibleFeature(devopsMatrix, "Kubernetes",[], "Deploy docker images on a kubernetes cluster; limited to a single network interface. Tested on CentOS 7 on Azure");
+	new compatibleFeature(devopsMatrix, "vmware",	['Ansible'], "Deploy on existing networks, with static IP addresses (no DHCP), either as an OVF appliance or as a set of instances by Ansible");
+	new compatibleFeature(devopsMatrix, "Kubernetes",[], "Experimental: deploy docker images on a kubernetes cluster; limited to a single network interface. Tested on CentOS 7 on Azure");
 	
 	return true;
 }
@@ -351,7 +355,7 @@ uniqueRole.prototype.v = this.v;
 // Set if y, unless already true; in that case, return a duplication alert for role
 uniqueRole.prototype.setIfNotOrAlert = function(y){
 	if(y){
-		if(this.v)return "\nRole " + this.name + " is duplicated."
+		if(this.v)return "\nNodes section: role " + this.name + " is duplicated."
 		this.v = true;
 	}
 	return "";
@@ -417,6 +421,7 @@ userLoadedFile.prototype.isConsistent = function(){
 // Class implementing a Heat node: a short name, and a flavor
 // Plus a list of network interfaces identified by the integer behind the 'eth' prefix, -1 for the external network used to connect floating IPs
 // Plus 2 booleans: isVIP if this node is a VIP and hasVIP if this node hosts VIP(s)
+// And a table holding all IP addresses for this node, for infrastructure not allocating dynamically IP addresses (vmware, static)
 var heatPublicInterface = -1;   
 var cloudNode = function(aName, aFQDN){
 	this.flavor = 'flavorSmall';
@@ -425,7 +430,8 @@ var cloudNode = function(aName, aFQDN){
 	this.interfaces = new Array();
 	this.isVIP = false;
 	this.hasVIP = false;
-	this.ipAddress = undefined;
+	this.ipAddresses = undefined;
+	this.domain = aFQDN.substr(aFQDN.indexOf('.')+1);
 }
 
 // Global variables used for global consistency checks
@@ -473,7 +479,7 @@ function checkSeeInstanceId(candidateList, msgHeader){
 	candidateList.split(',').forEach(function(candidate){
 		if(candidate == '-')return;
 		var anId = Number(candidate);
-		if(Number.isNaN(anId)){result+=msgHeader+"Illegal value for SEE instance Id: "+candidate+"; expecting integer or dash '-' to not assign";} 
+		if(isNaN(anId)){result+=msgHeader+"Illegal value for SEE instance Id: "+candidate+"; expecting integer or dash '-' to not assign";} 
 		if(anId < 1 || anId > seeInstancesMax){result+=msgHeader+"Illegal value for SEE instance Id: "+candidate+"; expecting integer in the range 1 to "+seeInstancesMax;}
 	});
 	return result;
@@ -515,6 +521,7 @@ function ifVNFCclose(e,i){
 var consistency = new Object;
 var emsRole = new uniqueRole("EMS");
 var emsOcmpRole = new uniqueRole("EMS OCMP");
+var emsSecondaryOcmpRole = new uniqueRole("EMS OCMP SECONDARY");
 var ocmpVNFC = new uniqueRole("OCMP VNFC");
 var emsOcsnfRole = new uniqueRole("EMS OCSNF");
 var emsUspmRole = new uniqueRole("EMS USPM");
@@ -530,6 +537,7 @@ var oracleRole = new uniqueRole("oracle");
 consistency.initSingle = function (){
 	emsRole.init();
 	emsOcmpRole.init();
+	emsSecondaryOcmpRole.init();
 	ocmpVNFC.init();
 	emsOcsnfRole.init();
 	emsUspmRole.init();
@@ -552,27 +560,47 @@ consistency.check = function (){
 	if(!emsRole.v)warnings+="\nNodes section: EMS role is mandatory";
 	if(ocmpVNFC.v && !emsOcmpRole.v)warnings+="\nNodes section: OCMP EMS role is mandatory";
 	if(!Networks.search('network','MGMT'))warnings+="\nNetwork section: management interface is mandatory";
-	VNFCnames.forEach(function(VNFCname,VNFCindex){
-		var VNFdisplayName = VNFCindex != 0 ? "the VNFC " + VNFCname : "the composed VNF";
-		warnings+=checkDependency(NativeApps.activateNivrs[VNFCindex] == 'yes', [httpLb[VNFCindex] != undefined, seeSimplexIpAddr['MGMT'][VNFCindex] != undefined], "Nodes vs NativeApps sections on "+VNFdisplayName, ": NIVR and CaaS IVR applications require an HTTP LB VIP or a simplex SEE");
-	});
-	warnings+=checkDependency(NativeApps.search('CaaS IVR', 'yes'), [vipSipRole.v], "Nodes vs NativeApps sections: ", "CaaS IVR applications require a SIP LB VIP or a simplex OCMP");
+	if(NativeApps != undefined){
+		VNFCnames.forEach(function(VNFCname,VNFCindex){
+			var VNFdisplayName = VNFCindex != 0 ? "the VNFC " + VNFCname : "the composed VNF";
+			warnings+=checkDependency(NativeApps.activateNivrs[VNFCindex] == 'yes', [httpLb[VNFCindex] != undefined, seeSimplexIpAddr['MGMT'][VNFCindex] != undefined], "Nodes vs NativeApps sections on "+VNFdisplayName, ": NIVR and CaaS IVR applications require an HTTP LB VIP or a simplex SEE");
+		});
+		warnings+=checkDependency(NativeApps.search('CaaS IVR', 'yes'), [vipSipRole.v], "Nodes vs NativeApps sections: ", "CaaS IVR applications require a SIP LB VIP or a simplex OCMP");
+		[ 'oracle', 'pgsql', 'mysql' ].forEach(function(e,i,t){
+		warnings+=checkDependency(NativeApps.search('NIVR_DB_TYPE', e), [Nodes.search('DB role', e)], "Nodes vs NativeApps sections: ", "NIVR_DB_TYPE "+e+" requested by NativeApps not hosted by any node");
+		});
+		warnings+=checkDependency(NativeApps.count('NIVR_DB_TYPE') > 0, [Security.search('Property', 'NIVRDB_ADMIN') && Security.search('Property', 'NIVRDB_ADMIN_PASSWORD') && Security.search('Property', 'NIVRDB_APP') && Security.search('Property', 'NIVRDB_APP_PASSWORD') && Security.search('Property', 'NIVRDB_OPER') && Security.search('Property', 'NIVRDB_OPER_PASSWORD')], "NativeApps vs Security section: NIVR_DB_TYPE ", " requires NIVRDB_ADMIN NIVRDB_ADMIN_PASSWORD NIVRDB_APP NIVRDB_APP_PASSWORD NIVRDB_OPER NIVRDB_OPER_PASSWORD" );
+	}
 	if(oracleRole.v && oracleRole.service == undefined)warnings+="\nMisc section: ORACLE_SERVICE undefined while oracle DB is defined";
 	if(oracleRole.v && oracleRole.sysdba == undefined)warnings+="\nSecurity section: NIVRDB_SYSDBA account undefined while oracle DB is defined";
-	[ 'oracle', 'pgsql', 'mysql' ].forEach(function(e,i,t){
-	warnings+=checkDependency(NativeApps.search('NIVR_DB_TYPE', e), [Nodes.search('DB role', e)], "Nodes vs NativeApps sections: ", "NIVR_DB_TYPE "+e+" requested by NativeApps not hosted by any node");
-	});
 	if(!Security.search('Property','CERT_AUTH_ALIAS') || !Security.search('Property','CERT_AUTH_PASSWORD'))warnings+="\nSecurity section: missing certification authority: name and password";
-	if(!Misc.search('Property','SNMP_TRAP_DESTINATION'))warnings+="\nMisc section: missing SNMP_TRAP_DESTINATION";
-	if(Nodes.search('Http LB role','VIP') && !Misc.search('Property','HA_PING_IP_ADDR'))warnings+="\nMisc section: missing Reference IP address for LB HA: HA_PING_IP_ADDR";
+	if(Misc != undefined){
+		if(!Misc.search('Property','SNMP_TRAP_DESTINATION'))warnings+="\nMisc section: missing SNMP_TRAP_DESTINATION";
+		if(Nodes.search('Http LB role','VIP') && !Misc.search('Property','HA_PING_IP_ADDR'))warnings+="\nMisc section: missing Reference IP address for LB HA: HA_PING_IP_ADDR";
+		warnings+=checkDependency(Nodes.search('USPM role', 'Pri'), [Misc.search('Property', 'VNF_CONFIG_DATA_FILE')], "Nodes vs Misc sections:", " USPM middle ware requires VNF_CONFIG_DATA_FILE defining the auxiliary MSE Descriptor");
+	}
 	if(Nodes.search('WRTC BE','true') && !WebRTC.search('Function','WEBRTC_SIP_PORT')) warnings+="\nWebRTC section: WebRTC feature requires port definition: WEBRTC_SIP_PORT";
 	if(Nodes.search('WRTC BE','true') && !WebRTC.search('Function','WEBRTC_SIPPROXY_PORT')) warnings+="\nWebRTC section: WebRTC feature requires port definition: WEBRTC_SIPPROXY_PORT";
 	if(Nodes.search('WRTC BE','true') && !WebRTC.search('Function','WEBRTC_SIPREGISTRAR_PORT')) warnings+="\nWebRTC section: WebRTC feature requires port definition: WEBRTC_SIPREGISTRAR_PORT";
 	if(Nodes.search('WRTC BE','true') && !WebRTC.search('Function','WEBRTC_OCMP_TRANSCODER_PORT')) warnings+="\nWebRTC section: WebRTC feature requires port definition: WEBRTC_OCMP_TRANSCODER_PORT";
 	if(Nodes.search('WRTC BE','true') && !WebRTC.search('Function','WEBRTC_MEDIA_EXT_END')) warnings+="\nWebRTC section: WebRTC feature requires port definition: WEBRTC_MEDIA_EXT_END";
-	warnings+=checkDependency(NativeApps.count('NIVR_DB_TYPE') > 0, [Security.search('Property', 'NIVRDB_ADMIN') && Security.search('Property', 'NIVRDB_ADMIN_PASSWORD') && Security.search('Property', 'NIVRDB_APP') && Security.search('Property', 'NIVRDB_APP_PASSWORD') && Security.search('Property', 'NIVRDB_OPER') && Security.search('Property', 'NIVRDB_OPER_PASSWORD')], "NativeApps vs Security section: NIVR_DB_TYPE ", " requires NIVRDB_ADMIN NIVRDB_ADMIN_PASSWORD NIVRDB_APP NIVRDB_APP_PASSWORD NIVRDB_OPER NIVRDB_OPER_PASSWORD" );
-	warnings+=checkDependency(Nodes.search('USPM role', 'Pri'), [Misc.search('Property', 'VNF_CONFIG_DATA_FILE')], "Nodes vs Misc sections:", " USPM middle ware requires VNF_CONFIG_DATA_FILE defining the auxiliary MSE Descriptor");
-	
+	warnings+=checkDependency(Networks.search('network', 'HA'), [Security.search('Property','NIVRDB_LINUXHA_PASSWORD')], 
+		"Networks vs Security sections: connection to HA network", " requires NIVRDB_LINUXHA_PASSWORD");
+	warnings+=checkDependency(Nodes.search('OCMP role', 'Pri') || Nodes.search('OCMP role', 'Spx'), [
+			Licensing.search('Feature', 'SEE_SIP_SERIAL') && Licensing.search('Feature', 'SEE_SIP_CODEWORD') && 
+			Licensing.search('Feature', 'OCMP_BRE_LIC_KEY') && 
+			Licensing.search('Feature', 'OCMP_BRE_LIC_EXPIRES') && 
+			Licensing.search('Feature', 'OCMP_BRE_LIC_DESCRIPTION') && 
+			Licensing.search('Feature', 'OCMP_BRE_LIC_VXML_INSTANCES') && 
+			Licensing.search('Feature', 'OCMP_BRE_LIC_ASR_INSTANCES') && 
+			Licensing.search('Feature', 'OCMP_BRE_LIC_TTS_INSTANCES') && 
+			Licensing.search('Feature', 'OCMP_BRE_LIC_FEATURE_NAME') && 
+			Licensing.search('Feature', 'OCMP_BRE_LIC_FEATURE_INSTANCES'),
+			OCMPsettings != undefined && OCMPsettings.count('License file') != 0
+			], 
+			"Nodes vs Licensing sections: OCMP deployment: OCMP SIP and BRE licensing: SEE_SIP_SERIAL SEE_SIP_CODEWORD OCMP_BRE_LIC_KEY OCMP_BRE_LIC_EXPIRES OCMP_BRE_LIC_DESCRIPTION OCMP_BRE_LIC_VXML_INSTANCES OCMP_BRE_LIC_ASR_INSTANCES OCMP_BRE_LIC_TTS_INSTANCES OCMP_BRE_LIC_FEATURE_NAME OCMP_BRE_LIC_FEATURE_INSTANCES",
+			" are required in the Licensing section or an OCMP license file must be defined and imported in the OCMPsettings section");
+
 	return warnings;
 }
 
@@ -664,8 +692,8 @@ var vnfResource = function(title, columns, userFiles){
 		var trFile = document.createElement('TR');
 		var tdLabel = document.createElement('TD');
 		tdLabel.setAttribute("valign", "top");
-		tdLabel.append(document.createTextNode(aFile.label));
-		trFile.append(tdLabel);
+		tdLabel.appendChild(document.createTextNode(aFile.label));
+		trFile.appendChild(tdLabel);
 		
 		var tdBrowse = document.createElement('TD');
 		tdBrowse.setAttribute("valign", "top");
@@ -1007,11 +1035,12 @@ vnfResource.prototype.getAndSetSelection = function(row, nameIndexes, column, de
 var Networks = new vnfResource("Networks", [
 	{name:'network', type:'choice', width: '80px', choices:['MGMT', 'APP', 'SIP', 'LBNAT', 'PUBLIC', 'HA', 'DATA', 'M3UA1', 'M3UA2']}, 
 	{name:'interface', type:'text', width: '50px', value:'eth0'}, 
-	{name:'mask', type:'text', width: '120px', value:'255.255.248.0'}]
+	{name:'mask', type:'text', width: '120px', value:'255.255.248.0'}, 
+	{name:'portgroup', type:'text', width: '120px'}]
 	);
 	
 Networks.help = function(){
-	return "Network interfaces names and associated masks" + 
+	return "Network interfaces names and associated masks and resources" + 
 	"\nMGMT is mandatory: all nodes part of the MSE VNF should be connected to the MGMT interface"+
 	"\n\tThe hostname command should return the fully qualified domain name on this network, hostname -i the IPv4 address on this same network"+
 	"\nAPP: optional application network, typically used by OCMP nodes to collect Ccxml/Vxml scripts through an http load balancer"+
@@ -1030,7 +1059,9 @@ Networks.help = function(){
 	"\n\tThis width defines the maximum number of nodes and networks; it should be in the range 0 to 8, ie:"+
 	"\n\t- from mask 255.255.255.0: width: 8, 1 network, 256 nodes"+
 	"\n\t- to mask 255.255.255.255: width: 1, 256 networks, 1 node"+
-	"\n\t- recommended: 255.255.255.224: width: 5, 8 networks, 32 nodes";
+	"\n\t- recommended: 255.255.255.224: width: 5, 8 networks, 32 nodes"+
+	"\n\nVMware target"+
+	"\n\tportgroup: the name of the port group in the VMWare infrastructure mapping this network (optional, default: network name)";
 }
 	
 Networks.build = function(target, engine){
@@ -1040,6 +1071,10 @@ Networks.build = function(target, engine){
 	var table = document.getElementById('Networks');
 	var rowCount = table.rows.length;
 	Networks.heatNetworks = new Array();
+	Networks.names = new Array();
+	Networks.devices = new Array();
+	Networks.masks = new Array();
+	Networks.portgroups = new Array();
 	Networks.heatMaxNetwork = 0;
 	var HeatNetworkCount = Number(Networks.count('network') - 1);
 	Networks.heatWidth = undefined;
@@ -1057,6 +1092,7 @@ Networks.build = function(target, engine){
 		var networkName=Networks.getAndSetSelection(table.rows[i], nameIndexes, 'network');
 		var networkDevice=Networks.getAndSetValue(table.rows[i], nameIndexes, 'interface');
 		var networkMask=Networks.getAndSetValue(table.rows[i], nameIndexes, 'mask');
+		var networkPortgroup=Networks.getAndSetValue(table.rows[i], nameIndexes, 'portgroup', target=='OVFapp' || target=='vmware' ? networkName:'');
 		if(networkName == ""){
 			Networks.check += "\nNetworks: undefined network name for interface " + networkDevice;
 			continue;
@@ -1064,11 +1100,15 @@ Networks.build = function(target, engine){
 		// Check netmask consistency but allow the legacy placeholder
 		if(networkMask != "@netmask@")networkMask.split('.').forEach(function(e,i,t){
 			var aByte = Number(e);
-			if(Number.isNaN(aByte) || aByte < 0 || aByte > 255 )Networks.check += "\nNetworks: invalid netmask " + networkMask + " for interface " + networkDevice + "; expecting positive integer <= 255, found "+e;
+			if(isNaN(aByte) || aByte < 0 || aByte > 255 )Networks.check += "\nNetworks: invalid netmask " + networkMask + " for interface " + networkDevice + "; expecting positive integer <= 255, found "+e;
 		});
 		if(networkDevice != ""){
 			result += '\n'+networkName+'_DEVICE='+networkDevice;
 			result += '\n'+networkName+'_NETMASK='+networkMask;
+			Networks.names.push(networkName);
+			Networks.devices.push(networkDevice);
+			Networks.masks.push(networkMask);
+			Networks.portgroups.push(networkPortgroup);
 			
 			if(target == 'azure' && engine == 'ansible' || target == 'Heat' || target == 'kubernetes'){
 				// Heat deployments: all networks have the same width: guess it from the first netmask proposed 
@@ -1088,7 +1128,7 @@ Networks.build = function(target, engine){
 				if(!networkDevice.startsWith(prefix))Networks.check += "\nNetworks: unsupported interface name for "+target+" target " + networkDevice + ": prefix " + prefix +" required";
 				var candidate = networkDevice.substr(prefix.length);
 				var interfaceNumber = Number(candidate);
-				if(Number.isNaN(interfaceNumber)){
+				if(isNaN(interfaceNumber)){
 					Networks.check += "\nNetworks: illegal value for interface number "+networkName+" : "+candidate+"; expecting integer";
 					continue;
 				} 
@@ -1395,7 +1435,7 @@ Nodes.build = function(target, engine){
 		var redisInstanceName = nodeName.substr(0,12).split('.')[0];
 		
 		switch(target){
-		  case 'Heat':
+		  case 'Heat': case 'vmware':
 			// IP addresses will be known at instantiation time: 
 			// Replace undefined values with place holders resolved later
 			// Push the network interface number in the interfaces list for this node
@@ -1437,10 +1477,6 @@ Nodes.build = function(target, engine){
 			  theCloudNode.interfaces.push(Networks.heatNetworks['MGMT']);
 			} 
 			break;
-		  case 'static':
-		  	// IP address on the management network is known and required for building the dynamic inventory
-		  	theCloudNode.ipAddress = nodeIpAddr;
-		  	break;
 		}
 		
 		var nodeNames		= new Array();
@@ -1455,6 +1491,12 @@ Nodes.build = function(target, engine){
 		nodeIpAddresses['LBNAT']=	nodeNatIpAddr;
 		nodeNames['HA']			=	nodeHaName;
 		nodeIpAddresses['HA']	=	nodeHaIpAddr;
+		nodeIpAddresses['DATA']	=	nodeDataIpAddr;
+		nodeIpAddresses['M3UA1']=	nodeM3ua1IpAddr;
+		nodeIpAddresses['M3UA2']=	nodeM3ua2IpAddr;
+		
+		// For infrastructure where IP addresses are statically allocated (vmware, static)
+		theCloudNode.ipAddresses = nodeIpAddresses;
 		
 		if(refreshGroup != ""){
 			// no refresh supported on USPM out of the EMS and backends
@@ -1491,7 +1533,8 @@ Nodes.build = function(target, engine){
 		Nodes.check += checkDependency(redisHaRole == 'Pri', [Nodes.count('Redis HA', 'Sec') > 0], "Nodes: "+nodeName + ": Redis HA "+redisHaRole+" role requires one secondary: ", "missing a Sec role in Redis HA");
 		Nodes.check += checkDependency(redisHaRole == 'Sec', [Nodes.count('Redis HA', 'Pri') > 0], "Nodes: "+nodeName + ": Redis HA "+redisHaRole+" role requires one primary: ", "missing a Pri role in Redis HA");
 		Nodes.check += emsRole.setIfNotOrAlert(isEms);
-		Nodes.check += emsOcmpRole.setIfNotOrAlert(isOcmpEms);
+		// OCMP supports up to 2 EMS
+		Nodes.check += emsOcmpRole.v ? emsSecondaryOcmpRole.setIfNotOrAlert(isOcmpEms) : emsOcmpRole.setIfNotOrAlert(isOcmpEms);
 		Nodes.check += emsOcsnfRole.setIfNotOrAlert(isOcsnfEms);
 		Nodes.check += emsUspmRole.setIfNotOrAlert(isUspmEms);
 		Nodes.check += kpiRole.setIfNotOrAlert(isKpiGui);
@@ -1517,22 +1560,6 @@ Nodes.build = function(target, engine){
 		Nodes.check += checkDependency(VNFCindex != 0, [dbRole == "", seeRole != "", httpLbRole != "" ], 	"Nodes: "+nodeName + " on " + VNFdisplayName + ": dbRole not supported on a VNFC", " (SEE cluster and HTTP LB roles only)");
 		Nodes.check += checkDependency(VNFCindex != 0, [uspmRole == "", uspmRole == 'Simulap', seeRole != "", httpLbRole != "" ], 	"Nodes: "+nodeName + " on " + VNFdisplayName + ": uspmRole not supported on a VNFC", " (SEE cluster and HTTP LB roles only)");
 		Nodes.check += checkDependency(VNFCindex != 0, [ocmpRole == ""], 	"Nodes: "+nodeName + " on " + VNFdisplayName + ": ocmpRole not supported on a VNFC", " (SEE cluster and HTTP LB roles only)");
-		Nodes.check += checkDependency((nodeHaName != "" || nodeHaIpAddr != "") && (linuxHaRole != "" || redisHaRole != ""), [Security.search('Property','NIVRDB_LINUXHA_PASSWORD')], 
-			"Nodes vs Security sections: "+ nodeName+" connection to HA network", " requires NIVRDB_LINUXHA_PASSWORD");
-		Nodes.check += checkDependency(ocmpRole != "", [
-			Licensing.search('Feature', 'SEE_SIP_SERIAL') && Licensing.search('Feature', 'SEE_SIP_CODEWORD') && 
-			Licensing.search('Feature', 'OCMP_BRE_LIC_KEY') && 
-			Licensing.search('Feature', 'OCMP_BRE_LIC_EXPIRES') && 
-			Licensing.search('Feature', 'OCMP_BRE_LIC_DESCRIPTION') && 
-			Licensing.search('Feature', 'OCMP_BRE_LIC_VXML_INSTANCES') && 
-			Licensing.search('Feature', 'OCMP_BRE_LIC_ASR_INSTANCES') && 
-			Licensing.search('Feature', 'OCMP_BRE_LIC_TTS_INSTANCES') && 
-			Licensing.search('Feature', 'OCMP_BRE_LIC_FEATURE_NAME') && 
-			Licensing.search('Feature', 'OCMP_BRE_LIC_FEATURE_INSTANCES'),
-			OCMPsettings != undefined && OCMPsettings.count('License file') != 0
-			], 
-			nodeName + ": OCMP SIP and BRE licensing: SEE_SIP_SERIAL SEE_SIP_CODEWORD OCMP_BRE_LIC_KEY OCMP_BRE_LIC_EXPIRES OCMP_BRE_LIC_DESCRIPTION OCMP_BRE_LIC_VXML_INSTANCES OCMP_BRE_LIC_ASR_INSTANCES OCMP_BRE_LIC_TTS_INSTANCES OCMP_BRE_LIC_FEATURE_NAME OCMP_BRE_LIC_FEATURE_INSTANCES",
-			" are required in the Licensing section or an OCMP license file must be defined and imported in the OCMPsettings section");
 		Nodes.check += checkDependency(nbVNFC > 0 && dbRole != "", [seeRole == "" && httpLbRole == "", seeRole == 'Spx' ], 
 			"Nodes: "+nodeName + " cannot play a " + dbRole+" DB role concurrently with "+seeRole+" SEE role and "+httpLbRole+" HTTP LB role because databases are shared across the composed VNF and ", nbVNFC + " VNFC(s)");
 		Nodes.check += checkDependency(dbRole.startsWith("redis") || redisHaRole.endsWith("Sentinel"), [Security.search('Property','NIVRDB_LINUXHA_PASSWORD')], 
@@ -1590,8 +1617,14 @@ Nodes.build = function(target, engine){
 			cloudNodes.unshift(theCloudNode); 
 		}
 		if(isOcmpEms){
+			// OCMP supports up to 2 EMS
+			if(emsSecondaryOcmpRole.v){
+			result += "\n\n# OCMP VNF Component Element Manager Secondary#";
+			result += getNameIpAddr("OCMP_EMS2", "", nodeName, nodeIpAddr);
+			}else{
 			result += "\n\n# OCMP VNF Component Element Manager      #";
 			result += getNameIpAddr("OCMP_EMS", "", nodeName, nodeIpAddr);
+			}
 		}
 		if(isOcsnfEms){
 			result += "\n\n# OCSNF VNF Component Element Manager      #";
@@ -1779,7 +1812,7 @@ Nodes.build = function(target, engine){
 				var redisPorts = nodePort.split(",");
 				redisPorts.forEach(function(e,i,t){
 					verfiedNumber = Number(e);
-					if(Number.isNaN(verfiedNumber))Nodes.check += "\nNodes: "+nodeName + " has a non numerical Redis DB port number " + e;
+					if(isNaN(verfiedNumber))Nodes.check += "\nNodes: "+nodeName + " has a non numerical Redis DB port number " + e;
 					if(i > 1)Nodes.check += "\nNodes: "+nodeName + " useless Redis DB port number: " + e + "; max 2 ports expected: redis and sentinel";
 				});
 				if(redisPorts[0].trim() == "")redisPorts[0] = undefined;
@@ -2396,7 +2429,7 @@ var Misc = new vnfResource("Misc", [
 		'NIVR_OTHER_HOSTS', 'REDIS_SENTINEL_PORT_OFFSET', 'REDIS_DOWNAFTER', 'REDIS_PARALLEL_SYNCS', 'REDIS_FAILOVER_TIMEOUT',
 		'ORACLE_SERVICE', 'ORACLE_CONSOLE_PORT', 'ORACLE_PATH',
 		'YUM_REPO_LIST', 'HA_PING_IP_ADDR', 'MULTICAST_MTU', 'SEE_SWAGGER',
-		'DOCKER_IMAGE', 'NFVD_ADDR', 'NFVD_TENANT_NAME', 'NFVD_APPLICATION', 'NFVD_DATACENTER',
+		'DOCKER_IMAGE', 'OVF_IMAGE', 'OVF_DISK_SIZE', 'NFVD_ADDR', 'NFVD_TENANT_NAME', 'NFVD_APPLICATION', 'NFVD_DATACENTER',
 		'NFVD_USERNAME', 'NFVD_PASSWORD', 'NFVD_STACK_NAME', 'NFVD_REST_ADDR', 'NFVD_SCALING_TEMPLATE',
 		'NIVR_SCALING_ROLE','VNF_RETRY_POLICY_MAX_TIMEOUT'
 		]},
@@ -2419,6 +2452,8 @@ MiscDefault.SEE_SWAGGER="false";
 MiscDefault.YUM_REPO_LIST="yum_repos";
 MiscDefault.NFVD_REST_ADDR="${NFVD_ADDR}:5000/v2.0";
 MiscDefault.DOCKER_IMAGE="ndsna.azurecr.io/tas:v11";
+MiscDefault.OVF_IMAGE='C:/Users/ddomet/Downloads/tas3124/tas3124-disk1.vmdk';
+MiscDefault.OVF_DISK_SIZE='60';
 MiscDefault.REDIS_SENTINEL_PORT_OFFSET="20000";
 MiscDefault.REDIS_PARALLEL_SYNCS="1";
 MiscDefault.REDIS_FAILOVER_TIMEOUT="60000";
@@ -2435,6 +2470,8 @@ MiscComment.ORACLE_PATH="Absolute path to the Oracle instance on the Oracle serv
 MiscComment.ORACLE_CONSOLE_PORT="Port assigned to the Oracle console";
 MiscComment.YUM_REPO_LIST="list of YUM repositories used as an alternative to ISO images for products installation";
 MiscComment.DOCKER_IMAGE="Full name of the Docker container image used for kubernetes deployments";
+MiscComment.OVF_IMAGE="Path to the file containing the OVF image used for OVF appliance deployments";
+MiscComment.OVF_DISK_SIZE="Size of the disks used for OVF appliance deployments (Gb)";
 MiscComment.NFVD_ADDR="SNMP Traps destination outside the VNF";
 MiscComment.NFVD_TENANT_NAME="SNMP Traps attribute tenantId";
 MiscComment.NFVD_APPLICATION="SNMP Traps attribute applicationId";
@@ -2498,7 +2535,12 @@ Misc.help = function(){
 	"\n\t- NODE_OCMP: additional node in the OCMP cluster"+
 	"\n\tOtherwise, a node not getting an explicit role will idle"+
 	"\n\nYUM_REPO_LIST: "+MiscComment.YUM_REPO_LIST+
-	"\nVNF_RETRY_POLICY_MAX_TIMEOUT: "+MiscComment.VNF_RETRY_POLICY_MAX_TIMEOUT;
+	"\nVNF_RETRY_POLICY_MAX_TIMEOUT: "+MiscComment.VNF_RETRY_POLICY_MAX_TIMEOUT+
+	"\n"+
+	"\nDOCKER_IMAGE: "+MiscComment.DOCKER_IMAGE+
+	"\nOVF_IMAGE: "+MiscComment.OVF_IMAGE+
+	"\nOVF_DISK_SIZE: "+MiscComment.OVF_DISK_SIZE;
+	
 }
 
 Misc.build = function(target){
@@ -2541,12 +2583,12 @@ Misc.build = function(target){
 			case 'YUM_REPO_LIST':
 				result += "\n# YUM repositories list";
 				result += "\nYUM_REPO_LIST="+Misc.getAndSetValue(row, nameIndexes, 'Value', "'*'", 'YUM_REPO_LIST');
-				result += '\n[ "$YUM_REPO_LIST" != "" ] && IS_YUM_REPO=yes || IS_YUM_REPO=no'
+				result += '\nif [ "$YUM_REPO_LIST" != "" ] ; then IS_YUM_REPO=yes ; else IS_YUM_REPO=no ; fi'
 				break;
 			case 'SEE_INSTANCES_MAX':
 				var candidate=Misc.getAndSetValue(row, nameIndexes, 'Value', "4", MiscComment.SEE_INSTANCES_MAX);
 				seeInstancesMax = Number(candidate);
-				if(Number.isNaN(seeInstancesMax)){
+				if(isNaN(seeInstancesMax)){
 					Misc.check += "\nMisc section: Illegal value for SEE_INSTANCES_MAX: "+candidate+"; expecting integer";
 					break;
 				} 
@@ -2587,7 +2629,14 @@ Misc.build = function(target){
 				result += "\n# "+MiscComment[propertyName];
 				result += "\n"+propertyName+"="+netmtu;
 				break;
-				
+			case 'OVF_IMAGE': 
+				// Record the OVF image path for building the OVF descriptor later on
+				Misc.OVFimage=Misc.getAndSetValue(row, nameIndexes, 'Value', MiscDefault[propertyName], MiscComment[propertyName]);
+				break;
+			case 'OVF_DISK_SIZE': 
+				// Record the OVF disk size for building the OVF descriptor later on
+				Misc.OVFdiskSize=Misc.getAndSetValue(row, nameIndexes, 'Value', MiscDefault[propertyName], MiscComment[propertyName]);
+				break;
 			default:
 				if(propertyName != ""){
 				result += "\n# "+MiscComment[propertyName];
@@ -2608,8 +2657,10 @@ Misc.build = function(target){
 	Misc.check+=checkDependency(target != undefined, [AppAuxDescInput.isConsistent()], 'Misc section: APPs descriptor path APP_CONFIG_DATA_FILE and imported content consistency: ', 'both or none should be defined.');
 	Misc.check+=checkDependency(target != undefined, [uspmAuxDescInput.isConsistent()], 'Misc section: USPM descriptor path VNF_CONFIG_DATA_FILE and imported content consistency: ', 'both or none should be defined.');
 	
-	// Make sure a docker image is defined for kubernetes target
-	Misc.check+=checkDependency(target == 'kubernetes', [Misc.search('Property','DOCKER_IMAGE')], 'Misc section: Kubernetes target infrastructure', ' requires DOCKER_IMAGE definition.');
+	// Make sure a docker image is defined for kubernetes and OVFapp targets
+	Misc.check+=checkDependency(target == 'kubernetes', [Misc.search('Property','DOCKER_IMAGE')], 'Misc section: '+target+' infrastructure', ' requires DOCKER_IMAGE definition.');
+	Misc.check+=checkDependency(target == 'OVFapp', [Misc.search('Property','OVF_IMAGE')], 'Misc section: '+target+' infrastructure', ' requires OVF_IMAGE definition.');
+	Misc.check+=checkDependency(target == 'OVFapp', [Misc.search('Property','OVF_DISK_SIZE')], 'Misc section: '+target+' infrastructure', ' requires OVF_DISK_SIZE definition.');
 
 	if(Misc.check != "")return Misc.check;
 	return result;
@@ -3266,11 +3317,6 @@ MessagingGateway.build = function(){
 		if(!MessagingGateway.search('Property', 'SMSGW_APP_HOST'))MessagingGateway.check += "\nMessaging Gateway: SMSGW_APP_HOST is required";
 		if(!MessagingGateway.search('Property', 'SMSGW_SMPP_PORT'))MessagingGateway.check += "\nMessaging Gateway: SMSGW_SMPP_PORT is required";
 		
-		// Check mandatory parameters: at least one TCAP provider with the expected name
-		MessagingGateway.check += checkDependency(_ussd, [TCAP.search('Provider name', 'USSD-TCAP-Provider')], "Messaging Gateway vs TCAP sections:", "USSD-TCAP-Provider required for USSD messages gateway");
-		MessagingGateway.check += checkDependency(_ms, [TCAP.search('Provider name', 'MS-TCAP-Provider')], "Messaging Gateway vs TCAP sections:", "MS-TCAP-Provider required for MAP Services messages gateway");
-		MessagingGateway.check += checkDependency(_sms, [TCAP.search('Provider name', 'SMS-TCAP-Provider')], "Messaging Gateway vs TCAP sections:", "SMS-TCAP-Provider required for SMS messages gateway");
-			
 		// Prevent instantiation on SEE with non USPM back end nodes
 		if(Nodes.seeNodesNonUspmBackEnd != undefined && Nodes.seeNodesNonUspmBackEnd.length > 0)MessagingGateway.check+="\nMessaging Gateway: cannot instantiate on SEE cluster nodes not playing a USPM Back End role: "+Nodes.seeNodesNonUspmBackEnd.join(" ");
 	} else {
@@ -3363,16 +3409,16 @@ MessagingGatewayGroups.build = function(){
 		var Name=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Name', 'group-'+i);
 		numberCandidate=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Code', 100+i);
 		var Code=Number(numberCandidate);
-		if(Code == "" || Number.isNaN(Code) || Code < 100 || Code > 999)MessagingGatewayGroups.check += "Messaging Gateway Groups section: invalid code "+numberCandidate+"; integer in the range 100-999 expected";
+		if(Code == "" || isNaN(Code) || Code < 100 || Code > 999)MessagingGatewayGroups.check += "Messaging Gateway Groups section: invalid code "+numberCandidate+"; integer in the range 100-999 expected";
 		var Description=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Description');
 		var smpp=MessagingGatewayGroups.getAndSetChecked(table.rows[i], nameIndexes, 'SMPP');
 		var gateway=MessagingGatewayGroups.getAndSetChecked(table.rows[i], nameIndexes, 'Gateway');
 		var Path=MessagingGatewayServices.getAndSetValue(table.rows[i], nameIndexes, 'Service Path');
 		numberCandidate=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Connect timeout');
 		var connectTO=Number(numberCandidate);
-		if(Number.isNaN(connectTO) || connectTO <0)MessagingGatewayGroups.check += "Messaging Gateway Groups section: invalid Connect timeout "+numberCandidate+"; positive integer expected"; 
+		if(isNaN(connectTO) || connectTO <0)MessagingGatewayGroups.check += "Messaging Gateway Groups section: invalid Connect timeout "+numberCandidate+"; positive integer expected"; 
 		numberCandidate=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Read timeout');
-		if(Number.isNaN(readTO) || readTO <0)MessagingGatewayGroups.check += "Messaging Gateway Groups section: invalid Read timeout "+numberCandidate+"; positive integer expected";
+		if(isNaN(readTO) || readTO <0)MessagingGatewayGroups.check += "Messaging Gateway Groups section: invalid Read timeout "+numberCandidate+"; positive integer expected";
 		var readTO=Number(numberCandidate);
 		
 		// Consistency check
@@ -3966,8 +4012,19 @@ TCAP.build = function(){
 		}
 	}
 
+	// Messaging Gateway consistency check: at least one TCAP provider for each defined gateway of ussd, ms and sms
+	var _ussd=MessagingGateway.search('Property', 'GLOBAL_TITLE_USSD');
+	var _ms=MessagingGateway.search('Property', 'GLOBAL_TITLE_MS');
+	var _sms=MessagingGateway.search('Property', 'GLOBAL_TITLE_SMS');
+
 	VNFCnames.forEach(function(e,i,t){
-		if(names[i] == undefined || names[i].length == 0)return;
+		var isEmpty=names[i] == undefined || names[i].length == 0;
+		var VNFname= i>0 ?" for VNFC "+e : "";
+		TCAP.check += checkDependency(_ussd, [!isEmpty && names[i].indexOf('USSD-TCAP-Provider') >=0], "Messaging Gateway vs TCAP sections"+VNFname, ": USSD-TCAP-Provider required for USSD messages gateway");
+		TCAP.check += checkDependency(_ms, [!isEmpty && names[i].indexOf('MS-TCAP-Provider') >=0], "Messaging Gateway vs TCAP sections"+VNFname, ": MS-TCAP-Provider required for MAP Services messages gateway");
+		TCAP.check += checkDependency(_sms, [!isEmpty && names[i].indexOf('SMS-TCAP-Provider') >=0], "Messaging Gateway vs TCAP sections"+VNFname, ": SMS-TCAP-Provider required for SMS messages gateway");
+		
+		if(isEmpty)return;
 		fillArrays(serviceNames[i]);
 		fillArrays(instanceIds[i]);
 		fillArrays(appIds[i]);
@@ -7007,7 +7064,7 @@ function buildVNFDescriptor(target, engine){
 	desc += "\n# Legacy management based on MSE connectors ";
 	desc += "\n# Used to enable/disable features           ";
 	desc += "\n#-------------------------------------------";
-	desc += "\n_legacySEE() {  command -v install-mse-connectors.sh install-mse_connectors.sh > /dev/null || test -f /var/opt/OC/iso/OpenCall-SEE*.iso && return 0 || return 1 ; }";
+	desc += "\n_legacySEE() {  if command -v install-mse-connectors.sh install-mse_connectors.sh > /dev/null || test -f /var/opt/OC/iso/OpenCall-SEE*.iso ; then return 0 ; else return 1 ; fi }";
 	desc += "\n# NIVR and CaaS IVR: activate on SEE3 only";
 	desc += "\n# Messaging Framework, redis and all emscli resources: disable on SEE3";
 	desc += "\nif _legacySEE ; then";
@@ -7040,7 +7097,7 @@ function buildVNFDescriptor(target, engine){
 	desc += "\nXMLRPC_SERVER_ADDR=()";
 	desc += "\nelse";
 	desc += "\n# SEE > 3: NIVR native applications supported only without WebRTC ; no Reporting System";
-	desc += "\nACTIVATE_APPLI_NIVR=$([[ $WEBRTC_SIGNALING_IP_ADDR == '' ]] && echo $ACTIVATE_APPLI_NIVR || echo no)";
+	desc += "\nACTIVATE_APPLI_NIVR=$(if [[ $WEBRTC_SIGNALING_IP_ADDR == '' ]] ; then echo $ACTIVATE_APPLI_NIVR ; else echo no ; fi )";
 	desc += "\nACTIVATE_APPLI_CAASIVR=no";
 	desc += "\nACTIVATE_OCCP_SNTS=no";
 	desc += "\nRS_DB_TYPE='-'"
@@ -7101,8 +7158,11 @@ function deploymentHelp(){userOutput(
 "\n\t- from image: create one volume per instance from a qcow2 image which name is passed as parameter Image"+
 "\n\t- from master: create one volume per instance from a master volume which id is passed as parameter Image"+
 "\n\t- none: use local storage on compute node, no volume creation"+
-"\nTemplate output format: three options available "+
+"\nTemplate output format: four options available "+
 "\n\t- Heat: builds a HOT format (Heat Orchestration Template) to be deployed on top of OpenStack"+
+"\n\t- OVFapp: builds a OVF xml file (Open Virtualization Format) to be deployed on VMWare or any OVF aware infrastructure"+
+"\n\t\t- requires an image ready for automated deployment (Master Image) including the vmtoolsd package for transporting the application data"+
+"\n\t\t- deploy on existing networks, with static IP addresses (no DHCP)"+
 "\n\t- Tosca: builds a TOSCA format (Topology and Orchestration Specification for Cloud Applications) to be deployed on top of normalized orchestrators"+
 "\n\t- Kubernetes: builds a shell script to be invoked on the kubernetes console"+
 "\n\t\t- install docker and kubernetes on a Linux devops console"+
@@ -7126,6 +7186,7 @@ function deploy(){
 	switch(document.getElementById("deployer").value){
 		case 'Heat': buildHeatTemplate(); break;
 		case 'Kubernetes': buildKubernetesScript(); break;
+		case 'OVFapp': buildOVFapp(); break;
 		case 'Tosca': buildToscaTemplate(); break;
 	}
 }
@@ -7593,6 +7654,196 @@ function buildKubernetesScript(){
 	document.body.removeChild(a);
 }
 
+
+// ============================
+// MSE OVF appliance descriptor
+// ============================
+function buildOVFapp(){
+	var n0="\n";
+	var quickDescription = document.getElementById("quickDescription");
+	var ovf='<?xml version="1.0" encoding="UTF-8"?>';
+	ovf+=n0+'<!--Generated by MSE/TAS topology assistant for: '+quickDescription.value+' -->';
+	
+	// Build the descriptor (or get the errors) and do not publish
+	// Required soon enough to get specific variables properly setup
+    var desc = buildVNFDescriptor('OVFapp');
+	// if the enf of descriptor is not found, show the error and quit
+    if(desc.indexOf(endOfDescriptor) == -1)return; 
+
+	// Open envelope
+	ovf+=n0+'<Envelope xmlns="http://schemas.dmtf.org/ovf/envelope/1" xmlns:cim="http://schemas.dmtf.org/wbem/wscim/1/common" xmlns:ovf="http://schemas.dmtf.org/ovf/envelope/1" xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData" xmlns:vmw="http://www.vmware.com/schema/ovf" xmlns:vssd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_VirtualSystemSettingData" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">';
+	ovf+=n0+'  <References>';
+	ovf+=n0+'    <File ovf:href="'+Misc.OVFimage+'" ovf:id="image" />';
+	ovf+=n0+'  </References>';
+	ovf+=n0+'  <DiskSection>';
+	ovf+=n0+'    <Info>Virtual disk information</Info>';
+	ovf+=n0+'    <Disk ovf:capacity="'+Misc.OVFdiskSize+'" ovf:capacityAllocationUnits="byte * 2^30" ovf:diskId="vmdisk1" ovf:fileRef="image" ovf:format="http://www.vmware.com/interfaces/specifications/vmdk.html#streamOptimized" />';
+	ovf+=n0+'  </DiskSection>';
+	
+	// Network interfaces
+	// Prevent IP addresses duplication for infrastructures missing dynamic allocation (vmware)
+    var uniqueDevice = new Array();
+    ovf+=n0+'  <NetworkSection>';
+	ovf+=n0+'    <Info>The list of logical networks</Info>';
+	Networks.names.forEach(function(netName,netIndex){
+		var _device = Networks.devices[netIndex];
+		var _portgroup = Networks.portgroups[netIndex];
+		if(_portgroup == undefined || _portgroup == '')_portgroup=netName;
+		if(uniqueDevice.indexOf(_device) >= 0)return;
+		uniqueDevice.push(_device);
+		ovf+=n0+'    <Network ovf:name="'+_portgroup+'">';
+		ovf+=n0+"      <Description>The "+_portgroup+" network</Description>";
+		ovf+=n0+'    </Network>';
+		});
+	ovf+=n0+'  </NetworkSection>';
+	
+	// List of nodes
+	ovf+=n0+'  <ovf:VirtualSystemCollection ovf:id="TASappliance">';
+	ovf+=n0+'    <ovf:Info>'+quickDescription.value+'</ovf:Info>';
+	ovf+=n0+'    <ovf:Name>TASappliance</ovf:Name><ovf:AnnotationSection><ovf:Info>'+quickDescription.value+' on VMWare infrastructure</ovf:Info><ovf:Annotation>'+quickDescription.value+'</ovf:Annotation></ovf:AnnotationSection>';
+	ovf+=n0+'    <ProductSection>';
+	ovf+=n0+'      <Info>'+quickDescription.value+'</Info>';
+	ovf+=n0+'      <Product>HPE NDS Network Applications TAS/MSE appliance</Product>';
+	ovf+=n0+'      <Vendor>HPE Hewlett Packard Enterprise</Vendor>';
+	ovf+=n0+'      <Version>'+Misc.OVFimage+'</Version>';
+	ovf+=n0+'      <FullVersion>'+Misc.OVFimage+' on '+Misc.OVFdiskSize+' Gb disks</FullVersion>';
+	ovf+=n0+'    </ProductSection>';
+	
+	// Default VM attributes
+	var vmAttributes='';	
+	vmAttributes+=n0+'<Item>\n\t<rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>\n\t<rasd:Description>Number of Virtual CPUs</rasd:Description>\n\t<rasd:ElementName>4 virtual CPU(s)</rasd:ElementName>\n\t<rasd:InstanceID>1</rasd:InstanceID>\n\t<rasd:ResourceType>3</rasd:ResourceType>\n\t<rasd:VirtualQuantity>4</rasd:VirtualQuantity>';
+	vmAttributes+=n0+'</Item>';
+    vmAttributes+=n0+'<Item>\n\t<rasd:AllocationUnits>byte * 2^20</rasd:AllocationUnits>\n\t<rasd:Description>Memory Size</rasd:Description>\n\t<rasd:ElementName>8192MB of memory</rasd:ElementName>\n\t<rasd:InstanceID>2</rasd:InstanceID>\n\t<rasd:ResourceType>4</rasd:ResourceType>\n\t<rasd:VirtualQuantity>8192</rasd:VirtualQuantity>';
+	vmAttributes+=n0+'</Item>';
+    vmAttributes+=n0+'<Item>\n\t<rasd:Address>0</rasd:Address>\n\t<rasd:Description>SCSI Controller</rasd:Description>\n\t<rasd:ElementName>SCSI controller 0</rasd:ElementName>\n\t<rasd:InstanceID>3</rasd:InstanceID>\n\t<rasd:ResourceSubType>VirtualSCSI</rasd:ResourceSubType>\n\t<rasd:ResourceType>6</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="slotInfo.pciSlotNumber" vmw:value="160" />';
+	vmAttributes+=n0+'</Item>';
+    vmAttributes+=n0+'<Item>\n\t<rasd:Address>1</rasd:Address>\n\t<rasd:Description>IDE Controller</rasd:Description>\n\t<rasd:ElementName>IDE 1</rasd:ElementName>\n\t<rasd:InstanceID>4</rasd:InstanceID>\n\t<rasd:ResourceType>5</rasd:ResourceType>';
+	vmAttributes+=n0+'</Item>';
+    vmAttributes+=n0+'<Item>\n\t<rasd:Address>0</rasd:Address>\n\t<rasd:Description>IDE Controller</rasd:Description>\n\t<rasd:ElementName>IDE 0</rasd:ElementName>\n\t<rasd:InstanceID>5</rasd:InstanceID>\n\t<rasd:ResourceType>5</rasd:ResourceType>';
+	vmAttributes+=n0+'</Item>';
+    vmAttributes+=n0+'<Item ovf:required="false">\n\t<rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>\n\t<rasd:ElementName>Video card</rasd:ElementName>\n\t<rasd:InstanceID>6</rasd:InstanceID>\n\t<rasd:ResourceType>24</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="enable3DSupport" vmw:value="false" /><vmw:Config ovf:required="false" vmw:key="use3dRenderer" vmw:value="automatic" /><vmw:Config ovf:required="false" vmw:key="useAutoDetect" vmw:value="false" /><vmw:Config ovf:required="false" vmw:key="videoRamSizeInKB" vmw:value="8192" />';
+	vmAttributes+=n0+'</Item>';
+    vmAttributes+=n0+'<Item ovf:required="false">\n\t<rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>\n\t<rasd:ElementName>VMCI device</rasd:ElementName>\n\t<rasd:InstanceID>7</rasd:InstanceID>\n\t<rasd:ResourceSubType>vmware.vmci</rasd:ResourceSubType>\n\t<rasd:ResourceType>1</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="allowUnrestrictedCommunication" vmw:value="false" /><vmw:Config ovf:required="false" vmw:key="slotInfo.pciSlotNumber" vmw:value="32" />';
+	vmAttributes+=n0+'</Item>';
+    vmAttributes+=n0+'<Item ovf:required="false">\n\t<rasd:AddressOnParent>0</rasd:AddressOnParent>\n\t<rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>\n\t<rasd:ElementName>CD/DVD drive 1</rasd:ElementName>\n\t<rasd:InstanceID>8</rasd:InstanceID>\n\t<rasd:Parent>4</rasd:Parent>\n\t<rasd:ResourceSubType>vmware.cdrom.remotepassthrough</rasd:ResourceSubType>\n\t<rasd:ResourceType>15</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="backing.exclusive" vmw:value="false" />';
+	vmAttributes+=n0+'</Item>';
+    vmAttributes+=n0+'<Item>\n\t<rasd:AddressOnParent>0</rasd:AddressOnParent>\n\t<rasd:ElementName>Hard disk 1</rasd:ElementName>\n\t<rasd:HostResource>ovf:/disk/vmdisk1</rasd:HostResource>\n\t<rasd:InstanceID>9</rasd:InstanceID>\n\t<rasd:Parent>3</rasd:Parent>\n\t<rasd:ResourceType>17</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="backing.writeThrough" vmw:value="false" />';
+	vmAttributes+=n0+'</Item>';
+    vmAttributes+=n0+'<Item ovf:required="false">\n\t<rasd:AddressOnParent>0</rasd:AddressOnParent>\n\t<rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>\n\t<rasd:Description>Floppy Drive</rasd:Description>\n\t<rasd:ElementName>Floppy drive 1</rasd:ElementName>\n\t<rasd:InstanceID>10</rasd:InstanceID>\n\t<rasd:ResourceSubType>vmware.floppy.remotedevice</rasd:ResourceSubType>\n\t<rasd:ResourceType>14</rasd:ResourceType>';
+	vmAttributes+=n0+'</Item>';
+	
+	// build the list of non VIP nodes
+	// Pass the fqdn and mgmt ip address as two properties
+	// On the ems node, pass the descriptor as an additional property, escaping double quotes and new lines
+    var nonVipNodes = Nodes.cloudNodes.filter(function(e){return !e.isVIP;});
+    var emsNode = Nodes.cloudNodes[Nodes.cloudNodes.length - 1];
+    nonVipNodes.forEach(function(aNode, indexNode){
+    var name=aNode.name;
+    ovf+=n0+'    <VirtualSystem ovf:id="'+name+'">';
+	ovf+=n0+'    <Info>Virtual machine '+name+'</Info>';
+	ovf+=n0+'    <Name>'+name+'</Name>';
+	ovf+=n0+'    <ProductSection>';
+	ovf+=n0+'      <Info>HPE NDS Network Applications TAS/MSE appliance</Info>';
+	ovf+=n0+'      <Product>HPE NDS Network Applications TAS/MSE appliance</Product>';
+	ovf+=n0+'      <Vendor>HPE Hewlett Packard Enterprise</Vendor>';
+	ovf+=n0+'      <Version>"'+Misc.OVFimage+'"</Version>';
+	ovf+=n0+'      <FullVersion>"'+Misc.OVFimage+' on '+Misc.OVFdiskSize+' Gb disks"</FullVersion>';
+	// Define network interfaces: device, mask, ip
+	uniqueDevice = new Array();
+	Networks.names.forEach(function(netName,netIndex){
+		var _ip = nonVipNodes[indexNode].ipAddresses[netName];
+		var _device = Networks.devices[netIndex];
+		var _mask = Networks.masks[netIndex];
+		if(_ip==undefined || _ip=='' || uniqueDevice.indexOf(_device) >= 0)return;
+		uniqueDevice.push(_device);
+	ovf+=n0+'      <Property ovf:key="'+netName+'.device" ovf:type="string" ovf:value="'+Networks.devices[netIndex]+'"></Property>';
+	ovf+=n0+'      <Property ovf:key="'+netName+'.mask" ovf:type="string" ovf:value="'+Networks.masks[netIndex]+'"></Property>';
+	ovf+=n0+'      <Property ovf:key="'+netName+'.ip" ovf:type="string" ovf:value="'+aNode.ipAddresses[netName]+'"></Property>';
+	});
+	ovf+=n0+'      <Property ovf:key="MGMT.fqdn" ovf:type="string" ovf:value="'+aNode.fqdn+'"></Property>';
+	if(name == emsNode.name){
+	ovf+=n0+'      <Property ovf:key="vnf.descriptor" ovf:type="string" ovf:value="'+desc.replace(/\"/g, '&amp;quot;').replace(/\n/g, '&amp;#10;')+'"></Property>';
+	
+	// If a USPM descriptor is defined, push its auxiliary descriptor
+	if(uspmAuxDescInput.isDefined()){
+	ovf+=n0+'      <Property ovf:key="uspm.descriptor.path" ovf:type="string" ovf:value="'+uspmAuxDescInput.path+'"></Property>';
+	ovf+=n0+'      <Property ovf:key="uspm.descriptor" ovf:type="string" ovf:value="'+uspmAuxDescInput.content.replace(/\"/g, '&amp;quot;').replace(/\n/g, '&amp;#10;')+'"></Property>';
+	}
+	if(AppAuxDescInput.isDefined()){
+	ovf+=n0+'      <Property ovf:key="app.descriptor.path" ovf:type="string" ovf:value="'+AppAuxDescInput.path+'"></Property>';
+	ovf+=n0+'      <Property ovf:key="app.descriptor" ovf:type="string" ovf:value="'+AppAuxDescInput.content.replace(/\"/g, '&amp;quot;').replace(/\n/g, '&amp;#10;')+'"></Property>';
+	}
+	if(ocmpLicense.path != undefined && ocmpLicense.isDefined()){
+	ovf+=n0+'      <Property ovf:key="ocmp.license.path" ovf:type="string" ovf:value="'+ocmpLicense.path+'"></Property>';
+	ovf+=n0+'      <Property ovf:key="ocmp.license" ovf:type="string" ovf:value="'+ocmpLicense.content.replace(/\"/g, '&amp;quot;').replace(/\n/g, '&amp;#10;')+'"></Property>';
+	}
+	}
+	ovf+=n0+'    </ProductSection>';
+	ovf+=n0+'    <VirtualHardwareSection ovf:transport="com.vmware.guestInfo">';
+	ovf+=n0+'      <Info>Virtual hardware requirements</Info>';
+	ovf+=n0+'      <System>';
+	ovf+=n0+'        <vssd:ElementName>Virtual Hardware Family</vssd:ElementName>';
+	ovf+=n0+'        <vssd:InstanceID>0</vssd:InstanceID>';
+	ovf+=n0+'        <vssd:VirtualSystemIdentifier>'+name+'</vssd:VirtualSystemIdentifier>';
+	ovf+=n0+'        <vssd:VirtualSystemType>vmx-08</vssd:VirtualSystemType>';
+	ovf+=n0+'      </System>';
+	ovf+=n0+vmAttributes.replace(/\n/g, "\n"+  
+			"      ");        
+    
+    // Connect the network adapters
+    var _baseAddressOnParent=7;
+    var _baseInstanceID=11;
+    uniqueDevice = new Array();
+    Networks.names.forEach(function(netName,netIndex){
+		var _ip = nonVipNodes[indexNode].ipAddresses[netName];
+		var _device = Networks.devices[netIndex];
+		var _portgroup = Networks.portgroups[netIndex];
+		if(_portgroup == undefined || _portgroup == '')_portgroup=netName;
+		var _addressOnParent=_baseAddressOnParent+netIndex;
+		var _instanceId=_baseInstanceID+netIndex;
+		if(uniqueDevice.indexOf(_device) >= 0)return;
+		uniqueDevice.push(_device);
+	ovf+=n0+'      <Item>';
+	ovf+=n0+'        <rasd:AddressOnParent>'+_addressOnParent+'</rasd:AddressOnParent>';
+	ovf+=n0+'        <rasd:AutomaticAllocation>true</rasd:AutomaticAllocation>';
+	ovf+=n0+'        <rasd:Connection>'+_portgroup+'</rasd:Connection>';
+	ovf+=n0+'        <rasd:Description>VmxNet3 ethernet adapter on "'+_portgroup+'"</rasd:Description>';
+	ovf+=n0+'        <rasd:ElementName>Network adapter on '+_portgroup+'</rasd:ElementName>';
+	ovf+=n0+'        <rasd:InstanceID>'+_instanceId+'</rasd:InstanceID>';
+	ovf+=n0+'        <rasd:ResourceSubType>VmxNet3</rasd:ResourceSubType>';
+	ovf+=n0+'        <rasd:ResourceType>10</rasd:ResourceType>';
+		if(_ip == undefined || _ip == "")
+		{
+	ovf+=n0+"        <!-- This interface must be disconnected -->";
+		}
+		else
+		{
+	ovf+=n0+'        <!-- This ip address '+_ip+' must be configured on this interface -->';
+		}
+	ovf+=n0+"      </Item>";
+		});
+    ovf+=n0+'    </VirtualHardwareSection>';
+    ovf+=n0+'    </VirtualSystem>';
+    });
+    
+	// Close the list of nodes
+	ovf+=n0+'  </ovf:VirtualSystemCollection>';
+	
+	// Close envelope
+	ovf+=n0+'</Envelope>';
+	
+
+	// Show to the user and save to nivr-cluster-nfv.yaml
+    userOutput(ovf);
+	
+	var blobOvf = new Blob([ovf], {type: "text/plain;charset=utf-8"});
+	var a = document.createElement('a');
+	a.href = window.URL.createObjectURL(blobOvf);
+    a.download = "nivr-cluster-nfv.ovf";
+    document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+}
 // ===========================
 // MSE TOSCA template build
 // ===========================
@@ -7891,7 +8142,7 @@ function buildToscaTemplate(){
 
 function chefDeploymentHelp(){userOutput(
 "DevOps limitations:"+
-"\n\t- single network interface except for Heat stacks on OpenStack infrastructure and static pre-allocated instances or bare metal"+
+"\n\t- multiple network interfaces supported only for Heat stacks on OpenStack infrastructure, vmware and static pre-allocated instances or bare metal"+
 "\n\t- Supported environments: chef and ansible engines on openstack, azure and aws infrastructures, or static pre-allocated instances or bare metal"+
 "\nPre requisites:"+
 "\n\t- download the hpe_mse Chef recipes and Ansible roles from github: 'git clone https://github.com/HewlettPackard/hpe_mse.git'"+
@@ -7912,6 +8163,10 @@ function chefDeploymentHelp(){userOutput(
 "\nFor static target:"+
 "\n\t- configure all nodes fully qualified domain names and static IP addresses on the MGMT network"+
 "\n\t- install the ssh key used by Ansible on all the nodes, consistently with the environment variable CLOUD_SSH_KEY from metadata.rb"+
+"\nFor vmware target: pre-requisite: template and networks available in the infrastructure"+
+"\n\t- install the ssh key used by Ansible on all the vmware template, consistently with the environment variable CLOUD_SSH_KEY from metadata.rb"+
+"\n\t- create the virtual networks (port groups) and set their names consistently in the Networks section"+
+"\n\t- define IP addresses for all nodes on all networks in the nodes sections (no dynamic allocation of IP addresses assumed in the infrastructure)"+
 "\nFor azure target:"+
 "\n\t- install the azure CLI from https://docs.microsoft.com/fr-fr/cli/azure/install-azure-cli-windows?view=azure-cli-latest"+
 "\n\t- install pre requisite gem: chef gem install kitchen-azurerm"+
@@ -8162,6 +8417,16 @@ function buildAnsiblePlaybook(){
 		cook+=n0+"";
 		cook+=n0+"  tasks:";
 		break;	  
+	  case 'vmware':
+		cook+=n0+"- name: deploy the instance(s) on vSphere {{ lookup('env','VSPHERE_HOSTNAME') }}";
+		cook+=n0+"  hosts: localhost";
+		cook+=n0+"  vars:";
+		cook+=n0+"    the_state: poweredon";
+		
+		cook+=n0+"  gather_facts: false";
+		cook+=n0;
+		cook+=n0+"  tasks:";
+		break;	  
 	  default: 
 	  	userOutput('DevOps Ansible is not supported on '+infrastructure); return;
 	  	break;
@@ -8170,13 +8435,16 @@ function buildAnsiblePlaybook(){
     // build the list of non VIP nodes
     var nonVipNodes = Nodes.cloudNodes.filter(function(e){return !e.isVIP;});
     var emsNode = Nodes.cloudNodes[Nodes.cloudNodes.length - 1];
-      
+    
     // For each non VIP node: create the instance
     // The EMS is the last node in Nodes.cloudNodes: it must be part of the ems group in addition to the base group
     var nodeGroup='base';
     nonVipNodes.forEach(function(aNode, indexNode){
     var name=aNode.name;
-    if(name == emsNode.name)nodeGroup+=',ems'
+    if(name == emsNode.name)nodeGroup+=',ems';
+    // Prevent IP addresses duplication for infrastructures missing dynamic allocation (vmware)
+    var uniqueDevice = new Array();
+    
 	switch(infrastructure){
 	  case 'aws':
 		cook+=n0+"  - name: set the instance "+name+" to count {{the_count}}";
@@ -8270,7 +8538,7 @@ function buildAnsiblePlaybook(){
 		cook+=n0+"    retries: 30";
 		cook+=n0+"    delay: 10";
 		cook+=n0+'    when: the_state!="absent"';
-		cook+=n0+"  - name: Add "+name+" Instance to "+nodeGroup+" group";
+		cook+=n0+"  - name: Add instance "+name+" to "+nodeGroup+" group";
 		cook+=n0+'    add_host:';
 		cook+=n0+'      name: '+name;
 		cook+=n0+'      nick_name: '+name;
@@ -8285,15 +8553,70 @@ function buildAnsiblePlaybook(){
 		cook+=n0+"  - name: Wait for SSH on "+name;
 		cook+=n0+"    command: >";
 		cook+=n0+"      ssh -oBatchMode=yes -oStrictHostKeyChecking=no -i {{ lookup('env','CLOUD_SSH_KEY') }}";
-		cook+=n0+"      {{ lookup('env',' CLOUD_DEFAULT_USER') }}@"+nonVipNodes[indexNode].ipAddress+" true";
+		cook+=n0+"      {{ lookup('env',' CLOUD_DEFAULT_USER') }}@"+nonVipNodes[indexNode].ipAddresses['MGMT']+" true";
 		cook+=n0+"    register: result";
 		cook+=n0+"    until: result is success";
 		cook+=n0+"    retries: 30";
 		cook+=n0+"    delay: 10";
-		cook+=n0+"  - name: Add "+name+" Instance to "+nodeGroup+" group";
+		cook+=n0+"  - name: Add instance "+name+" to "+nodeGroup+" group";
 		cook+=n0+"    add_host: name="+name+" groups="+nodeGroup+" nick_name="+name+" fqdn="+nonVipNodes[indexNode].fqdn;
-		cook+=n0+"              ansible_ssh_host="+nonVipNodes[indexNode].ipAddress;
+		cook+=n0+"              ansible_ssh_host="+nonVipNodes[indexNode].ipAddresses['MGMT'];
 		cook+=n0+"";
+		break;
+	case 'vmware':
+		cook+=n0+"  - name: Set "+name+" to state {{the_state}} from the template {{ lookup('env','VSPHERE_TEMPLATE') }}";
+		cook+=n0+"    vmware_guest:";
+		cook+=n0+"      hostname: \"{{ lookup('env','VSPHERE_HOSTNAME') }}\"";
+		cook+=n0+"      username: \"{{ lookup('env','VSPHERE_USERNAME') }}\"";
+		cook+=n0+"      password: \"{{ lookup('env','VSPHERE_PASSWORD') }}\"";
+		cook+=n0+"      validate_certs: False";
+		cook+=n0+"      name: "+name;
+		cook+=n0+"      template: \"{{ lookup('env','VSPHERE_TEMPLATE') }}\"";
+		cook+=n0+"      datacenter: \"{{ lookup('env','VSPHERE_DATACENTER') }}\"";
+		cook+=n0+"      folder: \"{{ lookup('env','VSPHERE_FOLDER') }}\"";
+		cook+=n0+"      state: \"{{the_state}}\"";
+		cook+=n0+"      force: true";
+		cook+=n0+"      cluster: \"{{ lookup('env','VSPHERE_CLUSTER') }}\"";
+		cook+=n0+"      wait_for_ip_address: no";
+		cook+=n0+"      customization:";
+		cook+=n0+"        domain: "+nonVipNodes[indexNode].domain;
+		// Network interfaces
+		cook+=n0+"      networks:";
+		Networks.names.forEach(function(netName,netIndex){
+			var _ip = nonVipNodes[indexNode].ipAddresses[netName];
+			var _device = Networks.devices[netIndex];
+			var _portgroup = Networks.portgroups[netIndex];
+			if(_portgroup == undefined || _portgroup == '')_portgroup=netName;
+			if(uniqueDevice.indexOf(_device) >= 0)return;
+		cook+=n0+'      - name: "'+_portgroup+'"';
+			if(_ip == undefined || _ip == "")
+			{
+		cook+=n0+"        start_connected: false";
+			}
+			else
+			{
+				uniqueDevice.push(_device);
+		cook+=n0+"        ip: "+_ip;
+		cook+=n0+'        netmask: '+Networks.masks[netIndex];
+			}
+		cook+=n0+'        device_type: vmxnet3';
+		});
+		cook+=n0;
+		
+		cook+=n0+"  - name: Wait for SSH on instance "+name+" and interface "+nonVipNodes[indexNode].ipAddresses['MGMT'];
+		cook+=n0+"    command: >";
+		cook+=n0+"      ssh -oBatchMode=yes -oStrictHostKeyChecking=no -i {{ lookup('env','CLOUD_SSH_KEY') }}";
+		cook+=n0+"      {{ lookup('env',' CLOUD_DEFAULT_USER') }}@"+nonVipNodes[indexNode].ipAddresses['MGMT']+" true";
+		cook+=n0+"    register: result";
+		cook+=n0+"    until: result is success";
+		cook+=n0+"    retries: 30";
+		cook+=n0+"    delay: 10";
+		cook+=n0+'    when: the_state is undefined or the_state!="absent"';
+		cook+=n0+"  - name: Add instance "+name+" to "+nodeGroup+" group";
+		cook+=n0+"    add_host: name="+name+" groups="+nodeGroup+" nick_name="+name+" fqdn="+nonVipNodes[indexNode].fqdn;
+		cook+=n0+"              ansible_ssh_host="+nonVipNodes[indexNode].ipAddresses['MGMT'];
+		cook+=n0+'    when: the_state is undefined or the_state!="absent"';
+		cook+=n0;
 		break;
 
 	  }
@@ -8373,9 +8696,9 @@ function buildAnsiblePlaybook(){
 	// Append the descriptors as a variables
 	cook+=n0+"  vars:";
 	cook+=n0+"    descriptor: |";
-	cook+=n0+"      "+desc.replace(/\n/g, "\n"+  
-		     "      ");	// fix the descriptor indentation as expected by Yaml
-	
+    cook+=n0+"      "+desc.replace(/\n/g, "\n"+  
+		     "      ");	// fix the descriptor indentation
+    
 	// If a auxiliary descriptors are defined, push them with their path
     if(uspmAuxDescInput.isDefined()){
 	cook+=n0+"    uspm_descriptor_path: "+uspmAuxDescInput.path;
@@ -8395,8 +8718,7 @@ function buildAnsiblePlaybook(){
 	cook+=n0+"    app_descriptor_path: ''";
    	cook+=n0+"    app_descriptor: ''";
 	}
-    
-	cook+=n0;
+    cook+=n0;
 	cook+=n0+"- name: collect deployment information";
 	cook+=n0+"  hosts: base";
 	cook+=n0+"  become: True";
@@ -8505,6 +8827,19 @@ if(!('contains' in String.prototype)){
 	}
 }
 
+// Useful 'startsWith' method for String is not available everywhere
+if (!String.prototype.startsWith) {
+  String.prototype.startsWith = function(searchString, position) {
+    position = position || 0;
+    return this.indexOf(searchString, position) === position;
+  };
+}
+if (!String.prototype.endsWith) {
+	String.prototype.endsWith = function(pattern) {
+	  var d = this.length - pattern.length;
+	  return d >= 0 && this.lastIndexOf(pattern) === d;
+	};
+}
 // In a list of arrays 'a', for all empty elements from index 0 to the last existing array, create an array and insert a 'defaultString'
 function fillArrays(a, defaultString){
 	if(a == undefined)return;

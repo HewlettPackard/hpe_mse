@@ -36,8 +36,8 @@ CentOS/RedHat >= 6.3 on OpenStack, Azure or Amazon infrastructure
 
 To keep the generated books generic, attributes are expected as environment variables for both the Infrastructure and Product definition:
 
-# TAS product on CentOS 7
-#########################
+# TAS product on RHEL/CentOS 7
+##############################
 # URL providing MSE ISO images
 export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/TAS31/'
 # URL providing MSE patches
@@ -45,7 +45,7 @@ export MSE_PATCH_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/TAS31/'
 # ISO image delivering the MSE automated deployer engine in MSE_ISO_URL or directory specified by cacheIso variable
 export MSE_ENGINE='ClusterManager-3.1.6-3.000381.eab0051.el7.iso'
 # List of ISO images delivering the MSE products in MSE_ISO_URL or directory specified by cacheIso variable
-export MSE_PRODUCT="['TAS-3.1.1-9.020429.el7.iso','USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.1-1.000082.e4bc103.el7.iso','OpenCall-OCMP-4.5.0.iso','HPE-SNF-1.1.1-10.000589.el7.x86_64.iso']"
+export MSE_PRODUCT="['TAS-3.1.2-4.000961.120159a.el7.iso','USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.1-1.000082.e4bc103.el7.iso','OpenCall-OCMP-4.5.0.iso','HPE-SNF-1.1.1-10.000589.el7.x86_64.iso']"
 # List of lab drops as an array of rpm packages in MSE_ISO_URL or directory specified by cacheIso variable
 export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.8-3.000565.20190415184527.014d039.snap.el7.noarch.rpm','hpoc-nfv-base-1.1.8-2.000279.20190412103724.9a5e3eb.snap.el7.x86_64.rpm','hpoc-nfv-base-selinux-1.1.8-2.000279.20190412103724.9a5e3eb.snap.el7.x86_64.rpm']"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
@@ -61,8 +61,8 @@ export CLOUD_OS_SIGNATURE="Red Hat Enterprise Linux Server release 7.4 (Maipo)"
 # Optional YUM version lock file 
 export YUM_VERSION_LOCK=''
 
-# MSE product on CentOS 6
-#########################
+# MSE product on RHEL/CentOS 6
+##############################
 # URL providing MSE ISO images
 export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/MSE30/'
 # URL providing MSE patches
@@ -151,6 +151,32 @@ export CLOUD_REPOS_URL="http://192.168.66.194/repos/"
 export ANSIBLE_REMOTE_USER=$CLOUD_DEFAULT_USER
 export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
 
+# VMWare Infrastructure
+#######################
+# Infrastructure credentials
+export VSPHERE_HOSTNAME="esx.server.dot.com"
+export VSPHERE_USERNAME="alice@dot.com"
+export VSPHERE_PASSWORD="password"
+export VSPHERE_DATACENTER="FoundationA"
+export VSPHERE_CLUSTER="NDS_MSE_Hosts_NFV"
+export VSPHERE_FOLDER="/NDS_VMs/NDS_TAS_VMs/NDS_TAS_Devs_VMs/D3m/dynamic"
+export VSPHERE_TEMPLATE="rhel74"
+# The ssh public key used to reach the infrastructure
+export CLOUD_SSH_KEY="../sshKeys/vm4lab/id_rsa"
+# Additional environment variables set in instances as a json hash
+export CLOUD_ENVIRONMENT='{}'
+# List of yum repositories to be used during MSE automated deployer installation
+# labdrops is mandatory to enable the labdrops
+export MSE_YUM_REPO='uspm,labdrops'
+# The default user
+export CLOUD_DEFAULT_USER="root"
+# List of yum repositories definitions to add to the nodes retrieved from CLOUD_REPOS_URL
+export CLOUD_REPOS_LIST="['rhel6dvd.repo','uspm42RP7.private.repo','mysql.private.repo','mongodb.private.repo']"
+export CLOUD_REPOS_URL="http://192.168.66.194/repos/"
+# Propagate user and key to ansible engine
+export ANSIBLE_REMOTE_USER=$CLOUD_DEFAULT_USER
+export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
+
 # Azure Infrastructure
 ######################
 # The path to the ssh public key used to reach the infrastructure
@@ -224,7 +250,7 @@ export CLOUD_IMAGE="ami-404f4339"
 
 # (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
 EOH
-version '0.4.4'
+version '0.4.5'
 chef_version '>= 12.14' if respond_to?(:chef_version)
 
 # The `issues_url` points to the location where issues for this cookbook are
