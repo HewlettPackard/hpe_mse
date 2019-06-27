@@ -7,7 +7,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-06-20 Version 3.31</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-06-27 Version 3.32</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -111,6 +111,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-06-27 3.32	Ansible deployment playbook includes the OCMP license file if any"+
 	"\n2019-06-20 3.31	support vmware infrastructure target; OCMP VNF on RHEL7: support for a secondary element manager; Messaging Gateway consistency check vs TCAP refined; restore compatibility with Microsoft browsers"+
 	"\n2019-05-17 3.3	Orchestration: support docker images deployment on kubernetes cluster"+ 
 	"\n2019-04-26 3.23	Align Chef deployments with Ansible ones on Azure: add explicit packages, additional yum repositories definitions, mandatory services startup, OS signature setup"+
@@ -8717,6 +8718,15 @@ function buildAnsiblePlaybook(){
 	}else{
 	cook+=n0+"    app_descriptor_path: ''";
    	cook+=n0+"    app_descriptor: ''";
+	}
+	if(ocmpLicense.isDefined()){
+	cook+=n0+"    ocmp_license_path: "+ocmpLicense.path;
+	cook+=n0+"    ocmp_license: |";
+	cook+=n0+"      "+ocmpLicense.content.replace(/\n/g, "\n"+  
+		     "      ");	// fix the descriptor indentation as expected by Yaml
+	}else{
+	cook+=n0+"    ocmp_license_path: ''";
+   	cook+=n0+"    ocmp_license: ''";
 	}
     cook+=n0;
 	cook+=n0+"- name: collect deployment information";
