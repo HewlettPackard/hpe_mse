@@ -10,13 +10,19 @@
   copy:
     content: "{{ uspm_descriptor }}"
     dest: "{{ uspm_descriptor_path }}"
-  when: uspm_descriptor_path != ''
+  when: uspm_descriptor_path is defined and uspm_descriptor_path != ''
 
 - name: Copy app descriptor if any 
   copy:
     content: "{{ app_descriptor }}"
     dest: "{{ app_descriptor_path }}"
-  when: app_descriptor_path != ''
+  when: app_descriptor_path is defined and app_descriptor_path != ''
+
+- name: Copy OCMP license if any 
+  copy:
+    content: "{{ ocmp_license }}"
+    dest: "{{ ocmp_license_path }}"
+  when: ocmp_license_path is defined and ocmp_license_path != ''
 
 - name: Copy descriptor to template 
   copy:
