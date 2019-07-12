@@ -4,10 +4,11 @@
     <title>MSE Descriptor</title>
 </head>
 <body >
+<input id="_uniqueInputId" value="1" type="hidden" placeholder="Hidden input recording the html id for dynamic delete buttons"/>
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-06-27 Version 3.32</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-07-11 Version 3.34</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -67,8 +68,6 @@ on
 </td> 
 </tr><tr>
 <td valign="top">Save the current session</td><td valign="top"><input class="helpButton" type="button" value="Save" onclick="saveSession()"></td>
-</tr><tr>
-<td valign="top">Import session from file</td><td valign="top"><input id="importSession" class="helpButton" type="file" value="Import..." onchange="importSession()"><BR><B style="color:red">(Directory change is *NOT* supported)</B></td>
 </tr>
 </table>
 
@@ -111,6 +110,8 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-07-11 3.34	Topology: enable composition of SEE simplex and SEE clusters; session import moved to Misc section, working for all browsers; Ansible for VMWare: manage shared network interfaces"+
+	"\n2019-07-02 3.33	Robustness: ensure unique IDs for all 'delete' buttons; Heat target: publish public VIPs; kubernetes target: allow concurrent deployments"+
 	"\n2019-06-27 3.32	Ansible deployment playbook includes the OCMP license file if any"+
 	"\n2019-06-20 3.31	support vmware infrastructure target; OCMP VNF on RHEL7: support for a secondary element manager; Messaging Gateway consistency check vs TCAP refined; restore compatibility with Microsoft browsers"+
 	"\n2019-05-17 3.3	Orchestration: support docker images deployment on kubernetes cluster"+ 
@@ -371,12 +372,15 @@ uniqueRole.prototype.setIfNotOrAlert = function(y){
 // Constructor: 
 // - name of the variable instantiated: required to link the user's events to the object's methods
 // - label describing the purpose of this file, displayed besides the 'browse' button
-var userLoadedFile = function(aVarName, aLabel){
+// - (optional) function to call upon loading, defaults to displaying the loaded content
+var userLoadedFile = function(aVarName, aLabel, anAction){
 	this.label = aLabel;
 	this.var = aVarName;
 	this.inputId = aVarName+"_inputId";
 	this.content = undefined;
 	this.path = undefined;
+	this.action = "view";
+	if(anAction != undefined)this.action = anAction; 
 }
 // Usage example:
 // - instantiate the object; parameter: the name of the HTML input button Id to allow clearance  
@@ -392,8 +396,8 @@ userLoadedFile.prototype.load = function(event){
     reader.onload = ( function(target){ return function(e){
     	// Store the file content in the original object
     	target.content = this.result;
-    	// Display for control
-    	target.view();
+    	// Action 
+    	target.action();
     	}
     })(this);
     reader.readAsText(file);
@@ -629,7 +633,15 @@ var cellWidth="85px";
 var boolCellWidth="15px";
 var choiceCellWidth="200px";
 
+// Ensure unicity of ids for all the dynamic delete buttons by incrementing an integer at each button creation
+// This value has to be recorded in the DOM so that when starting from an existing document, the new ids will not clash with the existing ones
+// Default to 1 if nothing valid is recorded in the DOM
 var _uniqueInputId=1;
+var _uniqueInputIdDOM=document.getElementById("_uniqueInputId");
+if(_uniqueInputIdDOM != undefined){
+	var candidate = Number(_uniqueInputIdDOM.value);
+	if(!isNaN(candidate))_uniqueInputId=candidate;
+}
 
 // List of VNF resources for applying actions to multiples resources
 vnfResources = new Array();
@@ -805,6 +817,7 @@ vnfResource.prototype.add = function(){
 	delButton.type="button";
 	delButton.value="Del";
 	delButton.id="delButton"+(_uniqueInputId++);
+	_uniqueInputIdDOM.setAttribute("value", _uniqueInputId);
 	delButton.setAttribute("onClick", this.title + ".delete('"+delButton.id+"');");
 	var cell = row.insertCell(0);
 	cell.appendChild(delButton);
@@ -1077,11 +1090,12 @@ Networks.build = function(target, engine){
 	Networks.masks = new Array();
 	Networks.portgroups = new Array();
 	Networks.heatMaxNetwork = 0;
-	var HeatNetworkCount = Number(Networks.count('network') - 1);
+	var networkCount = Number(Networks.count('interface'));
+	if(target == 'Heat')networkCount--; // For Heat target, do not count the public interface in the quota, it is a 'pseudo interface', not actually instantiated
 	Networks.heatWidth = undefined;
 	
 	if(Networks.count('network', 'MGMT') != 1)Networks.check += "\nNetworks: one and only one MGMT is required";
-	checkDependency(target == 'Heat', [Networks.count('network', 'PUBLIC') > 0 ],  "Networks: missing PUBLIC pseudo interface; ", "required for OpenStack Heat target");
+	Networks.check += checkDependency(target == 'Heat', [Networks.count('network', 'PUBLIC') > 0 ],  "Networks: missing PUBLIC pseudo interface; ", "required for OpenStack Heat target");
 	['APP', 'SIP', 'LBNAT', 'PUBLIC', 'HA', 'DATA', 'M3UA1', 'M3UA2'].forEach(function(name){
 		if(Networks.count('network', name) > 1)Networks.check += "\nNetworks: concurrent definitions of "+name+" detected";
 	});
@@ -1122,7 +1136,7 @@ Networks.build = function(target, engine){
 					Networks.heatCidrLength=Number(32-Networks.heatWidth).toString();
 					Networks.heatMaxNodes=Math.pow(2, Networks.heatWidth);
 					Networks.heatMask="255.255.255."+Number(256-Networks.heatMaxNodes).toString();
-					if(HeatNetworkCount > Networks.heatMaxInterfaces)Networks.check += "\nNetworks: network count limited by the netmask "+Networks.heatMask+" for Heat target to " + Networks.heatMaxInterfaces + ": found " + HeatNetworkCount;
+					if(networkCount > Networks.heatMaxInterfaces)Networks.check += "\nNetworks: network count limited by the netmask "+Networks.heatMask+" for "+target+" target to " + Networks.heatMaxInterfaces + ": found " + networkCount;
 				}
 				// Heat networks should be named ethN, N integer
 				var prefix='eth';
@@ -1135,12 +1149,12 @@ Networks.build = function(target, engine){
 				} 
 				Networks.heatNetworks[networkName] = interfaceNumber;
 				Networks.heatMaxNetwork = Math.max(Networks.heatMaxNetwork,interfaceNumber);
-				if(networkMask !== Networks.heatMask)Networks.check += "\nNetworks: netmask for "+target+" target is enforced to " + Networks.heatMask + ": found " + networkMask + " on interface " + networkName;
+				if(networkMask !== Networks.heatMask)Networks.check += "\nNetworks: netmask for "+target+" target cannot be larger than " + Networks.heatMask + ": found " + networkMask + " on interface " + networkName;
 			}
 		}
 	}
 	
-	Networks.check += checkDependency(target == 'kubernetes' || target == 'azure' || target == 'aws', [Networks.heatMaxNetwork == 0], "Networks: "+target+" infrastructure is limited to one single network; found ", Networks.heatMaxNetwork + 1);
+	Networks.check += checkDependency(target == 'kubernetes' || target == 'azure' || target == 'aws', [Networks.heatMaxNetwork == 0], "Networks: "+target+" infrastructure is limited to one single network; found ", Networks.heatMaxNetwork + 1); 
 
 	// update visible networks in the nodes table
 	Nodes.hideUnused();
@@ -2109,8 +2123,8 @@ Nodes.build = function(target, engine){
 		var VNFCusingInterface = false;
 		var VNFusingInterface = false;
 		VNFCnames.forEach(function(e,i,t){
-			var usingInterface = true;
-			if(seePrimaryIpAddr[n][i] == undefined || seePrimaryIpAddr[n][i] == "") usingInterface = false;
+			var usingInterface = seePrimaryIpAddr[n][i] != undefined && seePrimaryIpAddr[n][i] != "";
+			usingInterface |= seeSimplexIpAddr[n][i] != undefined && seeSimplexIpAddr[n][i] != "";
 			if(i == 0)
 				VNFusingInterface |= usingInterface;
 			else
@@ -2421,6 +2435,7 @@ if(Security.isEmpty()){
 // Files candidate for user import: auxiliary descriptors
 var uspmAuxDescInput = new userLoadedFile("uspmAuxDescInput", "Import USPM auxiliary descriptor...");
 var AppAuxDescInput = new userLoadedFile("AppAuxDescInput", "Import SEE lite applications auxiliary descriptor...");
+var importedSession = new userLoadedFile("importedSession", "Import an existing session...", importSession);
 
 var Misc = new vnfResource("Misc", [
 	{name:'Property', width:'400px', type:'choice', choices:[ 
@@ -2436,7 +2451,7 @@ var Misc = new vnfResource("Misc", [
 		]},
 	{name:'Value', type:'text', width:'400px'}
 	],
-	[uspmAuxDescInput, AppAuxDescInput]
+	[importedSession, uspmAuxDescInput, AppAuxDescInput]
 	);
 	
 // Default values for misc properties
@@ -2484,7 +2499,7 @@ MiscComment.NFVD_REST_ADDR="Scaling: the address listening to scaling REST reque
 MiscComment.NFVD_SCALING_TEMPLATE="Scaling: the stack template used to instantiate a scaling node";
 MiscComment.VNF_CONFIG_DATA_FILE="USPM auxiliary descriptor: absolute path to the file on the target";
 MiscComment.APP_CONFIG_DATA_FILE="Applications Json auxiliary descriptor used by SEE lite services to carry additional configuration: absolute path to the file on the target";
-MiscComment.NIVR_OTHER_HOSTS="list of space separated pairs of IP address/fqdn to be added in /etc/hosts; Example: 192.168.11.56/repoOS.domain 93.184.220.20/lemonde.fr 16.17.94.84/cmsgvm04.gre.hpecorp.net"
+MiscComment.NIVR_OTHER_HOSTS="list of space separated pairs of IP address/fqdn to be added in /etc/hosts; Example: 192.168.11.56/repoOS.domain 93.184.220.20/lemonde.fr"
 MiscComment.REDIS_SENTINEL_PORT_OFFSET="The Sentinel associated port number offset compared to its related redis port number (default 20000)";
 MiscComment.REDIS_DOWNAFTER="Number of milliseconds the master (or any attached slave or sentinel) should be unreachable in order to consider it in S_DOWN state (default 5000).";
 MiscComment.REDIS_PARALLEL_SYNCS="How many slaves we can reconfigure to point to the new slave simultaneously during the failover (default 1)";
@@ -2495,7 +2510,8 @@ MiscComment.VNF_RETRY_POLICY_MAX_TIMEOUT="Max timeout applied to all actions in 
 
 Misc.help = function(){
 	return "Miscellaneous settings" +
-	"\nSNMP:"+
+	"\nTo import a previously saved session, use 'Import an existing session...' here below" +
+	"\n\nSNMP:"+
 	"\n\tSNMP_TRAP_DESTINATION: " +MiscComment.SNMP_TRAP_DESTINATION+
 	"\n\tSNMP_TRAP_COMMUNITY: " +MiscComment.SNMP_TRAP_COMMUNITY+
 	"\nSEE_INSTANCES_MAX: " +MiscComment.SEE_INSTANCES_MAX+
@@ -2505,12 +2521,12 @@ Misc.help = function(){
 	"\nREDIS_PARALLEL_SYNCS: " +MiscComment.REDIS_PARALLEL_SYNCS+
 	"\nREDIS_FAILOVER_TIMEOUT: " +MiscComment.REDIS_FAILOVER_TIMEOUT+
 	"\n\nVNF_CONFIG_DATA_FILE: " +MiscComment.VNF_CONFIG_DATA_FILE+
-	"\n\tFor OpenStack deployments, click the button 'Import USPM descriptor' to push a local descriptor to the target."+
+	"\n\tTo load this file content, use 'Import USPM auxiliary descriptor...' here below"+
 	"\n\tIn this descriptor, IP addresses are available as place holders on all nodes and interfaces conforming to the naming scheme ~<name>_<network>~"+
 	"\n\tWhere name is the short node name and network identifies the network interface as one of mgmt app sip nat ha data m3ua1 m3ua2 pub"+
 	"\n\tExamples: ~see1_mgmt~ ~uspm1_data~ ~simulap_m3ua1~"+
 	"\n\nAPP_CONFIG_DATA_FILE: " +MiscComment.APP_CONFIG_DATA_FILE+
-	"\n\tFor OpenStack deployments, click the button 'Import APPs descriptor' to push a local descriptor to the target."+
+	"\n\tTo load this file content, use 'Import SEE lite applications auxiliary descriptor...' here below"+
 	"\n\nDefault gateways:" +
 	"\n\tNOTE: declaration is mandatory on OpenStack deployments using multiple network interfaces to enable remote access; use a question mark ? to let the infrastructure set the appropriate address." +
 	"\n\tDEFAULT_GATEWAY_IP_ADDR: Default gateway IP address: useful for topologies using multiple interfaces to set the gateway on the interface offering a public access" +
@@ -7131,27 +7147,24 @@ function saveSession(){
 }
 
 function importSession(){
-	var importFromFile = document.getElementById("importSession").files.item(0).name;
-	var importedWindow = window.open(importFromFile, "importedDocument");
+	var importedWindow = window.open('', "importedDocument");
+	try{
+	importedWindow.document.write(importedSession.content);
 	var summary = "Import summary";
-	// To do: add a listner on page loaded; in the meantime, wait one second before working on this page
-	setTimeout(function(){
-		try { 
-			var importedQuickDescription = importedWindow.document.getElementById("quickDescription").value;
-			if(importedQuickDescription != ""){
-				summary += "\nVNF description: " + importedQuickDescription;
-				var quickDescription = document.getElementById("quickDescription");
-				quickDescription.value += importedQuickDescription;
-				quickDescription.setAttribute("value", quickDescription);
-			}
-			vnfResources.forEach(function(e,i,t){summary += e.import(importedWindow.document);});
-			userOutput(summary);
-			// Display populated sections
-			vnfResources.forEach(function(e,i,t){e.display(!e.isEmpty())});
-		} catch(e){
-			alert("Session import not supported by this browser, try Firefox or Internet Explorer\n" + e.message);
-		}
-		}, 1000);
+	var importedQuickDescription = importedWindow.document.getElementById("quickDescription").value;
+	if(importedQuickDescription != ""){
+		summary += "\nVNF description: " + importedQuickDescription;
+		var quickDescription = document.getElementById("quickDescription");
+		quickDescription.value += importedQuickDescription;
+		quickDescription.setAttribute("value", quickDescription);
+	}
+	vnfResources.forEach(function(e,i,t){summary += e.import(importedWindow.document);});
+	userOutput(summary);
+	// Display populated sections
+	vnfResources.forEach(function(e,i,t){e.display(!e.isEmpty())});
+	} catch(e){
+		alert("Write to document failed, please try another browser\n" + e.message);
+	}
 }
 
 function deploymentHelp(){userOutput(
@@ -7457,7 +7470,7 @@ function buildHeatTemplate(){
 	
     // Add outputs:
     heat+=n0+"outputs:";
-    // Ansible deployments: list of nodes and descriptor
+    // Ansible deployments: list of nodes, vips and descriptor
     heat+=n0+"  public_nodes:";
     heat+=n0+"    description: List of hosts as a name, fqdn, public ip address and groups membership";
     heat+=n0+"    value:";
@@ -7468,6 +7481,16 @@ function buildHeatTemplate(){
     heat+=n0+"        fqdn: "+Nodes.cloudNodes[indexNode].fqdn
     heat+=n0+"        ipaddress: {get_attr: ["+name+"-"+mgmtName+"-floatingIP, floating_ip_address]}";
     heat+=n0+"        groups: base"; if(indexNode == Nodes.cloudNodes.length - 1)heat+=",ems"
+    });
+    heat+=n0+"  public_vips:";
+    heat+=n0+"    description: List of public virtual IPs as a name, fqdn and public ip address";
+    heat+=n0+"    value:";
+    // For each VIP node having a public IP address: publish the name, fqdn and public IP address 
+    nodesNames.forEach(function(name, indexNode){ if(! Nodes.cloudNodes[indexNode].isVIP || Nodes.cloudNodes[indexNode].interfaces.indexOf(heatPublicInterface) == -1)return;
+    heat+=n0+"      -";
+    heat+=n0+"        name: "+name;
+    heat+=n0+"        fqdn: "+Nodes.cloudNodes[indexNode].fqdn
+    heat+=n0+"        ipaddress: {get_attr: ["+name+"-"+mgmtName+"-floatingIP, floating_ip_address]}";
     });
     heat+=n0+"  main_descriptor:";
     heat+=n0+"    description: /etc/opt/OC/hpoc-nivr-nfv/nivr-cluster-nfv.properties";
@@ -7545,6 +7568,14 @@ function buildKubernetesScript(){
     // The EMS is the last node in Nodes.cloudNodes: remove it to build the list of non EMS nodes,then filter the nodes playing a VIP role
     var nonEmsNodesNames = Nodes.cloudNodes.slice(0, Nodes.cloudNodes.length - 1).filter(function(e){return !e.isVIP;}).map(function(e){return e.name;});  
     
+    kube+=n0+'# Use the script name as the specific directory to perform this deployment';
+    kube+=n0;
+    kube+=n0+'_theStack=$(basename $0 .sh)';
+    kube+=n0+'if ! mkdir --parents ${_theStack} || ! cd ${_theStack} ; then';
+    kube+=n0+'  echo Cannot use ${_theStack}  directory to perform this deployment: $?';
+    kube+=n0+'  exit 1';
+    kube+=n0+'fi';
+    kube+=n0;
     kube+=n0+'# The list of pods to deploy';
     kube+=n0+'_theEMS='+nodesNames[Nodes.cloudNodes.length - 1];
     kube+=n0+'_podsList="'+nonEmsNodesNames.join(" ")+' $_theEMS"';
@@ -7578,7 +7609,7 @@ function buildKubernetesScript(){
     
 	
 	kube+=n0;
-	kube+=n0+'echo "Kubernetes customization file ./kustomization.yaml deploying the pod(s) $_podsList with image $DOCKER_IMAGE: '+quickDescription.value+'"';
+	kube+=n0+'echo "Kubernetes customization file ${_theStack}/kustomization.yaml deploying the pod(s) $_podsList with image $DOCKER_IMAGE: '+quickDescription.value+'"';
 	kube+=n0+'echo "resources:" >./kustomization.yaml';
 	kube+=n0+'# Pods description';
 	kube+=n0+'for _pod in $_podsList ; do';
@@ -7609,7 +7640,7 @@ function buildKubernetesScript(){
 	kube+=n0+'EOF';
 	kube+=n0+'done';
 
-	kube+=n0+'echo "Deploying the stack from ./kustomization.yaml"';
+	kube+=n0+'echo "Deploying the stack from ${_theStack}/kustomization.yaml"';
 	kube+=n0+'kubectl apply --kustomize . || exit 1';
 	kube+=n0+'# Retrieve pod\'s IP addresses';
 	kube+=n0+'echo "Building ${_nivr_properties} from ${_template_nivr_properties} with actual IP addresses"';
@@ -7641,7 +7672,7 @@ function buildKubernetesScript(){
 	kube+=n0;
 	kube+=n0+'echo "Deployment started: checking the consolidated status on the EMS node: kubectl exec $_theEMS -- service nivr-nfv consolidated-status"';
 	kube+=n0+'sleep 2m && until kubectl exec $_theEMS -- service nivr-nfv consolidated-status || (( $? > 127 )) ; do sleep 20s ; done';
-	kube+=n0+'echo "Done: to delete the stack: kubectl delete --kustomize ."';
+	kube+=n0+'echo "Done: to delete the stack, run: kubectl delete --kustomize ${_theStack}"';
 	
 	// Show to the user and save to nivr-cluster-nfv.yaml
     userOutput(kube);
@@ -8584,22 +8615,25 @@ function buildAnsiblePlaybook(){
 		// Network interfaces
 		cook+=n0+"      networks:";
 		Networks.names.forEach(function(netName,netIndex){
-			var _ip = nonVipNodes[indexNode].ipAddresses[netName];
 			var _device = Networks.devices[netIndex];
+			// The same interface can be used by several networks; use the first defined ip address for all those networks sharing the same device
+			var _altNetworks = Networks.names.filter(function(altNetwork, altIndexNetwork){ return Networks.devices[altIndexNetwork] == _device; });
+			var _ip = '';
+			_altNetworks.forEach(function(altName){ if(_ip == '') _ip = nonVipNodes[indexNode].ipAddresses[altName] ; });
 			var _portgroup = Networks.portgroups[netIndex];
 			if(_portgroup == undefined || _portgroup == '')_portgroup=netName;
 			if(uniqueDevice.indexOf(_device) >= 0)return;
 		cook+=n0+'      - name: "'+_portgroup+'"';
-			if(_ip == undefined || _ip == "")
+			if(_ip == '')
 			{
 		cook+=n0+"        start_connected: false";
 			}
 			else
 			{
-				uniqueDevice.push(_device);
 		cook+=n0+"        ip: "+_ip;
 		cook+=n0+'        netmask: '+Networks.masks[netIndex];
 			}
+			uniqueDevice.push(_device);
 		cook+=n0+'        device_type: vmxnet3';
 		});
 		cook+=n0;
