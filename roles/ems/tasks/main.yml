@@ -1,5 +1,16 @@
 ---
 
+- name: Install the certification authority {{ mse_certification_authority }}
+  with_items: "{{ mse_certification_authority }}"
+  loop_control:
+    loop_var:
+      _file
+  copy:
+    src: "{{_file}}"
+    dest: /etc/opt/OC/hpoc-nivr-nfv/certAuth/
+    mode: 0644
+  when: mse_certification_authority is defined and mse_certification_authority != ''
+
 - name: check for a refresh due to ISO image(s) change
   file:
     path: /var/opt/OC/iso/refresh_trigger.log

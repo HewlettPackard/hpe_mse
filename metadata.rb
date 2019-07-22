@@ -50,6 +50,9 @@ export MSE_PRODUCT="['TAS-3.1.2-4.000961.120159a.el7.iso','USPM433_Linux_RHEL7_4
 export MSE_LABDROPS="['hpoc-nivr-nfv-3.1.8-3.000565.20190415184527.014d039.snap.el7.noarch.rpm','hpoc-nfv-base-1.1.8-2.000279.20190412103724.9a5e3eb.snap.el7.x86_64.rpm','hpoc-nfv-base-selinux-1.1.8-2.000279.20190412103724.9a5e3eb.snap.el7.x86_64.rpm']"
 # URL providing common ssh keys: id_rsa, ssh_host_ecdsa_key, ssh_host_ed25519_key, ssh_host_rsa_key and their relative pub files
 export MSE_SSH_KEYS_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/sshKeys/'
+# (optional) Certification authority as a list of 3 files 
+# ${CERT_AUTH_ALIAS}-cacert.pem, ${CERT_AUTH_ALIAS}.jks, cacerts.jks where CERT_AUTH_ALIAS is the name of the certificate authority defined in the MSE descriptor
+export MSE_CERTIFICATION_AUTHORITY="['certAuth/cacerts.jks','certAuth/nfvCert-cacert.pem','certAuth/nfvCert.jks']"
 # Explicit additional packages to install if available: mlocate as a quick file searcher, omping as multicast checker
 export YUM_EXPLICIT_PACKAGES="['mlocate','firewalld','iptables-services']"
 # Mandatory services to be started
@@ -250,7 +253,7 @@ export CLOUD_IMAGE="ami-404f4339"
 
 # (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
 EOH
-version '0.4.5'
+version '0.4.6'
 chef_version '>= 12.14' if respond_to?(:chef_version)
 
 # The `issues_url` points to the location where issues for this cookbook are

@@ -87,6 +87,7 @@
       patched_files: "{{ lookup('env','PATCHED_FILES') }}"
       mandatory_services: "{{ lookup('env','MANDATORY_SERVICES') }}"
       yum_explicit_packages: "{{ lookup('env','YUM_EXPLICIT_PACKAGES') }}"
+      mse_certification_authority: "{{ lookup('env','MSE_CERTIFICATION_AUTHORITY') }}"
       yum_version_lock: "{{ lookup('env','YUM_VERSION_LOCK') | default('') }}"
       yum_exclude: "{{ lookup('env','YUM_EXCLUDE') | default('') }}"
 
