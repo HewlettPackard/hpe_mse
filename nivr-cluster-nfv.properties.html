@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-07-11 Version 3.34</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-07-22 Version 3.35</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -110,6 +110,9 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-07-22 3.35	Files import: display content on load completion; Ansible deployment: allow user certification authority definition; "+
+	"\n\t\tOpenStack: require MTU setting, allowed_address_pairs robustness on multiple networks;"+
+	"\n\t\tSession import: import Json descriptor (experimental)"+
 	"\n2019-07-11 3.34	Topology: enable composition of SEE simplex and SEE clusters; session import moved to Misc section, working for all browsers; Ansible for VMWare: manage shared network interfaces"+
 	"\n2019-07-02 3.33	Robustness: ensure unique IDs for all 'delete' buttons; Heat target: publish public VIPs; kubernetes target: allow concurrent deployments"+
 	"\n2019-06-27 3.32	Ansible deployment playbook includes the OCMP license file if any"+
@@ -379,7 +382,7 @@ var userLoadedFile = function(aVarName, aLabel, anAction){
 	this.inputId = aVarName+"_inputId";
 	this.content = undefined;
 	this.path = undefined;
-	this.action = "view";
+	this.action = this.view;
 	if(anAction != undefined)this.action = anAction; 
 }
 // Usage example:
@@ -807,7 +810,8 @@ vnfResource.prototype.delete = function(inputId){
 	table.deleteRow(index);	
 }
 // Add a new line in the table
-vnfResource.prototype.add = function(){
+// Optional values can be provided as a table of dictionaries of column / value like [{column:"columnA", value:"a"}, {column:"columnB", value:"b"}, {column:"columnD", value:"d"}, ...] 
+vnfResource.prototype.add = function(values){
 	var table = document.getElementById(this.title);
 	var columns = this.columns;
  
@@ -824,12 +828,19 @@ vnfResource.prototype.add = function(){
 	for (i=0; i<columns.length; i++){
 		var cell = row.insertCell(i+1);
 		cell.className = this.title + columns[i].name;
+		// Initial value: first element of values with a matching column name
+		var init=undefined;
+		if(values != undefined){
+			var initValues = values.filter(function(e){return e.column == columns[i].name;});
+			if(initValues.length > 0)init=initValues[0].value;
+		}
 		switch(columns[i].type){
 			case 'bool':
 				var checkCell = document.createElement('INPUT');
 				checkCell.className = this.title + columns[i].name;
 				checkCell.type = "checkbox";
 				cell.style.width = checkCell.style.width = boolCellWidth;
+				if(init)checkCell.setAttribute("checked", "checked");
 				cell.appendChild(checkCell);
 				break;
 			case 'choice':
@@ -847,6 +858,7 @@ vnfResource.prototype.add = function(){
 				// if the default value is not a null string, avoid adding always the same selection:
 				// set a default value according to the row in the table, instead of the first choice
 				if(columns[i].choices[0] != "")selectCell.value = columns[i].choices[rowCount-1];
+				if(init != undefined)selectCell.value = init;
 				cell.appendChild(selectCell);
 				break;
 			default:
@@ -857,6 +869,7 @@ vnfResource.prototype.add = function(){
 				cell.style.width = inputCell.style.width = localWidth;
 				inputCell.type = "text";
 				if(columns[i].value != undefined)inputCell.value = columns[i].value;
+				if(init != undefined)inputCell.value = init;
 				cell.appendChild(inputCell);
 				break;
 		}
@@ -1340,8 +1353,6 @@ Nodes.build = function(target, engine){
 		seeWitnessIpAddr[e] = new Array(nbVNFC);
 		seeNodesIpAddr[e] = new Array(nbVNFC);
 	});
-	simulapNames = new Array(nbVNFC);
-	simulapIpAddr = new Array(nbVNFC);
 	// Network interfaces concerned with Linux HA
 	linuxHANetworks = ['MGMT', 'HA'];
 	
@@ -2023,13 +2034,12 @@ Nodes.build = function(target, engine){
 				result += getNameIpAddr("BACKEND_HOST"+uspmBeNodesCount, "_DATA", nodeDataName, nodeDataIpAddr);
 				break;
 			case 'Simulap':
-				// The simulap node is defined only on the management network in the MSE Descriptor
-				// Addresses on other interfaces are guessed at run time from the network configuration
-				// => pre requisite on the target node: data and m3ua1 networks are configured
-				// One simulap node can be instantiated per VNFC
-				if(simulapNames[VNFCindex] != undefined)Nodes.check += "\nNodes: "+nodeName + " is duplicating simulap role compared to "+simulapNames[VNFCindex]+" for "+VNFdisplayName;
-				simulapNames[VNFCindex] = nodeName; 
-				simulapIpAddr[VNFCindex] = nodeIpAddr;
+				result += "\n\n# Simulap tester           #";
+				result += getNameIpAddr("SIMULAP", "", nodeName, nodeIpAddr);
+				result += getNameIpAddr("SIMULAP", "_M3UA1", nodeM3ua1Name, nodeM3ua1IpAddr);
+				result += getNameIpAddr("SIMULAP", "_M3UA2", nodeM3ua2Name, nodeM3ua2IpAddr);
+				result += "\n# Compatibility with legacy naming";
+				result += "\nSIMULAP_HOST=${SIMULAP_NAME}";
 				break;
 		}
 		if(isWrtcBE){
@@ -2193,19 +2203,6 @@ Nodes.build = function(target, engine){
 	result += getNameIpAddr("NODE_SEE", "_LBNAT_DEVICE", seeNodesNames['LBNAT'], seeNodesIpAddr['LBNAT']);
 	result += getNameIpAddr("NODE_SEE", "_HA_DEVICE", seeNodesNames['HA'], seeNodesIpAddr['HA']);
 
-	fillArrays(simulapNames);
-	fillArrays(simulapIpAddr);
-	if(simulapNames.length != 0){
-	result += "\n\n# SIMULAP Tester    #";
-	VNFCnames.forEach(function(e,i){
-		if(simulapNames[i] == undefined || simulapNames[i] == '""')return;
-		result += ifVNFCopen(e,i);
-		result += "\nSIMULAP_HOST="+simulapNames[i];
-		result += "\nSIMULAP_IP_ADDR="+simulapIpAddr[i];
-		result += ifVNFCclose(e,i);
-		});
-	}
-	
 	// HTTP LB nodes
 	// HTTP LB consistency
 	VNFCnames.forEach(function(e,i,t){
@@ -2326,8 +2323,8 @@ Nodes.hideUnused = function(){
 	});
 };
 
-// Add one node by default
-if(Nodes.isEmpty())Nodes.add();
+// Add one node by default with the EMS role
+if(Nodes.isEmpty())Nodes.add([{column:'MSE EMS', value:'true'}]);
 Nodes.hideUnused();
 
 // ===========================
@@ -2436,6 +2433,7 @@ if(Security.isEmpty()){
 var uspmAuxDescInput = new userLoadedFile("uspmAuxDescInput", "Import USPM auxiliary descriptor...");
 var AppAuxDescInput = new userLoadedFile("AppAuxDescInput", "Import SEE lite applications auxiliary descriptor...");
 var importedSession = new userLoadedFile("importedSession", "Import an existing session...", importSession);
+var importedDescriptor = new userLoadedFile("importedDescriptor", "Import an existing JSON descriptor...", importDescriptor);
 
 var Misc = new vnfResource("Misc", [
 	{name:'Property', width:'400px', type:'choice', choices:[ 
@@ -2451,7 +2449,7 @@ var Misc = new vnfResource("Misc", [
 		]},
 	{name:'Value', type:'text', width:'400px'}
 	],
-	[importedSession, uspmAuxDescInput, AppAuxDescInput]
+	[importedSession, uspmAuxDescInput, AppAuxDescInput, importedDescriptor]
 	);
 	
 // Default values for misc properties
@@ -2575,6 +2573,8 @@ Misc.build = function(target){
 	
 	// Require DEFAULT_GATEWAY_IP_ADDR for Heat deployments on more than one network interface
 	Misc.check+=checkDependency(target == 'Heat' && Networks.heatMaxNetwork > 0, [Misc.search('Property', 'DEFAULT_GATEWAY_IP_ADDR')], 'Misc section: ', 'Floating IPs on Heat deployments with '+ (Networks.heatMaxNetwork+1) +' network interfaces requires setting DEFAULT_GATEWAY_IP_ADDR; use a question mark (?) for an automatic setting on the external network.');
+	// Require MULTICAST_MTU for Heat deployments 
+	Misc.check+=checkDependency(target == 'Heat', [Misc.search('Property', 'MULTICAST_MTU')], 'Misc section: ', 'Missing MULTICAST_MTU setting, required for SEE deployment on OpenStack');
 	result += "\n# ------------------------------- #";
 	result += "\n# Miscellaneous properties        #";
 	result += "\n# ------------------------------- #";
@@ -3426,20 +3426,20 @@ MessagingGatewayGroups.build = function(){
 		var Name=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Name', 'group-'+i);
 		numberCandidate=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Code', 100+i);
 		var Code=Number(numberCandidate);
-		if(Code == "" || isNaN(Code) || Code < 100 || Code > 999)MessagingGatewayGroups.check += "Messaging Gateway Groups section: invalid code "+numberCandidate+"; integer in the range 100-999 expected";
+		if(Code == "" || isNaN(Code) || Code < 100 || Code > 999)MessagingGatewayGroups.check += "\nMessaging Gateway Groups section: invalid code "+numberCandidate+"; integer in the range 100-999 expected";
 		var Description=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Description');
 		var smpp=MessagingGatewayGroups.getAndSetChecked(table.rows[i], nameIndexes, 'SMPP');
 		var gateway=MessagingGatewayGroups.getAndSetChecked(table.rows[i], nameIndexes, 'Gateway');
 		var Path=MessagingGatewayServices.getAndSetValue(table.rows[i], nameIndexes, 'Service Path');
 		numberCandidate=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Connect timeout');
 		var connectTO=Number(numberCandidate);
-		if(isNaN(connectTO) || connectTO <0)MessagingGatewayGroups.check += "Messaging Gateway Groups section: invalid Connect timeout "+numberCandidate+"; positive integer expected"; 
+		if(isNaN(connectTO) || connectTO <0)MessagingGatewayGroups.check += "\nMessaging Gateway Groups section: invalid Connect timeout "+numberCandidate+"; positive integer expected"; 
 		numberCandidate=MessagingGatewayGroups.getAndSetValue(table.rows[i], nameIndexes, 'Read timeout');
-		if(isNaN(readTO) || readTO <0)MessagingGatewayGroups.check += "Messaging Gateway Groups section: invalid Read timeout "+numberCandidate+"; positive integer expected";
 		var readTO=Number(numberCandidate);
+		if(isNaN(readTO) || readTO <0)MessagingGatewayGroups.check += "\nMessaging Gateway Groups section: invalid Read timeout "+numberCandidate+"; positive integer expected";
 		
 		// Consistency check
-		if(Name == "" || Name == undefined) MessagingGatewayGroups.check += "Messaging Gateway Groups section: name cannot be undefined";
+		if(Name == "" || Name == undefined) MessagingGatewayGroups.check += "\nMessaging Gateway Groups section: name cannot be undefined";
 		MessagingGatewayGroups.check += checkDependency(smpp, [Path == ""], 'Messaging Gateway Groups section: Service path ', Path+' not supported for SMPP service '+ Name);
 		
 		names.push(Name);
@@ -7167,6 +7167,135 @@ function importSession(){
 	}
 }
 
+// Import a Meta Automated Deployer (mad) descriptor
+function importDescriptor(){
+	var summary = "Import summary";
+	try{
+	var mad = JSON.parse(importedDescriptor.content);
+	if(mad.meta.description != undefined){
+		var quickDescription = document.getElementById("quickDescription");
+		quickDescription.setAttribute("value", mad.meta.description);
+	}
+	if(mad.meta.image != undefined){
+		summary+="\nOVF_IMAGE="+mad.meta.image;
+		Misc.add([{column:'Property', value:'OVF_IMAGE'}, {column:'Value', value:mad.meta.image}, ]);
+	}
+	if(mad.meta.diskSizeGb != undefined){
+		summary+="\nOVF_DISK_SIZE="+mad.meta.diskSizeGb;
+		Misc.add([{column:'Property', value:'OVF_DISK_SIZE'}, {column:'Value', value:mad.meta.diskSizeGb}, ]);
+	}
+	// Interface names are defined with hosts and used with networks
+	interface=new Array();
+	nodesToAdd=new Array();
+	
+	var emsHostName=undefined;
+	if(mad.ems != undefined){
+		Object.entries(mad.ems).forEach(function(property){
+			switch(property[0]){
+				case 'host': emsHostName=property[1]; summary+="\n\nEMS name: "+emsHostName; break;
+				default: break;
+			}
+		});
+	}
+	
+	if(mad.hosts != undefined){
+		var hosts = Object.entries(mad.hosts);
+		// Each host has a set of fqdns, ips, interfaces, for each network
+		var network, fqdn, ip, interface, isEms;
+		summary+="\n\nHosts";
+		hosts.forEach(function(host){
+			fqdn=new Array();
+			ip=new Array();
+			isEms=(emsHostName == host[0]);
+			summary+="\n- "+host[0];
+			Object.entries(host[1]).forEach(function(e){
+				switch(e[0]){
+					case 'type': summary+=": "+e[1]; break;
+					default: 
+						// network definition
+						network=e[0]
+						summary+="\n\t"+network;
+						Object.entries(e[1]).forEach(function(e){
+							switch(e[0]){
+								case 'hostname': fqdn[network]=e[1]; summary+="; fqdn: "+e[1]; break;
+								case 'ip': ip[network]=e[1]; summary+="; ip: "+e[1]; break;
+								case 'interface': 
+									var theInterface=e[1];
+									if(interface[network] != undefined && interface[network] != theInterface)
+										throw new Error("Duplicated defintion of interface name for network "+network+": "+interface[network]+" vs "+theInterface); 
+									interface[network]=theInterface; 
+									summary+="; interface: "+theInterface; 
+									break;
+							}
+						});
+						break;
+					}
+			});
+			// Build the list of interfaces to add
+			var node=new Array();
+			['MGMT', 'APP', 'SIP', 'LBNAT', 'PUBLIC', 'HA', 'DATA', 'M3UA1', 'M3UA2'].forEach(function(network){
+				var _fqdn=new Object;
+				_fqdn.column=network+" fqdn";
+				_fqdn.value=fqdn[network];
+				node.push(_fqdn);
+				var _ip=new Object;
+				_ip.column=network+" IP addr";
+				_ip.value=ip[network];
+				node.push(_ip);
+			});
+			var _isEms=new Object;
+			_isEms.column="MSE EMS";
+			_isEms.value=isEms;
+			node.push(_isEms);
+			nodesToAdd.push(node);
+		});
+	}
+	
+	if(mad.networks != undefined){
+		var networks = Object.entries(mad.networks);
+		summary+="\n\nNetworks";
+		networks.forEach(function(network){
+			var _network=new Array();
+			var _name=new Object;
+			_name.column='network';
+			_name.value=network[0];
+			_network.push(_name);
+			var _interface=new Object;
+			_interface.column='interface';
+			_interface.value=interface[network[0]];
+			_network.push(_interface);
+			summary+="\n- "+network[0];
+			Object.entries(network[1]).forEach(function(e){
+				switch(e[0]){
+					case 'virtualId':
+						var _portgroup=new Object;
+						_portgroup.column='portgroup';
+						_portgroup.value=e[1];
+						_network.push(_portgroup); 
+						summary+="; virtualId: "+e[1]; 
+						break;
+					case 'mask': 
+						var _mask=new Object;
+						_mask.column='mask';
+						_mask.value=e[1];
+						_network.push(_mask); 
+						summary+="; mask: "+e[1]; 
+						break;
+				}
+			});
+			Networks.add(_network);
+		});
+	}
+	
+	// Network section is ready, nodes can be added
+	nodesToAdd.forEach(function(e){Nodes.add(e);});
+	
+	} catch(e){
+		alert("Invalid JSON descriptor\n" + e.message);
+	}
+	userOutput(summary);
+}
+
 function deploymentHelp(){userOutput(
 "Storage allocation policy: three options are available:"+
 "\n\t- from image: create one volume per instance from a qcow2 image which name is passed as parameter Image"+
@@ -7326,14 +7455,14 @@ function buildHeatTemplate(){
     	// Create one port on every network to ensure proper interface numbering, but connect only used interfaces
     	// Prepare the ports declared in the instance as yaml instructions in this variable: port
     	var port=""
-    	for(var i = 0; i <= Networks.heatMaxNetwork; i++){
+    	for(var iNetwork = 0; iNetwork <= Networks.heatMaxNetwork; iNetwork++){
 			// VIP processing in Heat/OpenStack: 
 			// - a VIP is instantiated as a port
 			// - a VIP is declared as allowed_address_pairs on the load balancer nodes
 	    	
-	    	var interfaceName = networkPrefix+i;	// network name, Networks.heatMaxNodes addresses large
+	    	var interfaceName = networkPrefix+iNetwork;	// network name, Networks.heatMaxNodes addresses large
 	    	var interfaceUp = "True";
-	    	if(Nodes.cloudNodes[indexNode].interfaces.indexOf(i) == -1)interfaceUp = "False";
+	    	if(Nodes.cloudNodes[indexNode].interfaces.indexOf(iNetwork) == -1)interfaceUp = "False";
 	    	heat+=n0+"  "+name+"-"+interfaceName+"-port:";
 	    	heat+=n0+"    type: OS::Neutron::Port";
 	    	heat+=n0+"    properties:";
@@ -7342,16 +7471,18 @@ function buildHeatTemplate(){
 	      	
 	      	// if this node has VIPs, add allowed_address_pairs accordingly
 	      	if(Nodes.cloudNodes[indexNode].hasVIP){
-	      		heat+=n0+"      allowed_address_pairs:";
+	      		var allowed_address_pairs_header=n0+"      allowed_address_pairs:";
 	      		// Search for VIPs on this interface on all nodes
 	      		nodesNames.forEach(function(nameVIP, indexVIP){
 	      			// if this node is a VIP
 	      			if(Nodes.cloudNodes[indexVIP].isVIP){
 	      				// This node is a VIP: add an allowed address for all concerned interfaces
 	      				for(var iVIP = 0; iVIP <= Networks.heatMaxNetwork; iVIP++){
-	      					// if this VIP is not defined on this interface, continue
-	      					if(Nodes.cloudNodes[indexVIP].interfaces.indexOf(iVIP) == -1)continue;
-	      					// Enable this address in the firewall 
+	      					// if this VIP is not defined on this interface or disconnected, continue
+	      					if(iNetwork != iVIP || interfaceUp != "True")continue;
+	      					// Enable this address in the firewall
+	      					heat+=allowed_address_pairs_header;
+	      					allowed_address_pairs_header=""; 
 	      					heat+=n0+"        - ip_address: {get_attr: ["+nameVIP+"-"+networkPrefix+iVIP+"-port, fixed_ips, 0, ip_address]}";
 	      				} // add an allowed address for all concerned interfaces
 	      			} // if this node is a VIP
@@ -7362,14 +7493,14 @@ function buildHeatTemplate(){
 	      	port+=n0+"          port: { get_resource: "+name+"-"+interfaceName+"-port}";
 	      	
 	      	// Resolve ip address for this port on this node
-	      	if(Networks.heatNetworks['MGMT'] == i)	addr+=n0+"~"+name+"_mgmt~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
-	      	if(Networks.heatNetworks['APP'] == i)	addr+=n0+"~"+name+"_app~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
-	      	if(Networks.heatNetworks['SIP'] == i)	addr+=n0+"~"+name+"_sip~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
-	      	if(Networks.heatNetworks['LBNAT'] == i)	addr+=n0+"~"+name+"_nat~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
-	      	if(Networks.heatNetworks['HA'] == i)	addr+=n0+"~"+name+"_ha~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
-	      	if(Networks.heatNetworks['DATA'] == i)	addr+=n0+"~"+name+"_data~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
-	      	if(Networks.heatNetworks['M3UA1'] == i)	addr+=n0+"~"+name+"_m3ua1~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
-	      	if(Networks.heatNetworks['M3UA2'] == i)	addr+=n0+"~"+name+"_m3ua2~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
+	      	if(Networks.heatNetworks['MGMT'] == iNetwork)	addr+=n0+"~"+name+"_mgmt~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
+	      	if(Networks.heatNetworks['APP'] == iNetwork)	addr+=n0+"~"+name+"_app~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
+	      	if(Networks.heatNetworks['SIP'] == iNetwork)	addr+=n0+"~"+name+"_sip~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
+	      	if(Networks.heatNetworks['LBNAT'] == iNetwork)	addr+=n0+"~"+name+"_nat~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
+	      	if(Networks.heatNetworks['HA'] == iNetwork)	addr+=n0+"~"+name+"_ha~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
+	      	if(Networks.heatNetworks['DATA'] == iNetwork)	addr+=n0+"~"+name+"_data~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
+	      	if(Networks.heatNetworks['M3UA1'] == iNetwork)	addr+=n0+"~"+name+"_m3ua1~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
+	      	if(Networks.heatNetworks['M3UA2'] == iNetwork)	addr+=n0+"~"+name+"_m3ua2~: {get_attr: ["+name+"-"+interfaceName+"-port, fixed_ips, 0, ip_address]}";
       	}
       	if(Nodes.cloudNodes[indexNode].interfaces.indexOf(heatPublicInterface) != -1){
 	   		heat+=n0+"  "+name+"-"+mgmtName+"-floatingIP:";
@@ -8694,6 +8825,7 @@ function buildAnsiblePlaybook(){
 	cook+=n0+"    patched_files: \"{{ lookup('env','PATCHED_FILES') }}\"";
 	cook+=n0+"    mandatory_services: \"{{ lookup('env','MANDATORY_SERVICES') }}\"";
 	cook+=n0+"    yum_explicit_packages: \"{{ lookup('env','YUM_EXPLICIT_PACKAGES') }}\"";
+	cook+=n0+"    mse_certification_authority: \"{{ lookup('env','MSE_CERTIFICATION_AUTHORITY') }}\"";
 	cook+=n0+"    yum_version_lock: \"{{ lookup('env','YUM_VERSION_LOCK') | default('') }}\"";
     cook+=n0+"    yum_exclude: \"{{ lookup('env','YUM_EXCLUDE') | default('') }}\"";
 	cook+=n0;
