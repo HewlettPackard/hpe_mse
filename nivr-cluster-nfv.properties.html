@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-07-22 Version 3.35</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-08-01 Version 3.36</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -110,6 +110,8 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-08-01 3.36	Simulap: available on SEE5, one per VNFC, with complete network interfaces definition."+
+	"\n\t\tRedis on Linux HA: in nodes sections, allow the VIP definition before the cluster definition."+
 	"\n2019-07-22 3.35	Files import: display content on load completion; Ansible deployment: allow user certification authority definition; "+
 	"\n\t\tOpenStack: require MTU setting, allowed_address_pairs robustness on multiple networks;"+
 	"\n\t\tSession import: import Json descriptor (experimental)"+
@@ -271,15 +273,15 @@ function compatibilityMatrix(){
 	}
 	
 	// Supported features
-	new compatibleFeature(featureMatrix, "SEE simplex",	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature(featureMatrix, "SEE cluster",	['SEE3.6', 'SEE3.7', 'SEE4','SEE5']);
+	new compatibleFeature(featureMatrix, "SEE simplex",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "SEE cluster",		['SEE3.6', 'SEE3.7', 'SEE4','SEE5'], "No node+witness co-location on SEE5");
 	new compatibleFeature(featureMatrix, "Linux HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "USPM", 			['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "HTTP LB", 		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature(featureMatrix, "SIP LB simplex", ['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "SIP LB simplex", 	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "SIP LB HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature(featureMatrix, "Simulap",		['SEE4']);
-	new compatibleFeature(featureMatrix, "OCMP",			['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "Simulap",			['SEE4', 'SEE5'], "No ISO image on RHEL7, yum installation only");
+	new compatibleFeature(featureMatrix, "OCMP/OCSNF",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "Databases");
 	new compatibleFeature(featureMatrix, "MySQL simplex",	['SEE3.6', 'SEE3.7', 'SEE4']);
 	new compatibleFeature(featureMatrix, "Oracle simplex",	['SEE3.6', 'SEE3.7', 'SEE4']);
@@ -1276,7 +1278,6 @@ Nodes.help = function(){
 	"\n- Standalone (no HA): "+
 	"\n\tIf the Redis HA role is left blank on a node playing a redis DB role, one standalone redis instance is setup up this node"+
 	"\nUSPM role: role of this node in an USPM cluster: primary, secondary, backend, simulap"+
-	"\n\tNOTE for Simulap: The simulap node is defined only on the management network in the MSE Descriptor."+
 	"\n\tAddresses on other interfaces are guessed at run time from the network configuration"+
 	"\n\t=> pre requisite on the target node: data and m3ua1 networks are configured"+
 	"\nOCMP role: role of this node in an OCMP cluster: primary, secondary, node"+
@@ -1331,16 +1332,19 @@ Nodes.build = function(target, engine){
 	var seeNodesNonUspmBackEnd = new Array();
 	// For all interfaces concerned with SEE roles
 	var seeNetworks = ['MGMT', 'APP', 'SIP', 'LBNAT', 'HA'];
+	var uspmNetworks = ['MGMT', 'DATA', 'M3UA1', 'M3UA2'];
 	var seeSimplexNames = new Array();
 	var seePrimaryNames = new Array();
 	var seeSecondaryNames = new Array();
 	var seeWitnessNames = new Array();
 	var seeNodesNames = new Array();
+	var simulapNames  = new Array();
 	seeSimplexIpAddr = new Array();
 	seePrimaryIpAddr = new Array();
 	var seeSecondaryIpAddr = new Array();
 	var seeWitnessIpAddr = new Array();
 	var seeNodesIpAddr = new Array();
+	var simulapIpAddr  = new Array();
 	seeNetworks.forEach(function(e,i,t){
 		seeSimplexNames[e] = new Array(nbVNFC);
 		seePrimaryNames[e] = new Array(nbVNFC);
@@ -1352,6 +1356,10 @@ Nodes.build = function(target, engine){
 		seeSecondaryIpAddr[e] = new Array(nbVNFC);
 		seeWitnessIpAddr[e] = new Array(nbVNFC);
 		seeNodesIpAddr[e] = new Array(nbVNFC);
+	});
+	uspmNetworks.forEach(function(e,i,t){
+		simulapNames[e] = new Array(nbVNFC);
+		simulapIpAddr[e] = new Array(nbVNFC);
 	});
 	// Network interfaces concerned with Linux HA
 	linuxHANetworks = ['MGMT', 'HA'];
@@ -1396,7 +1404,7 @@ Nodes.build = function(target, engine){
 	var sipGroups;
 	var pgsqlNodeName = new Array(nbVNFC);
 	var pgsqlNodeIp = new Array(nbVNFC);
-	var REDIS_HA_MODE;
+	var REDIS_HA_MODE; // To ensure consistency between the various possible modes of Redis: 'standalone', 'sentinel', 'linuxha'
 	var cloudNodes = new Array();
 	
 	result += "\n# ------------------------------- #";
@@ -1517,8 +1525,11 @@ Nodes.build = function(target, engine){
 		nodeIpAddresses['LBNAT']=	nodeNatIpAddr;
 		nodeNames['HA']			=	nodeHaName;
 		nodeIpAddresses['HA']	=	nodeHaIpAddr;
+		nodeNames['DATA']		=	nodeDataName;
 		nodeIpAddresses['DATA']	=	nodeDataIpAddr;
+		nodeNames['M3UA1']		=	nodeM3ua1Name;
 		nodeIpAddresses['M3UA1']=	nodeM3ua1IpAddr;
+		nodeNames['M3UA2']		=	nodeM3ua2Name;
 		nodeIpAddresses['M3UA2']=	nodeM3ua2IpAddr;
 		
 		// For infrastructure where IP addresses are statically allocated (vmware, static)
@@ -1846,9 +1857,13 @@ Nodes.build = function(target, engine){
 				REDIS_PORT.push(redisPorts[0]);
 				REDIS_SENTINEL_PORT.push(redisPorts[1]);
 				if(!checkRedisNetworkConsistency())break;
-				// Default HA mode: standalone, unless sentinel ports are defined; sentinel has precedence on standalone
+				// Default HA mode: standalone, unless sentinel ports are defined, or LinuxHA role exists; sentinel has precedence on standalone
 				Nodes.check += checkDependency(REDIS_HA_MODE != undefined && redisPorts[1] != undefined, [REDIS_HA_MODE == 'sentinel', REDIS_HA_MODE == 'standalone'], "Nodes section: "+nodeName, " with Redis sentinel port "+redisPorts[1]+" is not compatible with the Redis HA mode "+REDIS_HA_MODE+"; Sentinel and "+REDIS_HA_MODE+" modes are mutually exclusive");
-				if(REDIS_HA_MODE == undefined || REDIS_HA_MODE == 'standalone'){if(redisPorts[1] != undefined){REDIS_HA_MODE = 'sentinel';}else{REDIS_HA_MODE = 'standalone';}}
+				if(REDIS_HA_MODE == undefined || REDIS_HA_MODE == 'standalone'){
+					if(redisPorts[1] != undefined){REDIS_HA_MODE = 'sentinel';}
+					else if(Nodes.search('Redis HA', 'Pri')){REDIS_HA_MODE = 'linuxha';}
+					else {REDIS_HA_MODE = 'standalone';}
+				}
 				break;
 			case 'mongo':
 				result += "\n\n# Mongo database";
@@ -2034,12 +2049,12 @@ Nodes.build = function(target, engine){
 				result += getNameIpAddr("BACKEND_HOST"+uspmBeNodesCount, "_DATA", nodeDataName, nodeDataIpAddr);
 				break;
 			case 'Simulap':
-				result += "\n\n# Simulap tester           #";
-				result += getNameIpAddr("SIMULAP", "", nodeName, nodeIpAddr);
-				result += getNameIpAddr("SIMULAP", "_M3UA1", nodeM3ua1Name, nodeM3ua1IpAddr);
-				result += getNameIpAddr("SIMULAP", "_M3UA2", nodeM3ua2Name, nodeM3ua2IpAddr);
-				result += "\n# Compatibility with legacy naming";
-				result += "\nSIMULAP_HOST=${SIMULAP_NAME}";
+				// Only one simulap node can be instantiated per VNFC
+				if(simulapNames['MGMT'][VNFCindex] != undefined)Nodes.check += "\nNodes: "+nodeName + " is duplicating simulap role compared to "+simulapNames['MGMT'][VNFCindex]+" for "+VNFdisplayName;
+				uspmNetworks.forEach(function(n,i,t){
+					if(nodeNames[n] != "")simulapNames[n][VNFCindex] = nodeNames[n]; 
+					if(nodeIpAddresses[n] != "")simulapIpAddr[n][VNFCindex] = nodeIpAddresses[n];
+				});
 				break;
 		}
 		if(isWrtcBE){
@@ -2202,7 +2217,25 @@ Nodes.build = function(target, engine){
 	result += getNameIpAddr("NODE_SEE", "_SIP_DEVICE", seeNodesNames['SIP'], seeNodesIpAddr['SIP']);
 	result += getNameIpAddr("NODE_SEE", "_LBNAT_DEVICE", seeNodesNames['LBNAT'], seeNodesIpAddr['LBNAT']);
 	result += getNameIpAddr("NODE_SEE", "_HA_DEVICE", seeNodesNames['HA'], seeNodesIpAddr['HA']);
-
+	
+	uspmNetworks.forEach(function(e,i,t){
+	fillArrays(simulapNames[e]);
+	fillArrays(simulapIpAddr[e]);
+	});
+	result += "\n\n# SIMULAP Tester    #";
+	VNFCnames.forEach(function(e,i){
+		if(simulapNames['MGMT'][i] == undefined || simulapNames['MGMT'][i] == '')return;
+		result += ifVNFCopen(e,i);
+		result += getNameIpAddr("SIMULAP", "", simulapNames['MGMT'][i], simulapIpAddr['MGMT'][i]);
+		result += getNameIpAddr("SIMULAP", "_DATA", simulapNames['DATA'][i], simulapIpAddr['DATA'][i]);
+		result += getNameIpAddr("SIMULAP", "_M3UA1", simulapNames['M3UA1'][i], simulapIpAddr['M3UA1'][i]);
+		result += getNameIpAddr("SIMULAP", "_M3UA2", simulapNames['M3UA2'][i], simulapIpAddr['M3UA2'][i]);
+		result +="\n# Compatibility with legacy naming";
+		result +="\nSIMULAP_HOST=${SIMULAP_NAME}";
+		result += ifVNFCclose(e,i);
+		});
+	
+	
 	// HTTP LB nodes
 	// HTTP LB consistency
 	VNFCnames.forEach(function(e,i,t){
@@ -2839,7 +2872,7 @@ OCMPsettings.build = function(target){
 		
 		var config = OCMPsettings.getAndSetSelection(table.rows[i], nameIndexes, 'Startup configuration');
 		ocmpLicense.path = OCMPsettings.getAndSetValue(table.rows[i], nameIndexes, 'License file');
-		Misc.check+=checkDependency(target != undefined, [ocmpLicense.isConsistent()], 'OCMPsettings section: license file path and imported content consistency:', 'both or none should be defined.');
+		OCMPsettings.check+=checkDependency(target != undefined, [ocmpLicense.isConsistent()], 'OCMPsettings section: license file path and imported content consistency:', 'both or none should be defined.');
 		
 		result += '\nOCMP_CLUSTER_NAME="'+name+'"';
 		result += '\nOCMP_INSTALL_MODULE="'+modules.join(",")+'"';
@@ -2920,7 +2953,7 @@ OCSNFpolicy.build = function(){
 	for(var i=1; i < rowCount; i++){
 		var range=OCSNFpolicy.getAndSetSelection(table.rows[i], nameIndexes, 'Range');
 		
-		if(groups[range] != undefined)OCSNFpolicy.check += "OCSNF policy: range "+range+" duplicated";
+		if(groups[range] != undefined)OCSNFpolicy.check += "\nOCSNF policy: range "+range+" duplicated";
 		
 		// Build the group by concatenating all definitions for this range got from the Nodes table
 		var nodesGroups = new Array();
@@ -2933,7 +2966,7 @@ OCSNFpolicy.build = function(){
 		nodesGroups.push(OCSNFpolicy.getAndSetSelection(table.rows[i], nameIndexes, '6th').substr(sipGrpPrefix.length));
 		
 		// Not all should be undefined 
-		if(nodesGroups.every(function(e,i,t){return e == -1;}))OCSNFpolicy.check += 'OCSNF policy: range '+ range+' has no target group defined';
+		if(nodesGroups.every(function(e,i,t){return e == -1;}))OCSNFpolicy.check += '\nOCSNF policy: range '+ range+' has no target group defined';
 		// Concatenates the nodes defined in the Nodes table from all groups in one table
 		var nodesList = new Array();
 		nodesGroups.forEach(function(e,i,t){
