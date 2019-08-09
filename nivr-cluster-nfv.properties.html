@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-08-01 Version 3.36</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-08-09 Version 3.37</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -110,6 +110,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-08-09 3.37	Flavors section: cpu and memory customization for Kubernetes and OVF VMware deployments; session import: step back, removing Json descriptor import, unused"+
 	"\n2019-08-01 3.36	Simulap: available on SEE5, one per VNFC, with complete network interfaces definition."+
 	"\n\t\tRedis on Linux HA: in nodes sections, allow the VIP definition before the cluster definition."+
 	"\n2019-07-22 3.35	Files import: display content on load completion; Ansible deployment: allow user certification authority definition; "+
@@ -2482,7 +2483,9 @@ var Misc = new vnfResource("Misc", [
 		]},
 	{name:'Value', type:'text', width:'400px'}
 	],
-	[importedSession, uspmAuxDescInput, AppAuxDescInput, importedDescriptor]
+	[importedSession, uspmAuxDescInput, AppAuxDescInput
+	//, importedDescriptor // for the Meta automated deployer, still reluctant to reuse...
+	]
 	);
 	
 // Default values for misc properties
@@ -2720,6 +2723,88 @@ Misc.build = function(target){
 if(Misc.isEmpty()){
 	Misc.add();
 }
+
+// ===========================
+// Flavors settings
+// (required by infrastructures missing the flavor concept: OVF vmware, kubernetes)
+// ===========================
+var Flavors = new vnfResource("Flavors", [
+	{name:'Infrastructure', width:'100px', type:'choice', choices:['kubernetes', 'OVF VMware']},
+	{name:'Flavor', width:'100px', type:'choice', choices:['flavorSmall', 'flavorStandard', 'flavorPerformance']},
+	{name:'cpu', type:'text', width:'80px'},
+	{name:'memory', type:'text', width:'80px'},
+	{name:'cpuMax', type:'text', width:'80px'},
+	{name:'memoryMax', type:'text', width:'80px'}
+	]
+	);
+// Kubernetes profiles default values
+Flavors['kubernetes'] = new Array();
+Flavors['kubernetes']['flavorStandard'] = {cpu: "800m", memory: "4300Mi", cpuMax: "2", memoryMax: "5Gi"};
+Flavors['kubernetes']['flavorSmall'] = {cpu: "200m", memory: "800Mi", cpuMax: "1", memoryMax: "2Gi"};
+Flavors['kubernetes']['flavorPerformance'] = {cpu: "2", memory: "8Gi", cpuMax: "4", memoryMax: "12Gi"}; 
+// OVF profiles default values
+Flavors['OVF VMware'] = new Array();
+Flavors['OVF VMware']['flavorStandard'] = {cpu: "2", memory: "8", cpuMax: "", memoryMax: ""};
+Flavors['OVF VMware']['flavorSmall'] = {cpu: "2", memory: "2", cpuMax: "", memoryMax: ""};
+Flavors['OVF VMware']['flavorPerformance'] = {cpu: "4", memory: "12", cpuMax: "", memoryMax: ""}; 
+Flavors.help = function(){return "Infrastructure flavors: recommended for infrastructures missing the flavor concept: OVF VMware, kubernetes"+
+	"\nFlavor of a node is defined by the roles played on this node:"+
+	"\n\t- Small: default flavor"+
+	"\n\t- Standard: SIP load balancer roles and SEE roles except witness"+
+	"\n\t- Performance: OCMP roles"+
+	"\nKubernetes:"+
+	"\n\tUnits:"+
+	"\n\t- cpu: number of cpus or milli-cpu with the suffix 'm', eg 1500m for one and half a cpu"+
+	"\n\t- memory: size in gigabytes (Gi) or megabytes (Mi)"+
+	"\n\tDefault values:"+
+	"\n\t- Standard: cpu="+Flavors['kubernetes']['flavorStandard'].cpu+"; memory="+Flavors['kubernetes']['flavorStandard'].memory+"; cpuMax="+Flavors['kubernetes']['flavorStandard'].cpuMax+"; memoryMax="+Flavors['kubernetes']['flavorStandard'].memoryMax+
+	"\n\t- Small: cpu="+Flavors['kubernetes']['flavorSmall'].cpu+"; memory="+Flavors['kubernetes']['flavorSmall'].memory+"; cpuMax="+Flavors['kubernetes']['flavorSmall'].cpuMax+"; memoryMax="+Flavors['kubernetes']['flavorSmall'].memoryMax+
+	"\n\t- Performance: cpu="+Flavors['kubernetes']['flavorPerformance'].cpu+"; memory="+Flavors['kubernetes']['flavorPerformance'].memory+"; cpuMax="+Flavors['kubernetes']['flavorPerformance'].cpuMax+"; memoryMax="+Flavors['kubernetes']['flavorPerformance'].memoryMax+
+	"\nOVF VMware: (only cpu and memory values apply, max are ignored)"+
+	"\n\tUnits:"+
+	"\n\t- cpu: total number of cores"+
+	"\n\t- memory: size in Gb"+
+	"\n\tDefault values:"+
+	"\n\t- Standard: cpu="+Flavors['OVF VMware']['flavorStandard'].cpu+"; memory="+Flavors['OVF VMware']['flavorStandard'].memory+
+	"\n\t- Small: cpu="+Flavors['OVF VMware']['flavorSmall'].cpu+"; memory="+Flavors['OVF VMware']['flavorSmall'].memory+
+	"\n\t- Performance: cpu="+Flavors['OVF VMware']['flavorPerformance'].cpu+"; memory="+Flavors['OVF VMware']['flavorPerformance'].memory
+}
+
+Flavors.build = function(target){
+	var nameIndexes = Flavors.nameIndexes;
+	var result = "";
+	Flavors.check="";
+	var table = document.getElementById("Flavors");
+	var rowCount = table.rows.length;
+	
+	for(var i=1; i < rowCount; i++){
+		if(result==""){
+			result += "\n"
+			result += "\n# ------------------------------- #";
+			result += "\n# Flavors customization           #";
+			result += "\n# ------------------------------- #";
+			}
+		var row = table.rows[i];
+		var infra=Flavors.getAndSetSelection(row, nameIndexes, 'Infrastructure');
+		var flavor=Flavors.getAndSetSelection(row, nameIndexes, 'Flavor');
+		switch(infra){
+			case 'kubernetes': 
+				Flavors[infra][flavor].memoryMax=Flavors.getAndSetValue(row, nameIndexes, 'memoryMax', Flavors[infra][flavor].memoryMax, "Memory limit for "+flavor+" on "+infra);
+				Flavors[infra][flavor].cpuMax=Flavors.getAndSetValue(row, nameIndexes, 'cpuMax', Flavors[infra][flavor].cpuMax, "CPU limit for "+flavor+" on "+infra);
+			case 'OVF VMware':
+				Flavors[infra][flavor].cpu=Flavors.getAndSetValue(row, nameIndexes, 'cpu', Flavors[infra][flavor].cpu, "CPU request for "+flavor+" on "+infra);
+				Flavors[infra][flavor].memory=Flavors.getAndSetValue(row, nameIndexes, 'memory', Flavors[infra][flavor].memory, "Memory request for "+flavor+" on "+infra);
+				result+="\n# "+infra+" "+flavor+": cpu="+Flavors[infra][flavor].cpu+"; memory="+Flavors[infra][flavor].memory+"; cpuMax="+Flavors[infra][flavor].cpuMax+"; memoryMax="+Flavors[infra][flavor].memoryMax;
+				break;
+			default:
+				Flavors.check += "\nFlavors section: setting flavors is not supported on infrastructure : "+infra;
+				break;
+		}
+	}
+	
+	if(Flavors.check != "")return Flavors.check;
+	return result;
+};
 
 // ========================
 // Redis Sentinel instances
@@ -7728,9 +7813,21 @@ function buildKubernetesScript(){
 	// if the enf of descriptor is not found, show the error and quit
     if(desc.indexOf(endOfDescriptor) == -1)return; 
     
+    var nonVipNodes = Nodes.cloudNodes.filter(function(e){return !e.isVIP;});
     var nodesNames = Nodes.cloudNodes.map(function(e){return e.name;});
     // The EMS is the last node in Nodes.cloudNodes: remove it to build the list of non EMS nodes,then filter the nodes playing a VIP role
-    var nonEmsNodesNames = Nodes.cloudNodes.slice(0, Nodes.cloudNodes.length - 1).filter(function(e){return !e.isVIP;}).map(function(e){return e.name;});  
+    var nonEmsNodesNames = Nodes.cloudNodes.slice(0, Nodes.cloudNodes.length - 1).filter(function(e){return !e.isVIP;}).map(function(e){return e.name;});
+    // Build the list of cpu and memory profiles for each node
+    var memoryList=new Array(); 
+    var cpuList=new Array();
+    var memoryMaxList=new Array(); 
+    var cpuMaxList=new Array();
+    nonVipNodes.forEach(function(e){
+    	memoryList.push(Flavors['kubernetes'][e.flavor].memory);
+    	cpuList.push(Flavors['kubernetes'][e.flavor].cpu);
+    	memoryMaxList.push(Flavors['kubernetes'][e.flavor].memoryMax);
+    	cpuMaxList.push(Flavors['kubernetes'][e.flavor].cpuMax);
+    });
     
     kube+=n0+'# Use the script name as the specific directory to perform this deployment';
     kube+=n0;
@@ -7742,7 +7839,11 @@ function buildKubernetesScript(){
     kube+=n0;
     kube+=n0+'# The list of pods to deploy';
     kube+=n0+'_theEMS='+nodesNames[Nodes.cloudNodes.length - 1];
-    kube+=n0+'_podsList="'+nonEmsNodesNames.join(" ")+' $_theEMS"';
+    kube+=n0+'_podsList=('+nonEmsNodesNames.join(" ")+' $_theEMS)';
+    kube+=n0+'_cpuList=('+cpuList.join(" ")+')';
+    kube+=n0+'_memoryList=('+memoryList.join(" ")+')';
+    kube+=n0+'_cpuMaxList=('+cpuMaxList.join(" ")+')';
+    kube+=n0+'_memoryMaxList=('+memoryMaxList.join(" ")+')';
     kube+=n0+'# The descriptors';
     kube+=n0+'_template_nivr_properties=nivr-cluster-nfv.properties.erb';
     kube+=n0+'_nivr_properties=nivr-cluster-nfv.properties';
@@ -7773,17 +7874,17 @@ function buildKubernetesScript(){
     
 	
 	kube+=n0;
-	kube+=n0+'echo "Kubernetes customization file ${_theStack}/kustomization.yaml deploying the pod(s) $_podsList with image $DOCKER_IMAGE: '+quickDescription.value+'"';
+	kube+=n0+'echo "Kubernetes customization file ${_theStack}/kustomization.yaml deploying the pod(s) ${_podsList[@]} with image $DOCKER_IMAGE: '+quickDescription.value+'"';
 	kube+=n0+'echo "resources:" >./kustomization.yaml';
 	kube+=n0+'# Pods description';
-	kube+=n0+'for _pod in $_podsList ; do';
-	kube+=n0+'echo "Building the pod description ${_pod}.yaml"';
-	kube+=n0+'echo "- ${_pod}.yaml" >>./kustomization.yaml';
-	kube+=n0+'cat <<EOF >./${_pod}.yaml';
+	kube+=n0+'for _iPod in ${!_podsList[@]} ; do';
+	kube+=n0+'echo "Building the pod description ${_podsList[$_iPod]}.yaml"';
+	kube+=n0+'echo "- ${_podsList[$_iPod]}.yaml" >>./kustomization.yaml';
+	kube+=n0+'cat <<EOF >./${_podsList[$_iPod]}.yaml';
 	kube+=n0+'apiVersion: v1';
 	kube+=n0+'kind: Pod';
 	kube+=n0+'metadata:';
-	kube+=n0+'  name: ${_pod}';
+	kube+=n0+'  name: ${_podsList[$_iPod]}';
 	kube+=n0+'spec:';
 	kube+=n0+'  subdomain: localdomain';
 	kube+=n0+'  volumes:';
@@ -7791,8 +7892,15 @@ function buildKubernetesScript(){
 	kube+=n0+'    hostPath:';
 	kube+=n0+'      path: /sys/fs/cgroup';
 	kube+=n0+'  containers:';
-	kube+=n0+'  - name: ${_pod}';
+	kube+=n0+'  - name: ${_podsList[$_iPod]}';
 	kube+=n0+'    image: ${DOCKER_IMAGE}';
+	kube+=n0+'    resources:';
+	kube+=n0+'      requests:';
+	kube+=n0+'        memory: ${_memoryList[$_iPod]}';
+	kube+=n0+'        cpu: ${_cpuList[$_iPod]}';
+	kube+=n0+'      limits:';
+	kube+=n0+'        memory: ${_memoryMaxList[$_iPod]}';
+	kube+=n0+'        cpu: ${_cpuMaxList[$_iPod]}';
 	kube+=n0+'    volumeMounts:';
 	kube+=n0+'    - name: cgroup';
 	kube+=n0+'      mountPath: /sys/fs/cgroup';
@@ -7810,7 +7918,7 @@ function buildKubernetesScript(){
 	kube+=n0+'echo "Building ${_nivr_properties} from ${_template_nivr_properties} with actual IP addresses"';
 	kube+=n0+'if ! test -f ${_template_nivr_properties} ; then echo "Template ${_template_nivr_properties} not found" && exit 1 ; fi';
 	kube+=n0+'cp -f ${_template_nivr_properties} ${_nivr_properties}';
-	kube+=n0+'for _pod in $_podsList ; do';
+	kube+=n0+'for _pod in ${_podsList[@]} ; do';
 	kube+=n0+'until [ "$(kubectl get pods $_pod -o jsonpath --template={.status.phase})" == "Running" ] ; do echo "Waiting 5s status Running on pod $_pod" && sleep 5s ; done';
 	kube+=n0+'_ip=$(kubectl get pods $_pod -o jsonpath --template={.status.podIP})';
 	kube+=n0+'if ! test -n "${_ip}" ; then echo "IP address undefined on pod $_pod" && exit 1 ; fi';
@@ -7905,28 +8013,30 @@ function buildOVFapp(){
 	ovf+=n0+'      <FullVersion>'+Misc.OVFimage+' on '+Misc.OVFdiskSize+' Gb disks</FullVersion>';
 	ovf+=n0+'    </ProductSection>';
 	
-	// Default VM attributes
-	var vmAttributes='';	
-	vmAttributes+=n0+'<Item>\n\t<rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>\n\t<rasd:Description>Number of Virtual CPUs</rasd:Description>\n\t<rasd:ElementName>4 virtual CPU(s)</rasd:ElementName>\n\t<rasd:InstanceID>1</rasd:InstanceID>\n\t<rasd:ResourceType>3</rasd:ResourceType>\n\t<rasd:VirtualQuantity>4</rasd:VirtualQuantity>';
-	vmAttributes+=n0+'</Item>';
-    vmAttributes+=n0+'<Item>\n\t<rasd:AllocationUnits>byte * 2^20</rasd:AllocationUnits>\n\t<rasd:Description>Memory Size</rasd:Description>\n\t<rasd:ElementName>8192MB of memory</rasd:ElementName>\n\t<rasd:InstanceID>2</rasd:InstanceID>\n\t<rasd:ResourceType>4</rasd:ResourceType>\n\t<rasd:VirtualQuantity>8192</rasd:VirtualQuantity>';
-	vmAttributes+=n0+'</Item>';
-    vmAttributes+=n0+'<Item>\n\t<rasd:Address>0</rasd:Address>\n\t<rasd:Description>SCSI Controller</rasd:Description>\n\t<rasd:ElementName>SCSI controller 0</rasd:ElementName>\n\t<rasd:InstanceID>3</rasd:InstanceID>\n\t<rasd:ResourceSubType>VirtualSCSI</rasd:ResourceSubType>\n\t<rasd:ResourceType>6</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="slotInfo.pciSlotNumber" vmw:value="160" />';
-	vmAttributes+=n0+'</Item>';
-    vmAttributes+=n0+'<Item>\n\t<rasd:Address>1</rasd:Address>\n\t<rasd:Description>IDE Controller</rasd:Description>\n\t<rasd:ElementName>IDE 1</rasd:ElementName>\n\t<rasd:InstanceID>4</rasd:InstanceID>\n\t<rasd:ResourceType>5</rasd:ResourceType>';
-	vmAttributes+=n0+'</Item>';
-    vmAttributes+=n0+'<Item>\n\t<rasd:Address>0</rasd:Address>\n\t<rasd:Description>IDE Controller</rasd:Description>\n\t<rasd:ElementName>IDE 0</rasd:ElementName>\n\t<rasd:InstanceID>5</rasd:InstanceID>\n\t<rasd:ResourceType>5</rasd:ResourceType>';
-	vmAttributes+=n0+'</Item>';
-    vmAttributes+=n0+'<Item ovf:required="false">\n\t<rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>\n\t<rasd:ElementName>Video card</rasd:ElementName>\n\t<rasd:InstanceID>6</rasd:InstanceID>\n\t<rasd:ResourceType>24</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="enable3DSupport" vmw:value="false" /><vmw:Config ovf:required="false" vmw:key="use3dRenderer" vmw:value="automatic" /><vmw:Config ovf:required="false" vmw:key="useAutoDetect" vmw:value="false" /><vmw:Config ovf:required="false" vmw:key="videoRamSizeInKB" vmw:value="8192" />';
-	vmAttributes+=n0+'</Item>';
-    vmAttributes+=n0+'<Item ovf:required="false">\n\t<rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>\n\t<rasd:ElementName>VMCI device</rasd:ElementName>\n\t<rasd:InstanceID>7</rasd:InstanceID>\n\t<rasd:ResourceSubType>vmware.vmci</rasd:ResourceSubType>\n\t<rasd:ResourceType>1</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="allowUnrestrictedCommunication" vmw:value="false" /><vmw:Config ovf:required="false" vmw:key="slotInfo.pciSlotNumber" vmw:value="32" />';
-	vmAttributes+=n0+'</Item>';
-    vmAttributes+=n0+'<Item ovf:required="false">\n\t<rasd:AddressOnParent>0</rasd:AddressOnParent>\n\t<rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>\n\t<rasd:ElementName>CD/DVD drive 1</rasd:ElementName>\n\t<rasd:InstanceID>8</rasd:InstanceID>\n\t<rasd:Parent>4</rasd:Parent>\n\t<rasd:ResourceSubType>vmware.cdrom.remotepassthrough</rasd:ResourceSubType>\n\t<rasd:ResourceType>15</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="backing.exclusive" vmw:value="false" />';
-	vmAttributes+=n0+'</Item>';
-    vmAttributes+=n0+'<Item>\n\t<rasd:AddressOnParent>0</rasd:AddressOnParent>\n\t<rasd:ElementName>Hard disk 1</rasd:ElementName>\n\t<rasd:HostResource>ovf:/disk/vmdisk1</rasd:HostResource>\n\t<rasd:InstanceID>9</rasd:InstanceID>\n\t<rasd:Parent>3</rasd:Parent>\n\t<rasd:ResourceType>17</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="backing.writeThrough" vmw:value="false" />';
-	vmAttributes+=n0+'</Item>';
-    vmAttributes+=n0+'<Item ovf:required="false">\n\t<rasd:AddressOnParent>0</rasd:AddressOnParent>\n\t<rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>\n\t<rasd:Description>Floppy Drive</rasd:Description>\n\t<rasd:ElementName>Floppy drive 1</rasd:ElementName>\n\t<rasd:InstanceID>10</rasd:InstanceID>\n\t<rasd:ResourceSubType>vmware.floppy.remotedevice</rasd:ResourceSubType>\n\t<rasd:ResourceType>14</rasd:ResourceType>';
-	vmAttributes+=n0+'</Item>';
+	// Default VM attributes, per flavor
+	function vmAttributes(flavor){ return new String(
+	n0+'<Item>\n\t<rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>\n\t<rasd:Description>Number of Virtual CPUs</rasd:Description>\n\t<rasd:ElementName>'+Flavors['OVF VMware'][flavor].cpu+' virtual CPU(s)</rasd:ElementName>\n\t<rasd:InstanceID>1</rasd:InstanceID>\n\t<rasd:ResourceType>3</rasd:ResourceType>\n\t<rasd:VirtualQuantity>'+Flavors['OVF VMware'][flavor].cpu+'</rasd:VirtualQuantity>'+
+	n0+'</Item>'+
+	n0+'<Item>\n\t<rasd:AllocationUnits>byte * 2^30</rasd:AllocationUnits>\n\t<rasd:Description>Memory Size</rasd:Description>\n\t<rasd:ElementName>'+Flavors['OVF VMware'][flavor].memory+'GB of memory</rasd:ElementName>\n\t<rasd:InstanceID>2</rasd:InstanceID>\n\t<rasd:ResourceType>4</rasd:ResourceType>\n\t<rasd:VirtualQuantity>'+Flavors['OVF VMware'][flavor].memory+'</rasd:VirtualQuantity>'+
+	n0+'</Item>'+
+	n0+'<Item>\n\t<rasd:Address>0</rasd:Address>\n\t<rasd:Description>SCSI Controller</rasd:Description>\n\t<rasd:ElementName>SCSI controller 0</rasd:ElementName>\n\t<rasd:InstanceID>3</rasd:InstanceID>\n\t<rasd:ResourceSubType>VirtualSCSI</rasd:ResourceSubType>\n\t<rasd:ResourceType>6</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="slotInfo.pciSlotNumber" vmw:value="160" />'+
+	n0+'</Item>'+
+	n0+'<Item>\n\t<rasd:Address>1</rasd:Address>\n\t<rasd:Description>IDE Controller</rasd:Description>\n\t<rasd:ElementName>IDE 1</rasd:ElementName>\n\t<rasd:InstanceID>4</rasd:InstanceID>\n\t<rasd:ResourceType>5</rasd:ResourceType>'+
+	n0+'</Item>'+
+	n0+'<Item>\n\t<rasd:Address>0</rasd:Address>\n\t<rasd:Description>IDE Controller</rasd:Description>\n\t<rasd:ElementName>IDE 0</rasd:ElementName>\n\t<rasd:InstanceID>5</rasd:InstanceID>\n\t<rasd:ResourceType>5</rasd:ResourceType>'+
+	n0+'</Item>'+
+	n0+'<Item ovf:required="false">\n\t<rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>\n\t<rasd:ElementName>Video card</rasd:ElementName>\n\t<rasd:InstanceID>6</rasd:InstanceID>\n\t<rasd:ResourceType>24</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="enable3DSupport" vmw:value="false" /><vmw:Config ovf:required="false" vmw:key="use3dRenderer" vmw:value="automatic" /><vmw:Config ovf:required="false" vmw:key="useAutoDetect" vmw:value="false" /><vmw:Config ovf:required="false" vmw:key="videoRamSizeInKB" vmw:value="8192" />'+
+	n0+'</Item>'+
+	n0+'<Item ovf:required="false">\n\t<rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>\n\t<rasd:ElementName>VMCI device</rasd:ElementName>\n\t<rasd:InstanceID>7</rasd:InstanceID>\n\t<rasd:ResourceSubType>vmware.vmci</rasd:ResourceSubType>\n\t<rasd:ResourceType>1</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="allowUnrestrictedCommunication" vmw:value="false" /><vmw:Config ovf:required="false" vmw:key="slotInfo.pciSlotNumber" vmw:value="32" />'+
+	n0+'</Item>'+
+	n0+'<Item ovf:required="false">\n\t<rasd:AddressOnParent>0</rasd:AddressOnParent>\n\t<rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>\n\t<rasd:ElementName>CD/DVD drive 1</rasd:ElementName>\n\t<rasd:InstanceID>8</rasd:InstanceID>\n\t<rasd:Parent>4</rasd:Parent>\n\t<rasd:ResourceSubType>vmware.cdrom.remotepassthrough</rasd:ResourceSubType>\n\t<rasd:ResourceType>15</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="backing.exclusive" vmw:value="false" />'+
+	n0+'</Item>'+
+	n0+'<Item>\n\t<rasd:AddressOnParent>0</rasd:AddressOnParent>\n\t<rasd:ElementName>Hard disk 1</rasd:ElementName>\n\t<rasd:HostResource>ovf:/disk/vmdisk1</rasd:HostResource>\n\t<rasd:InstanceID>9</rasd:InstanceID>\n\t<rasd:Parent>3</rasd:Parent>\n\t<rasd:ResourceType>17</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="backing.writeThrough" vmw:value="false" />'+
+	n0+'</Item>'+
+	n0+'<Item ovf:required="false">\n\t<rasd:AddressOnParent>0</rasd:AddressOnParent>\n\t<rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>\n\t<rasd:Description>Floppy Drive</rasd:Description>\n\t<rasd:ElementName>Floppy drive 1</rasd:ElementName>\n\t<rasd:InstanceID>10</rasd:InstanceID>\n\t<rasd:ResourceSubType>vmware.floppy.remotedevice</rasd:ResourceSubType>\n\t<rasd:ResourceType>14</rasd:ResourceType>'+
+	n0+'</Item>'
+	);
+	}
 	
 	// build the list of non VIP nodes
 	// Pass the fqdn and mgmt ip address as two properties
@@ -7983,7 +8093,7 @@ function buildOVFapp(){
 	ovf+=n0+'        <vssd:VirtualSystemIdentifier>'+name+'</vssd:VirtualSystemIdentifier>';
 	ovf+=n0+'        <vssd:VirtualSystemType>vmx-08</vssd:VirtualSystemType>';
 	ovf+=n0+'      </System>';
-	ovf+=n0+vmAttributes.replace(/\n/g, "\n"+  
+	ovf+=n0+vmAttributes(Nodes.cloudNodes[indexNode].flavor).replace(/\n/g, "\n"+  
 			"      ");        
     
     // Connect the network adapters
