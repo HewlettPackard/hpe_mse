@@ -1,11 +1,12 @@
 ---
-- name: Deploying MSE node(s)
+- name: Deploying node(s)
   debug: 
     var=theNodeIpAddress
 
 - name: Install libselinux-python for Ansible to work with selinux on the target nodes
   yum:
     name: libselinux-python
+  ignore_errors: yes
 
 - name: Enable root at the console prompt
   shell: echo "root:hwroot" | chpasswd
@@ -43,7 +44,7 @@
     replace=''
     backup=yes
 
-- name: Create MSE directories
+- name: Create directories
   with_items: ["{{isoRepo}}","{{isoMountPoint}}"]
   loop_control:
     loop_var:
@@ -71,20 +72,43 @@
   retries: 3
   delay: 10
 
-- name: Get the MSE engine ISO image {{engineIso}} from cache {{cacheIso}}
+- name: Get patches from cache {{cachePatch}} if any
+  with_dict: "{{patched_files}}"
+  loop_control:
+    loop_var:
+      _patch
+  copy:
+    src: "{{cachePatch}}{{_patch.key}}"
+    dest: "{{_patch.value}}"
+    mode: preserve
+  when: cachePatch is defined
+
+- name: Get patches from {{patchUrl}} if any
+  with_dict: "{{patched_files}}"
+  loop_control:
+    loop_var:
+      _patch
+  get_url:
+    url: "{{patchUrl}}{{_patch.key}}"
+    dest: "{{_patch.value}}"
+    force: yes
+  when: cachePatch is not defined
+
+- name: Get the engine ISO image {{engineIso}} from cache {{cacheIso}}
   copy:
     src: "{{cacheIso}}{{engineIso}}"
     dest: "{{isoRepo}}"
-  when: cacheIso is defined
+    mode: preserve
+  when: cacheIso is defined and engineIso is defined and engineIso!=""
 
-- name: Get the MSE engine ISO image {{engineIso}} from remote {{isoUrl}}
+- name: Get the engine ISO image {{engineIso}} from remote {{isoUrl}}
   get_url:
     url: "{{isoUrl}}{{engineIso}}"
     dest: "{{isoRepo}}"
   notify: refresh MSE instance
-  when: cacheIso is not defined
+  when: cacheIso is not defined and engineIso is defined and engineIso!=""
 
-- name: Get the MSE product ISO images from cache {{cacheIso}}
+- name: Get the product ISO images from cache {{cacheIso}}
   with_items: "{{mseProduct}}"
   loop_control:
     loop_var:
@@ -95,7 +119,7 @@
   notify: refresh MSE instance
   when: cacheIso is defined
 
-- name: Get the MSE product ISO images from remote {{isoUrl}}
+- name: Get the product ISO images from remote {{isoUrl}}
   with_items: "{{mseProduct}}"
   loop_control:
     loop_var:
@@ -137,29 +161,33 @@
     ls ClusterManager*.iso 2> /dev/null || ls TAS*.iso 2> /dev/null || true
   register: _engineIso
 
-- name: Get MSE engine installer install-cluster-manager.sh from {{isoRepo}}{{_engineIso.stdout}}
+- name: Get engine installer install-cluster-manager.sh from {{isoRepo}}{{_engineIso.stdout}}
   iso_extract:
     image: "{{isoRepo}}{{_engineIso.stdout}}"
     dest: "{{isoRepo}}"
     files: "utils/install-cluster-manager.sh"
+  when: _engineIso.stdout!=""
 
 - name: Install versionlock plugin for yum
-  yum: 
-    name: yum-plugin-versionlock
-  register: result
-  until: result is success
-  retries: 3
-  delay: 10
+  block:
+    - name: yum-plugin-versionlock
+      yum: 
+        name: yum-plugin-versionlock
+  rescue:
+    - name: python3-dnf-plugin-versionlock
+      yum: 
+        name: yum-plugin-versionlock
 
-- name: Install the MSE Automated Deployment engine with-hpe-mse-nfv with-hpoc-uspm-nfv and with-hpocmp-nfv-ocmp if available
+- name: Install the Automated Deployment engine with-hpe-mse-nfv with-hpoc-uspm-nfv and with-hpocmp-nfv-ocmp if available
   shell: |
     > /etc/yum/pluginconf.d/versionlock.list
     cd {{isoRepo}} &&
-    _capabilities="--with-hpe-mse-nfv --with-hpoc-uspm-nfv "
-    if test -f install-cluster-manager.sh ; then _theInstaller=cluster-manager && _theIso=ClusterManager*.iso  ; else _theInstaller=tas && _theIso=TAS*.iso ; fi 
-    ./install-${_theInstaller}.sh --yes --install hpe-install-${_theInstaller} --disableplugin=yum-plugin-versionlock --iso ${_theIso} && 
+    _capabilities="--with-hpe-mse-nfv --with-hpoc-uspm-nfv " ; _isoSource=""
+    if test -f install-cluster-manager.sh ; then _theInstaller=cluster-manager ; elif test -f install-tas.sh ; then _theInstaller=tas ; fi 
+    if test -f ClusterManager*.iso ; then _isoSource=" --iso ClusterManager*.iso" ; elif test -f TAS*.iso ; then _isoSource=" --iso TAS*.iso" ; fi 
+    ./install-${_theInstaller}.sh --yes --install hpe-install-${_theInstaller} --disableplugin=yum-plugin-versionlock --enablerepo='{{yumRepo}}' ${_isoSource} && 
     if ./install-${_theInstaller}.sh --help --with-hpocmp-nfv-ocmp &> /dev/null ; then _capabilities+="--with-hpocmp-nfv-ocmp" ; fi &&
-    ./install-${_theInstaller}.sh --yes --install --with-hpoc-tls-certificates ${_capabilities} --enablerepo='{{yumRepo}}' --iso ${_theIso}
+    ./install-${_theInstaller}.sh --yes --install --with-hpoc-tls-certificates ${_capabilities} --enablerepo='{{yumRepo}}' ${_isoSource}
 
 - name: Create a labdrops yum repository for rpm packages in {{isoRepo}} with labdrops {{mseLabDrops }}
   shell: |
@@ -181,11 +209,12 @@
       enabled=1
       gpgcheck=0
 
-- name: Update with labdrops from {{isoRepo}}
+- name: Update with labdrops
   shell: |
     cd {{isoRepo}} &&
+    if test -f ClusterManager*.iso ; then _isoSource=" --iso ClusterManager*.iso" ; elif test -f TAS*.iso ; then _isoSource=" --iso TAS*.iso" ; fi 
     if test -f install-cluster-manager.sh ; then _theInstaller=cluster-manager && _theIso=ClusterManager*.iso  ; else _theInstaller=tas && _theIso=TAS*.iso ; fi 
-    ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='{{yumRepo}}' --iso ${_theIso}
+    ./install-${_theInstaller}.sh --yes --upgrade --enablerepo='{{yumRepo}}' ${_isoSource}
 
 - name: Update with patches from cache {{cachePatch}} if any
   with_dict: "{{patched_files}}"
@@ -195,6 +224,7 @@
   copy:
     src: "{{cachePatch}}{{_patch.key}}"
     dest: "{{_patch.value}}"
+    mode: preserve
   when: cachePatch is defined
 
 - name: Update with patches from {{patchUrl}} if any
@@ -208,14 +238,9 @@
     force: yes
   when: cachePatch is not defined
 
-
-- name: Install additional explicit packages from "{{yumRepo}}", ignoring errors
-  with_items: "{{ yum_explicit_packages }}"
-  loop_control:
-    loop_var:
-      _package
+- name: Install additional explicit packages {{ yum_explicit_packages }} from {{yumRepo}}, ignoring errors
   yum:
-    name: "{{_package}}"
+    name: "{{ yum_explicit_packages }}"
     enablerepo: "{{yumRepo}}"
   ignore_errors: yes
 
@@ -402,7 +427,7 @@
 # mse nfv services needs to be started only if not already successfully completed
 # ignore start error, as this can mean that the service is already running
 # Do not trust the status if the log file is missing (uspm status returns 0 even if the service has never run)
-- name: Start all MSE engines services
+- name: Start all engines services
   with_items: ['nivr','ocmp','ocsnf','uspm']
   loop_control:
     loop_var:
