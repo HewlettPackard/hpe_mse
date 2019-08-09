@@ -43,6 +43,8 @@ export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/TAS31/'
 # URL providing MSE patches
 export MSE_PATCH_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/TAS31/'
 # ISO image delivering the MSE automated deployer engine in MSE_ISO_URL or directory specified by cacheIso variable
+# Optional: if missing, the engine's installer must be provided as a patch along with a yum repository delivering the engine
+# Example: PATCHED_FILES='{"install-cluster-manager.sh": "/var/opt/OC/iso/"}' and CLOUD_REPOS_LIST="['clusterManager.repo']"
 export MSE_ENGINE='ClusterManager-3.1.6-3.000381.eab0051.el7.iso'
 # List of ISO images delivering the MSE products in MSE_ISO_URL or directory specified by cacheIso variable
 export MSE_PRODUCT="['TAS-3.1.2-4.000961.120159a.el7.iso','USPM433_Linux_RHEL7_4654.iso','HPE-Messaging-Gateway-3.1.1-1.000082.e4bc103.el7.iso','OpenCall-OCMP-4.5.0.iso','HPE-SNF-1.1.1-10.000589.el7.x86_64.iso']"
@@ -71,6 +73,8 @@ export MSE_ISO_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/MSE30/'
 # URL providing MSE patches
 export MSE_PATCH_URL='ftp://mse4nfv:password@ftp.ext.hpe.com/chef/MSE30/'
 # ISO image delivering the MSE automated deployer engine in MSE_ISO_URL or directory specified by cacheIso variable
+# Optional: if missing, the engine's installer must be provided as a patch along with a yum repository delivering the engine
+# Example: PATCHED_FILES='{"install-cluster-manager.sh": "/var/opt/OC/iso/"}' and CLOUD_REPOS_LIST="['clusterManager.repo']"
 export MSE_ENGINE='ClusterManager-3.1.6-1.000375.6e519a0.el6.iso'
 # List of ISO images delivering the MSE products in MSE_ISO_URL or directory specified by cacheIso variable
 export MSE_PRODUCT="['SEE-4.1.9-1.000223.a8b3309.el6.iso','MSE-3.0.7-1.000576.fc18d3a.el6.iso','simulap_internal_1.9.0-20180528105249git4e4f10f.iso','HPE-SMSC-2.1.1-01.1336.76ec5dc.snap.el6.x86_64.iso','OpenCall-OCMP-4.4.8.bg013842.el6.x86_64.iso','USPM4212_Linux_RHEL6_3931.iso','OpenCall_OCCP_3.0.3_004177.el6.x86_64.iso','HPE-TAS-Apps-1.1.1-001871.el6.iso']"
@@ -253,7 +257,7 @@ export CLOUD_IMAGE="ami-404f4339"
 
 # (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
 EOH
-version '0.4.6'
+version '0.4.7'
 chef_version '>= 12.14' if respond_to?(:chef_version)
 
 # The `issues_url` points to the location where issues for this cookbook are
