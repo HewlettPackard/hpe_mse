@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-08-09 Version 3.37</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-08-09 Version 3.38</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -110,7 +110,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
-	"\n2019-08-09 3.37	Flavors section: cpu and memory customization for Kubernetes and OVF VMware deployments; session import: step back, removing Json descriptor import, unused"+
+	"\n2019-08-09 3.38	Flavors section: cpu and memory customization for Kubernetes and OVF VMware deployments; session import: step back, removing Json descriptor import, unused"+
 	"\n2019-08-01 3.36	Simulap: available on SEE5, one per VNFC, with complete network interfaces definition."+
 	"\n\t\tRedis on Linux HA: in nodes sections, allow the VIP definition before the cluster definition."+
 	"\n2019-07-22 3.35	Files import: display content on load completion; Ansible deployment: allow user certification authority definition; "+
@@ -8093,7 +8093,7 @@ function buildOVFapp(){
 	ovf+=n0+'        <vssd:VirtualSystemIdentifier>'+name+'</vssd:VirtualSystemIdentifier>';
 	ovf+=n0+'        <vssd:VirtualSystemType>vmx-08</vssd:VirtualSystemType>';
 	ovf+=n0+'      </System>';
-	ovf+=n0+vmAttributes(Nodes.cloudNodes[indexNode].flavor).replace(/\n/g, "\n"+  
+	ovf+=n0+vmAttributes(nonVipNodes[indexNode].flavor).replace(/\n/g, "\n"+  
 			"      ");        
     
     // Connect the network adapters
