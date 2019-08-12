@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-08-09 Version 3.38</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-08-12 Version 3.4</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -110,7 +110,8 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
-	"\n2019-08-09 3.38	Flavors section: cpu and memory customization for Kubernetes and OVF VMware deployments; session import: step back, removing Json descriptor import, unused"+
+	"\n2019-08-12 3.4	Flavors section: name customization for OpenStack, cpu and memory customization for Kubernetes and VMware deployments"+
+	"\n\t\tSession import: step back, removing Json descriptor import, unused"+
 	"\n2019-08-01 3.36	Simulap: available on SEE5, one per VNFC, with complete network interfaces definition."+
 	"\n\t\tRedis on Linux HA: in nodes sections, allow the VIP definition before the cluster definition."+
 	"\n2019-07-22 3.35	Files import: display content on load completion; Ansible deployment: allow user certification authority definition; "+
@@ -2726,11 +2727,11 @@ if(Misc.isEmpty()){
 
 // ===========================
 // Flavors settings
-// (required by infrastructures missing the flavor concept: OVF vmware, kubernetes)
 // ===========================
 var Flavors = new vnfResource("Flavors", [
-	{name:'Infrastructure', width:'100px', type:'choice', choices:['kubernetes', 'OVF VMware']},
-	{name:'Flavor', width:'100px', type:'choice', choices:['flavorSmall', 'flavorStandard', 'flavorPerformance']},
+	{name:'Infrastructure', width:'100px', type:'choice', choices:['kubernetes', 'vmware', 'openstack']},
+	{name:'Flavor', width:'120px', type:'choice', choices:['flavorSmall', 'flavorStandard', 'flavorPerformance']},
+	{name:'name', type:'text', width:'80px'},
 	{name:'cpu', type:'text', width:'80px'},
 	{name:'memory', type:'text', width:'80px'},
 	{name:'cpuMax', type:'text', width:'80px'},
@@ -2739,15 +2740,21 @@ var Flavors = new vnfResource("Flavors", [
 	);
 // Kubernetes profiles default values
 Flavors['kubernetes'] = new Array();
-Flavors['kubernetes']['flavorStandard'] = {cpu: "800m", memory: "4300Mi", cpuMax: "2", memoryMax: "5Gi"};
-Flavors['kubernetes']['flavorSmall'] = {cpu: "200m", memory: "800Mi", cpuMax: "1", memoryMax: "2Gi"};
-Flavors['kubernetes']['flavorPerformance'] = {cpu: "2", memory: "8Gi", cpuMax: "4", memoryMax: "12Gi"}; 
-// OVF profiles default values
-Flavors['OVF VMware'] = new Array();
-Flavors['OVF VMware']['flavorStandard'] = {cpu: "2", memory: "8", cpuMax: "", memoryMax: ""};
-Flavors['OVF VMware']['flavorSmall'] = {cpu: "2", memory: "2", cpuMax: "", memoryMax: ""};
-Flavors['OVF VMware']['flavorPerformance'] = {cpu: "4", memory: "12", cpuMax: "", memoryMax: ""}; 
-Flavors.help = function(){return "Infrastructure flavors: recommended for infrastructures missing the flavor concept: OVF VMware, kubernetes"+
+Flavors['kubernetes']['flavorStandard'] = {name: '', cpu: "800m", memory: "4300Mi", cpuMax: "2", memoryMax: "5Gi"};
+Flavors['kubernetes']['flavorSmall'] = {name: '', cpu: "200m", memory: "800Mi", cpuMax: "1", memoryMax: "2Gi"};
+Flavors['kubernetes']['flavorPerformance'] = {name: '', cpu: "2", memory: "8Gi", cpuMax: "4", memoryMax: "12Gi"}; 
+// VMWare profiles default values
+Flavors['vmware'] = new Array();
+Flavors['vmware']['flavorStandard'] = {name: '', cpu: "2", memory: "8192", cpuMax: "", memoryMax: ""};
+Flavors['vmware']['flavorSmall'] = {name: '', cpu: "2", memory: "3072", cpuMax: "", memoryMax: ""};
+Flavors['vmware']['flavorPerformance'] = {name: '', cpu: "4", memory: "12288", cpuMax: "", memoryMax: ""}; 
+// OpenStack profiles default values
+Flavors['openstack'] = new Array();
+Flavors['openstack']['flavorStandard'] = {name: 'v2.m8', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
+Flavors['openstack']['flavorSmall'] = {name: 'v2.m4', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
+Flavors['openstack']['flavorPerformance'] = {name: 'v4.m8', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
+
+Flavors.help = function(){return "Infrastructure flavors:"+
 	"\nFlavor of a node is defined by the roles played on this node:"+
 	"\n\t- Small: default flavor"+
 	"\n\t- Standard: SIP load balancer roles and SEE roles except witness"+
@@ -2760,14 +2767,19 @@ Flavors.help = function(){return "Infrastructure flavors: recommended for infras
 	"\n\t- Standard: cpu="+Flavors['kubernetes']['flavorStandard'].cpu+"; memory="+Flavors['kubernetes']['flavorStandard'].memory+"; cpuMax="+Flavors['kubernetes']['flavorStandard'].cpuMax+"; memoryMax="+Flavors['kubernetes']['flavorStandard'].memoryMax+
 	"\n\t- Small: cpu="+Flavors['kubernetes']['flavorSmall'].cpu+"; memory="+Flavors['kubernetes']['flavorSmall'].memory+"; cpuMax="+Flavors['kubernetes']['flavorSmall'].cpuMax+"; memoryMax="+Flavors['kubernetes']['flavorSmall'].memoryMax+
 	"\n\t- Performance: cpu="+Flavors['kubernetes']['flavorPerformance'].cpu+"; memory="+Flavors['kubernetes']['flavorPerformance'].memory+"; cpuMax="+Flavors['kubernetes']['flavorPerformance'].cpuMax+"; memoryMax="+Flavors['kubernetes']['flavorPerformance'].memoryMax+
-	"\nOVF VMware: (only cpu and memory values apply, max are ignored)"+
+	"\nVMware: (only cpu and memory values apply, max are ignored)"+
 	"\n\tUnits:"+
 	"\n\t- cpu: total number of cores"+
-	"\n\t- memory: size in Gb"+
+	"\n\t- memory: size in Mb"+
 	"\n\tDefault values:"+
-	"\n\t- Standard: cpu="+Flavors['OVF VMware']['flavorStandard'].cpu+"; memory="+Flavors['OVF VMware']['flavorStandard'].memory+
-	"\n\t- Small: cpu="+Flavors['OVF VMware']['flavorSmall'].cpu+"; memory="+Flavors['OVF VMware']['flavorSmall'].memory+
-	"\n\t- Performance: cpu="+Flavors['OVF VMware']['flavorPerformance'].cpu+"; memory="+Flavors['OVF VMware']['flavorPerformance'].memory
+	"\n\t- Standard: cpu="+Flavors['vmware']['flavorStandard'].cpu+"; memory="+Flavors['vmware']['flavorStandard'].memory+
+	"\n\t- Small: cpu="+Flavors['vmware']['flavorSmall'].cpu+"; memory="+Flavors['vmware']['flavorSmall'].memory+
+	"\n\t- Performance: cpu="+Flavors['vmware']['flavorPerformance'].cpu+"; memory="+Flavors['vmware']['flavorPerformance'].memory+
+	"\nOpenStack/TOSCA: (flavors are identified by name, created by the infrastructure administrator; other fields than name are ignored)"+
+	"\n\tDefault values:"+
+	"\n\t- Standard: name="+Flavors['openstack']['flavorStandard'].name+
+	"\n\t- Small: name="+Flavors['openstack']['flavorSmall'].name+
+	"\n\t- Performance: name="+Flavors['openstack']['flavorPerformance'].name
 }
 
 Flavors.build = function(target){
@@ -2791,10 +2803,14 @@ Flavors.build = function(target){
 			case 'kubernetes': 
 				Flavors[infra][flavor].memoryMax=Flavors.getAndSetValue(row, nameIndexes, 'memoryMax', Flavors[infra][flavor].memoryMax, "Memory limit for "+flavor+" on "+infra);
 				Flavors[infra][flavor].cpuMax=Flavors.getAndSetValue(row, nameIndexes, 'cpuMax', Flavors[infra][flavor].cpuMax, "CPU limit for "+flavor+" on "+infra);
-			case 'OVF VMware':
+			case 'vmware':
 				Flavors[infra][flavor].cpu=Flavors.getAndSetValue(row, nameIndexes, 'cpu', Flavors[infra][flavor].cpu, "CPU request for "+flavor+" on "+infra);
 				Flavors[infra][flavor].memory=Flavors.getAndSetValue(row, nameIndexes, 'memory', Flavors[infra][flavor].memory, "Memory request for "+flavor+" on "+infra);
 				result+="\n# "+infra+" "+flavor+": cpu="+Flavors[infra][flavor].cpu+"; memory="+Flavors[infra][flavor].memory+"; cpuMax="+Flavors[infra][flavor].cpuMax+"; memoryMax="+Flavors[infra][flavor].memoryMax;
+				break;
+			case 'openstack': 
+				Flavors[infra][flavor].name=Flavors.getAndSetValue(row, nameIndexes, 'name', Flavors[infra][flavor].name, "Flavor name for "+flavor+" on "+infra);
+				result+="\n# "+infra+" "+flavor+": name="+Flavors[infra][flavor].name;
 				break;
 			default:
 				Flavors.check += "\nFlavors section: setting flavors is not supported on infrastructure : "+infra;
@@ -7489,15 +7505,15 @@ function buildHeatTemplate(){
 	heat+=n0+"  flavorStandard:";
     heat+=n0+"    type: string";
     heat+=n0+"    description: The name of the openstack flavor used to build the SEE Application nodes";
-    heat+=n0+"    default: v2.m8";
+    heat+=n0+"    default: "+Flavors['openstack']['flavorStandard'].name;
 	heat+=n0+"  flavorPerformance:";
     heat+=n0+"    type: string";
     heat+=n0+"    description: The name of the openstack flavor used to build the OCMP nodes";
-    heat+=n0+"    default: v2.m8";
+    heat+=n0+"    default: "+Flavors['openstack']['flavorPerformance'].name;
 	heat+=n0+"  flavorSmall:";
     heat+=n0+"    type: string";
     heat+=n0+"    description: The name of the openstack flavor used to build the other nodes";
-    heat+=n0+"    default: v2.m2";
+    heat+=n0+"    default: "+Flavors['openstack']['flavorSmall'].name;
 	heat+=n0+"  key_name:";
     heat+=n0+"    type: string";
     heat+=n0+"    description: the ssh key injected in the instances for remote access";
@@ -8015,9 +8031,9 @@ function buildOVFapp(){
 	
 	// Default VM attributes, per flavor
 	function vmAttributes(flavor){ return new String(
-	n0+'<Item>\n\t<rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>\n\t<rasd:Description>Number of Virtual CPUs</rasd:Description>\n\t<rasd:ElementName>'+Flavors['OVF VMware'][flavor].cpu+' virtual CPU(s)</rasd:ElementName>\n\t<rasd:InstanceID>1</rasd:InstanceID>\n\t<rasd:ResourceType>3</rasd:ResourceType>\n\t<rasd:VirtualQuantity>'+Flavors['OVF VMware'][flavor].cpu+'</rasd:VirtualQuantity>'+
+	n0+'<Item>\n\t<rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>\n\t<rasd:Description>Number of Virtual CPUs</rasd:Description>\n\t<rasd:ElementName>'+Flavors['vmware'][flavor].cpu+' virtual CPU(s)</rasd:ElementName>\n\t<rasd:InstanceID>1</rasd:InstanceID>\n\t<rasd:ResourceType>3</rasd:ResourceType>\n\t<rasd:VirtualQuantity>'+Flavors['vmware'][flavor].cpu+'</rasd:VirtualQuantity>'+
 	n0+'</Item>'+
-	n0+'<Item>\n\t<rasd:AllocationUnits>byte * 2^30</rasd:AllocationUnits>\n\t<rasd:Description>Memory Size</rasd:Description>\n\t<rasd:ElementName>'+Flavors['OVF VMware'][flavor].memory+'GB of memory</rasd:ElementName>\n\t<rasd:InstanceID>2</rasd:InstanceID>\n\t<rasd:ResourceType>4</rasd:ResourceType>\n\t<rasd:VirtualQuantity>'+Flavors['OVF VMware'][flavor].memory+'</rasd:VirtualQuantity>'+
+	n0+'<Item>\n\t<rasd:AllocationUnits>byte * 2^20</rasd:AllocationUnits>\n\t<rasd:Description>Memory Size</rasd:Description>\n\t<rasd:ElementName>'+Flavors['vmware'][flavor].memory+'MB of memory</rasd:ElementName>\n\t<rasd:InstanceID>2</rasd:InstanceID>\n\t<rasd:ResourceType>4</rasd:ResourceType>\n\t<rasd:VirtualQuantity>'+Flavors['vmware'][flavor].memory+'</rasd:VirtualQuantity>'+
 	n0+'</Item>'+
 	n0+'<Item>\n\t<rasd:Address>0</rasd:Address>\n\t<rasd:Description>SCSI Controller</rasd:Description>\n\t<rasd:ElementName>SCSI controller 0</rasd:ElementName>\n\t<rasd:InstanceID>3</rasd:InstanceID>\n\t<rasd:ResourceSubType>VirtualSCSI</rasd:ResourceSubType>\n\t<rasd:ResourceType>6</rasd:ResourceType><vmw:Config ovf:required="false" vmw:key="slotInfo.pciSlotNumber" vmw:value="160" />'+
 	n0+'</Item>'+
@@ -8189,7 +8205,7 @@ function buildToscaTemplate(){
     case 'from master':	
 	tosca+=n0+"      description: The id of the master volume used to instantiate MSE volumes"; break;
     }
-    tosca+=n0+"      default: MSE30x.qcow2";
+    tosca+=n0+"      default: mse.qcow2";
 	tosca+=n0+"    ExternalNetwork:";
     tosca+=n0+"      type: string";
     tosca+=n0+"      description: The name of the external public network used to connect floating IPs";
@@ -8201,15 +8217,15 @@ function buildToscaTemplate(){
 	tosca+=n0+"    flavorStandard:";
     tosca+=n0+"      type: string";
     tosca+=n0+"      description: The name of the openstack flavor used to build the SEE Application nodes";
-    tosca+=n0+"      default: v2.m8";
+    tosca+=n0+"      default: "+Flavors['openstack']['flavorStandard'].name;
 	tosca+=n0+"    flavorPerformance:";
     tosca+=n0+"      type: string";
     tosca+=n0+"      description: The name of the openstack flavor used to build the OCMP nodes";
-    tosca+=n0+"      default: v2.m8";
+    tosca+=n0+"      default: "+Flavors['openstack']['flavorPerformance'].name;
 	tosca+=n0+"    flavorSmall:";
     tosca+=n0+"      type: string";
     tosca+=n0+"      description: The name of the openstack flavor used to build the other nodes";
-    tosca+=n0+"      default: v2.m2";
+    tosca+=n0+"      default: "+Flavors['openstack']['flavorSmall'].name;
 	tosca+=n0+"    key_name:";
     tosca+=n0+"      type: string";
     tosca+=n0+"      description: the ssh key injected in the instances for remote access";
@@ -8886,6 +8902,10 @@ function buildAnsiblePlaybook(){
 		cook+=n0+"      wait_for_ip_address: no";
 		cook+=n0+"      customization:";
 		cook+=n0+"        domain: "+nonVipNodes[indexNode].domain;
+		cook+=n0+"      hardware:";
+		cook+=n0+"        memory_mb: "+Flavors['vmware'][nonVipNodes[indexNode].flavor].memory;
+		cook+=n0+"        num_cpus: "+Flavors['vmware'][nonVipNodes[indexNode].flavor].cpu;
+		
 		// Network interfaces
 		cook+=n0+"      networks:";
 		Networks.names.forEach(function(netName,netIndex){
