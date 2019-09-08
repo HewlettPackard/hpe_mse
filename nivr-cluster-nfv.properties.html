@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-08-12 Version 3.4</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-08-19 Version 3.41</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -62,6 +62,7 @@ on
 <option name="openstack">vmware</option>
 <option name="aws">aws</option>
 <option name="azure">azure</option>
+<option name="azure">google</option>
 </select></td>
 <td valign="top">
 <input class="helpButton" type="button" value="Help" onclick="chefDeploymentHelp()">
@@ -110,6 +111,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-08-19 3.41	Chef: accept licenses; target google cloud platform."+
 	"\n2019-08-12 3.4	Flavors section: name customization for OpenStack, cpu and memory customization for Kubernetes and VMware deployments"+
 	"\n\t\tSession import: step back, removing Json descriptor import, unused"+
 	"\n2019-08-01 3.36	Simulap: available on SEE5, one per VNFC, with complete network interfaces definition."+
@@ -1485,7 +1487,7 @@ Nodes.build = function(target, engine){
 			if(nodeM3ua1IpAddr == "?")	{nodeM3ua1IpAddr="~"+shortName+	"_m3ua1~";	theCloudNode.interfaces.push(Networks.heatNetworks['M3UA1']);}
 			if(nodeM3ua2IpAddr == "?")	{nodeM3ua2IpAddr="~"+shortName+	"_m3ua2~";	theCloudNode.interfaces.push(Networks.heatNetworks['M3UA2']);}
 			break;
-		  case 'aws': case 'openstack':
+		  case 'aws': case 'openstack': case 'google':
 		    // Node names will be known at instantiation time: 
 		    switch(engine){
 		      case 'chef': nodeName="<_%_= node['mse']['map']['"+shortName+"']['hostname'] _%_>"; break;
@@ -8562,20 +8564,32 @@ function buildChefCookbook(){
 		cook+=n0+"  security_group_ids: <%= ENV['CLOUD_SECURITY_GROUPS'] %>";
 		cook+=n0+"  retryable_tries: 120";
 		break;
+	  case 'google':
+		cook+=n0+"  name: gce";
+		cook+=n0+"  project: <%= ENV['CLOUD_PROJECT'] %>";
+		cook+=n0+"  zone: <%= ENV['CLOUD_LOCATION'] %>";
+		cook+=n0+"  image_project: <%= ENV['CLOUD_DISTRO'] %>";
+		cook+=n0+"  machine_type: <%= ENV['CLOUD_FLAVOR'] %>";
+		cook+=n0+"  image_name: <%= ENV['CLOUD_IMAGE'] %>";
+		cook+=n0+"  retryable_tries: 120";
+		break;
 	  default: 
 	  	userOutput('DevOps Chef is not supported on '+infrastructure); return;
 	  	break;
 	}	
 	cook+=n0;
 	cook+=n0+"transport:";
+	cook+=n0+"  username: <%= ENV['CLOUD_DEFAULT_USER'] %>";
 	cook+=n0+"  ssh_key: <%= ENV['CLOUD_SSH_KEY'] %>";
 	cook+=n0;
 	cook+=n0+"provisioner:";
 	cook+=n0+"  name: nodes";
-	cook+=n0+"";
+	cook+=n0+"  client_rb:";
+	cook+=n0+"    chef_license: accept";
+	cook+=n0;
 	cook+=n0+"verifier:";
 	cook+=n0+"  name: inspec";
-	cook+=n0+"";
+	cook+=n0;
 	cook+=n0+"platforms:";
 	
 	// Nodes dependency to EMS: to ensure all nodes readiness when the EMS starts, so that descriptor push succeeds, make the EMS depending on all other nodes
@@ -8590,16 +8604,26 @@ function buildChefCookbook(){
 	cook+=n0+"    machine_size: <%= ENV['CLOUD_FLAVOR'] %>";
 	cook+=n0+"    run_list:";
 	cook+=n0+"      - recipe[hpe_mse::base]";
+	if(infrastructure == 'google'){
+	cook+=n0+"    driver:";
+	cook+=n0+"      inst_name: "+Nodes.cloudNodes[indexNode].fqdn;
+	}else{
 	cook+=n0+"    driver_config:";
 	cook+=n0+"      vm_name: "+Nodes.cloudNodes[indexNode].fqdn;
+	}
 	});
 	// Create the EMS node afterwards to make sure that it will be able to collect all other nodes information
 	cook+=n0+"  - name: "+emsNode.name;
 	cook+=n0+"    machine_size: <%= ENV['CLOUD_FLAVOR'] %>";
 	cook+=n0+"    run_list:";
 	cook+=n0+"      - recipe[hpe_mse::ems]";
+	if(infrastructure == 'google'){
+	cook+=n0+"    driver:";
+	cook+=n0+"      inst_name: "+emsNode.fqdn;
+	}else{
 	cook+=n0+"    driver_config:";
 	cook+=n0+"      vm_name: "+emsNode.fqdn;
+	}
 	
 	// Define the MSE attributes from the environment and push the descriptor
 	cook+=n0+"";
