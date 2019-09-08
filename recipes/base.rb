@@ -237,7 +237,8 @@ log "Start all MSE engines services"
   service "#{vnfc}-nfv" do
     # mse nfv services needs to be started only if not already successfully completed
     # ignore start error, as this can mean that the service is already running
-    start_command "service #{vnfc}-nfv status || service #{vnfc}-nfv start || echo started"
+	# Do not trust the status if the log file is missing (uspm status returns 0 even if the service has never run)
+    start_command "service #{vnfc}-nfv status && test -f /var/log/#{vnfc}-setup.log || service #{vnfc}-nfv start || echo started"
     action :start
   end
 end
