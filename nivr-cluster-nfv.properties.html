@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-08-19 Version 3.41</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-09-19 Version 3.42</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -111,7 +111,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
-	"\n2019-08-19 3.41	Chef: accept licenses; target google cloud platform."+
+	"\n2019-09-19 3.42	Target google cloud platform. Extend flavors setting to azure and google targets. Chef: accept licenses."+
 	"\n2019-08-12 3.4	Flavors section: name customization for OpenStack, cpu and memory customization for Kubernetes and VMware deployments"+
 	"\n\t\tSession import: step back, removing Json descriptor import, unused"+
 	"\n2019-08-01 3.36	Simulap: available on SEE5, one per VNFC, with complete network interfaces definition."+
@@ -2731,7 +2731,7 @@ if(Misc.isEmpty()){
 // Flavors settings
 // ===========================
 var Flavors = new vnfResource("Flavors", [
-	{name:'Infrastructure', width:'100px', type:'choice', choices:['kubernetes', 'vmware', 'openstack']},
+	{name:'Infrastructure', width:'100px', type:'choice', choices:['kubernetes', 'vmware', 'openstack', 'azure', 'google']},
 	{name:'Flavor', width:'120px', type:'choice', choices:['flavorSmall', 'flavorStandard', 'flavorPerformance']},
 	{name:'name', type:'text', width:'80px'},
 	{name:'cpu', type:'text', width:'80px'},
@@ -2755,33 +2755,52 @@ Flavors['openstack'] = new Array();
 Flavors['openstack']['flavorStandard'] = {name: 'v2.m8', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
 Flavors['openstack']['flavorSmall'] = {name: 'v2.m4', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
 Flavors['openstack']['flavorPerformance'] = {name: 'v4.m8', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
+// Google profiles default values
+Flavors['google'] = new Array();
+Flavors['google']['flavorStandard'] = {name: 'n1-standard-2', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
+Flavors['google']['flavorSmall'] = {name: 'n1-standard-1', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
+Flavors['google']['flavorPerformance'] = {name: 'n1-standard-4', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
+// Azure profiles default values
+Flavors['azure'] = new Array();
+Flavors['azure']['flavorStandard'] = {name: 'Standard_D3', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
+Flavors['azure']['flavorSmall'] = {name: 'Standard_D1', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
+Flavors['azure']['flavorPerformance'] = {name: 'Standard_D3', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
 
-Flavors.help = function(){return "Infrastructure flavors:"+
+Flavors.help = function(){var help="Infrastructure flavors:"+
 	"\nFlavor of a node is defined by the roles played on this node:"+
 	"\n\t- Small: default flavor"+
 	"\n\t- Standard: SIP load balancer roles and SEE roles except witness"+
 	"\n\t- Performance: OCMP roles"+
-	"\nKubernetes:"+
+	"\nKubernetes: (name is ignored)"+
 	"\n\tUnits:"+
 	"\n\t- cpu: number of cpus or milli-cpu with the suffix 'm', eg 1500m for one and half a cpu"+
 	"\n\t- memory: size in gigabytes (Gi) or megabytes (Mi)"+
-	"\n\tDefault values:"+
-	"\n\t- Standard: cpu="+Flavors['kubernetes']['flavorStandard'].cpu+"; memory="+Flavors['kubernetes']['flavorStandard'].memory+"; cpuMax="+Flavors['kubernetes']['flavorStandard'].cpuMax+"; memoryMax="+Flavors['kubernetes']['flavorStandard'].memoryMax+
-	"\n\t- Small: cpu="+Flavors['kubernetes']['flavorSmall'].cpu+"; memory="+Flavors['kubernetes']['flavorSmall'].memory+"; cpuMax="+Flavors['kubernetes']['flavorSmall'].cpuMax+"; memoryMax="+Flavors['kubernetes']['flavorSmall'].memoryMax+
-	"\n\t- Performance: cpu="+Flavors['kubernetes']['flavorPerformance'].cpu+"; memory="+Flavors['kubernetes']['flavorPerformance'].memory+"; cpuMax="+Flavors['kubernetes']['flavorPerformance'].cpuMax+"; memoryMax="+Flavors['kubernetes']['flavorPerformance'].memoryMax+
-	"\nVMware: (only cpu and memory values apply, max are ignored)"+
+	"\nVMware: (only cpu and memory values apply, max and name are ignored)"+
 	"\n\tUnits:"+
 	"\n\t- cpu: total number of cores"+
 	"\n\t- memory: size in Mb"+
-	"\n\tDefault values:"+
-	"\n\t- Standard: cpu="+Flavors['vmware']['flavorStandard'].cpu+"; memory="+Flavors['vmware']['flavorStandard'].memory+
-	"\n\t- Small: cpu="+Flavors['vmware']['flavorSmall'].cpu+"; memory="+Flavors['vmware']['flavorSmall'].memory+
-	"\n\t- Performance: cpu="+Flavors['vmware']['flavorPerformance'].cpu+"; memory="+Flavors['vmware']['flavorPerformance'].memory+
-	"\nOpenStack/TOSCA: (flavors are identified by name, created by the infrastructure administrator; other fields than name are ignored)"+
-	"\n\tDefault values:"+
-	"\n\t- Standard: name="+Flavors['openstack']['flavorStandard'].name+
-	"\n\t- Small: name="+Flavors['openstack']['flavorSmall'].name+
-	"\n\t- Performance: name="+Flavors['openstack']['flavorPerformance'].name
+	"\nOther infrastructures:"+
+	"\n\tFlavors are identified by name, created by the infrastructure administrator"+
+	"\n\tOther fields than name are ignored"+
+	"\nExamples:\n";
+	// Table built with spaces for alignment, thanks to padStart
+	var colLength=20;
+	['Infrastructure', 'Flavor', 'Name', 'cpu', 'memory', 'cpuMax', 'memoryMax'].forEach(function(column){
+		help+=column.padStart(colLength);
+	});
+	['kubernetes','vmware', 'openstack', 'google', 'azure'].forEach(function(infrastructure){
+		['flavorStandard', 'flavorSmall','flavorPerformance'].forEach(function(flavor){
+		help+="\n"+infrastructure.padStart(colLength);
+		help+=flavor.padStart(colLength);
+		help+=Flavors[infrastructure][flavor].name.padStart(colLength);
+		help+=Flavors[infrastructure][flavor].cpu.padStart(colLength);
+		help+=Flavors[infrastructure][flavor].memory.padStart(colLength);
+		help+=Flavors[infrastructure][flavor].cpuMax.padStart(colLength);
+		help+=Flavors[infrastructure][flavor].memoryMax.padStart(colLength);
+		});	
+	});
+	
+	return help;
 }
 
 Flavors.build = function(target){
@@ -2810,7 +2829,7 @@ Flavors.build = function(target){
 				Flavors[infra][flavor].memory=Flavors.getAndSetValue(row, nameIndexes, 'memory', Flavors[infra][flavor].memory, "Memory request for "+flavor+" on "+infra);
 				result+="\n# "+infra+" "+flavor+": cpu="+Flavors[infra][flavor].cpu+"; memory="+Flavors[infra][flavor].memory+"; cpuMax="+Flavors[infra][flavor].cpuMax+"; memoryMax="+Flavors[infra][flavor].memoryMax;
 				break;
-			case 'openstack': 
+			case 'openstack': case 'google': case 'azure':
 				Flavors[infra][flavor].name=Flavors.getAndSetValue(row, nameIndexes, 'name', Flavors[infra][flavor].name, "Flavor name for "+flavor+" on "+infra);
 				result+="\n# "+infra+" "+flavor+": name="+Flavors[infra][flavor].name;
 				break;
@@ -7444,15 +7463,19 @@ function deploymentHelp(){userOutput(
 "\n\t\t- deploy on existing networks, with static IP addresses (no DHCP)"+
 "\n\t- Tosca: builds a TOSCA format (Topology and Orchestration Specification for Cloud Applications) to be deployed on top of normalized orchestrators"+
 "\n\t- Kubernetes: builds a shell script to be invoked on the kubernetes console"+
-"\n\t\t- install docker and kubernetes on a Linux devops console"+
+"\n\t\t- install and start docker and kubernetes on a Linux devops console: sudo yum install docker kubernetes ; sudo systemctl start docker"+
+"\n\t\t- configure kubernetes cli for the infrastructure"+
+"\n\t\t  eg for microsoft azure: az aks install-cli ; az aks get-credentials --resource-group <resource name> --name <cluster name> --subscription <subscription id>"+
+"\n\t\t  eg for google cloud platform: gcloud container clusters get-credentials gke --zone europe-west3-b --project hpe-mse"+
 "\n\t\t- clone the hpe_mse project from github: 'git clone https://github.com/HewlettPackard/hpe_mse.git'"+
 "\n\t\t- drop all RPM packages and installers in ./hpe_mse/docker/bits"+
 "\n\t\t- drop ssh keys (private, public, hosts) in ./hpe_mse/docker/keys"+
 "\n\t\t- build the docker image: 'cd hpe_mse/docker ; sudo docker build  -t ndsna/tas:latest .'"+
 "\n\t\t- publish the docker image to the repository: example on azure for pushing the image tas version v11 in the ndsna private repository:"+
-"\n\t\t  'sudo az acr login --name ndsna ; sudo docker tag ndsna/tas ndsna.azurecr.io/tas:v11 ; sudo docker push ndsna.azurecr.io/tas:v11'"+
+"\n\t\t  'sudo az login ; sudo az acr login --name ndsna ; sudo docker tag ndsna/tas ndsna.azurecr.io/tas:v11 ; sudo docker push ndsna.azurecr.io/tas:v11'"+
 "\n\t\t- define the topology in the assistant; include 'base*,hpe,updates' in the YUM_REPO_LIST definition"+
 "\n\t\t- select the kubernetes target and click 'Deploy'; run the resulting shell script in the devops console"+
+"\n\t\t- check and connect to the nodes and pods: kubectl get nodes -o wide ; kubectl get pods -o wide ; kubectl exec -it <pod name> -- bash"+
 "\nAnsible deployment of a Heat stack:"+
 "\n\t- prepare the Ansible console as per the DevOps Help section"+
 "\n\t- select the Heat output format in the drop down list besides the Deploy button, then click Deploy"+
@@ -8500,6 +8523,10 @@ function chefDeploymentHelp(){userOutput(
 "\n\t- install the aws CLI"+
 "\n\t- set aws credentials in ~/.aws/credentials"+
 "\n\t- prepare a key pair file"+
+"\nFor google target: https://docs.ansible.com/ansible/latest/scenario_guides/guide_gce.html"+
+"\n\t- install the google cloud platform authentication modules: sudo pip install requests google-auth"+
+"\n\t- download the JSON credentials file"+
+"\n\t- Provision ssh keys in the google cloud platform portal"+
 "\nFor openstack target:"+
 "\n\t- install ansible, git and pip from epel repository: yum install epel-release ; yum install ansible git python-pip --enablerepo='epel'"+
 "\n\t- install shade: pip install shade"+
@@ -8747,6 +8774,25 @@ function buildAnsiblePlaybook(){
 		cook+=n0+"";
 		cook+=n0+"  tasks:";
 		break;
+	  case 'google':
+		cook+=n0+"- name: Set the instance(s) on Google Cloud Platform";
+		cook+=n0+"  hosts: localhost";
+		cook+=n0+"  gather_facts: false";
+		cook+=n0+"  vars:";
+		cook+=n0+"    service_account_file: \"{{ lookup('env','CLOUD_ACCOUNT') }}\"";
+		cook+=n0+"    project: \"{{ lookup('env','CLOUD_PROJECT') }}\"";
+		cook+=n0+"    region: \"{{ lookup('env','CLOUD_LOCATION') }}\"";
+		cook+=n0+"    zone: \"{{ lookup('env','CLOUD_ZONE') }}\"";
+		cook+=n0+"    the_disk_size: \"{{ lookup('env','CLOUD_DISK_SIZE') }}\"";
+		cook+=n0+"    the_machine_size: \"{{ lookup('env','CLOUD_FLAVOR') }}\"";
+		cook+=n0+"    the_image: \"{{ lookup('env','CLOUD_IMAGE') }}\"";
+		cook+=n0+"    the_state: present";
+		cook+=n0+"    auth_kind: serviceaccount";
+		cook+=n0+"    scopes:";
+		cook+=n0+"      - https://www.googleapis.com/auth/compute";
+		cook+=n0+"";
+		cook+=n0+"  tasks:";
+		break;
 	  case 'openstack':
 		cook+=n0+"- name: create the instance(s)";
 		cook+=n0+"  hosts: localhost";
@@ -8835,7 +8881,7 @@ function buildAnsiblePlaybook(){
 		cook+=n0+'    azure_rm_virtualmachine:';
 		cook+=n0+'      resource_group: "{{the_stack}}"';
 		cook+=n0+'      name: '+name;
-		cook+=n0+'      vm_size: "{{ lookup(\'env\',\'CLOUD_FLAVOR\') }}"';
+		cook+=n0+"      vm_size: '"+Flavors[infrastructure][aNode.flavor].name+"'";
 		cook+=n0+'      admin_username: azureuser';
 		cook+=n0+'      ssh_password_enabled: false';
 		cook+=n0+'      ssh_public_keys:';
@@ -8857,6 +8903,49 @@ function buildAnsiblePlaybook(){
 		cook+=n0+'      ansible_ssh_host: "{{ output_ip_address.state.ip_address }}"';
 		cook+=n0+'      mgmt_ip_address: "{{ private_ip_address.state.ip_configurations[0].private_ip_address }}"';
 		cook+=n0;
+		break;
+	  case 'google':
+		cook+=n0+'  - name: set the instance {{ the_state }} '+name;
+		cook+=n0+'    gcp_compute_instance:';
+		cook+=n0+'      state: "{{ the_state }}"';
+		cook+=n0+'      name: '+name;
+		cook+=n0+"      machine_type: '"+Flavors[infrastructure][aNode.flavor].name+"'";
+		cook+=n0+'      disks:';
+		cook+=n0+'        - auto_delete: true';
+		cook+=n0+'          boot: true';
+		cook+=n0+'          initialize_params:';
+		cook+=n0+'            disk_size_gb: "{{ the_disk_size }}"';
+		cook+=n0+'            source_image: "{{ the_image }}"';
+		cook+=n0+'      network_interfaces:';
+		cook+=n0+'        - access_configs:';
+		cook+=n0+'            - name: \'External NAT\'';
+		cook+=n0+'              nat_ip:';
+		cook+=n0+'              type: \'ONE_TO_ONE_NAT\'';
+		cook+=n0+'      zone: "{{ zone }}"';
+		cook+=n0+'      project: "{{ project }}"';
+		cook+=n0+'      auth_kind: "{{ auth_kind }}"';
+		cook+=n0+'      service_account_file: "{{ service_account_file }}"';
+		cook+=n0+'      scopes: "{{ scopes }}"';
+		cook+=n0+'    register: '+name;
+		cook+=n0+'  - name: Wait for SSH to come up';
+		cook+=n0+"    command: >";
+		cook+=n0+"      ssh -oBatchMode=yes -oStrictHostKeyChecking=no -i {{ lookup('env','CLOUD_SSH_KEY') }}";
+		cook+=n0+"      {{ lookup('env',' CLOUD_DEFAULT_USER') }}@{{ "+name+".networkInterfaces[0].accessConfigs[0].natIP }} true";
+		cook+=n0+"    register: result";
+		cook+=n0+"    until: result is success";
+		cook+=n0+"    retries: 30";
+		cook+=n0+"    delay: 10";
+		cook+=n0+'    when: the_state is defined and the_state != "absent"';
+
+		cook+=n0+'  - name: add host '+name+' to the ansible dynamic inventory {{ '+name+'.networkInterfaces[0].networkIP }} {{ '+name+'.networkInterfaces[0].accessConfigs[0].natIP }}';
+		cook+=n0+'    add_host:';
+		cook+=n0+'      name: "'+name+'"';
+		cook+=n0+'      nick_name: "'+name+'"';
+		cook+=n0+'      fqdn: '+nonVipNodes[indexNode].fqdn;
+		cook+=n0+'      groups: "'+nodeGroup+'"';
+		cook+=n0+'      ansible_ssh_host: "{{ '+name+'.networkInterfaces[0].accessConfigs[0].natIP }}"';
+		cook+=n0+'      mgmt_ip_address: "{{ '+name+'.networkInterfaces[0].networkIP }}"';
+		cook+=n0+'    when: the_state is defined and the_state != "absent"';
 		break;
 	  case 'openstack':
 		cook+=n0+"  - name: set the instance "+name+" to state {{the_state}}";
@@ -9023,8 +9112,7 @@ function buildAnsiblePlaybook(){
 	case 'aws':
 	cook+=n0+"    theNodeIpAddress: \"{{hostvars[inventory_hostname]['ansible_default_ipv4']['address']}}\"";
 	break;
-	case 'azure':
-	case 'openstack':
+	case 'azure': case 'openstack': case 'google':
 	cook+=n0+"    theNodeIpAddress: \"{{hostvars[inventory_hostname]['mgmt_ip_address']}}\"";
 	break;
 	default:
