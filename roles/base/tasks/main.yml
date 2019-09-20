@@ -8,6 +8,13 @@
     name: libselinux-python
   ignore_errors: yes
 
+# The 'service' Ansible module fails when requesting the state stop on a non existing service
+- name: Remove package NetworkManager, known to prevent some settings on GCP typically
+  shell: "service NetworkManager stop || echo stopped"
+- yum:
+    name: NetworkManager
+    state: absent
+
 - name: Enable root at the console prompt
   shell: echo "root:hwroot" | chpasswd
 
@@ -72,6 +79,16 @@
   retries: 3
   delay: 10
 
+- name: Create patches directories 
+  with_dict: "{{patched_files}}"
+  loop_control:
+    loop_var:
+      _patch
+  file: 
+    path: "{{_patch.value}}" 
+    state: directory
+    recurse: yes
+
 - name: Get patches from cache {{cachePatch}} if any
   with_dict: "{{patched_files}}"
   loop_control:
@@ -92,6 +109,7 @@
     url: "{{patchUrl}}{{_patch.key}}"
     dest: "{{_patch.value}}"
     force: yes
+
   when: cachePatch is not defined
 
 - name: Get the engine ISO image {{engineIso}} from cache {{cacheIso}}
@@ -277,11 +295,23 @@
     line: "#Defaults    requiretty"
 
 - name: Enable ssh for root and ocadmin with fixed keys
-  shell: |
-    sed -i "/^PasswordAuthentication.*no/d" /etc/ssh/sshd_config &&
-    sed -i "s/#PasswordAuthentication.*/PasswordAuthentication yes/" /etc/ssh/sshd_config &&
-    sed -i "/^PermitRootLogin.*no/d" /etc/ssh/sshd_config &&
-    sed -i "s/#PermitRootLogin.*/PermitRootLogin yes/" /etc/ssh/sshd_config
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    state: absent
+    regexp: '^PasswordAuthentication.*no'
+- lineinfile:
+    path: /etc/ssh/sshd_config
+    state: absent
+    regexp: '^PermitRootLogin.*no'
+- replace:
+    path: /etc/ssh/sshd_config
+    regexp: '^#PasswordAuthentication.*'
+    replace: 'PasswordAuthentication yes'
+- replace:
+    path: /etc/ssh/sshd_config
+    regexp: '^#PermitRootLogin.*'
+    replace: 'PermitRootLogin yes'
+
 - name: root ssh directory
   file: 
     path: '/root/.ssh'
