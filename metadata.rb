@@ -141,7 +141,7 @@ export ANSIBLE_REMOTE_USER=$CLOUD_DEFAULT_USER
 export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
 
 # Static Infrastructure
-##############
+#######################
 # The ssh public key used to reach the infrastructure
 export CLOUD_SSH_KEY="../sshKeys/luna/id_rsa"
 # Additional environment variables set in instances as a json hash
@@ -255,35 +255,36 @@ export CLOUD_IMAGE="ami-3548444c"
 # Cent OS 6
 export CLOUD_IMAGE="ami-404f4339"
 
-# Google Infrastructure
-#######################
-# The path to the ssh public key used to reach the infrastructure
-$env:CLOUD_SSH_KEY="~/.ssh/d3m"
-# The location
-$env:CLOUD_LOCATION="europe-west3-c"
-# The GCP project name
-$env:CLOUD_PROJECT="hpe-mse"
-# The image flavor
-$env:CLOUD_FLAVOR="n1-standard-2"
+# Google Cloud Platform Infrastructure
+######################################
+# The GCP project and authentication json file used to reach the infrastructure
+export CLOUD_PROJECT="hpe-mse"
+export CLOUD_ACCOUNT="/home/ddomet/google/hpe-mse-1a1491ddf0ee.json"
+# The ssh  key and account used by Ansible to reach the instances
+export CLOUD_SSH_KEY="${HOME}/.ssh/id_rsa"
+export CLOUD_DEFAULT_USER="domin"
+# The  location 
+export CLOUD_LOCATION="europe-west3"
+export CLOUD_ZONE="europe-west3-c"
+# The instance disk size in Gb
+export CLOUD_DISK_SIZE="20"
 # List of yum repositories to be used during MSE automated deployer installation
-$env:MSE_YUM_REPO='labdrops,centos*,updates*,base*'
+export MSE_YUM_REPO='labdrops,updates,base'
 # Additional environment variables set in instances as a json hash
-$env:CLOUD_ENVIRONMENT='{}'
-# URL delivering additional yum repositories definitions CLOUD_REPOS_LIST
-$env:CLOUD_REPOS_URL="ftp://mse4nfv:password@ftp.ext.hpe.com/chef/repos/"
-# The default user
-$env:CLOUD_DEFAULT_USER="domin"
-# The image definition
-# Cent OS 7
-# The distribution image
-$env:CLOUD_DISTRO="centos-cloud"
-$env:CLOUD_IMAGE="centos-7-v20190813"
+export CLOUD_ENVIRONMENT='{}'
 # List of yum repositories definitions to add to the nodes retrieved from CLOUD_REPOS_URL
-$env:CLOUD_REPOS_LIST="['uspm43public.repo']"
+export CLOUD_REPOS_LIST="['uspm43public.repo']"
+export CLOUD_REPOS_URL="ftp://mse4nfv:password@ftp.ext.hpe.com/chef/repos/"
+# The  image name
+# Cent OS 7
+export CLOUD_IMAGE="projects/gce-uefi-images/global/images/centos-7-v20190905"
+# Propagate user and key to ansible engine
+export ANSIBLE_REMOTE_USER=$CLOUD_DEFAULT_USER
+export ANSIBLE_PRIVATE_KEY_FILE=$CLOUD_SSH_KEY
 
 # (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
 EOH
-version '0.4.7'
+version '0.4.8'
 chef_version '>= 12.14' if respond_to?(:chef_version)
 
 # The `issues_url` points to the location where issues for this cookbook are
