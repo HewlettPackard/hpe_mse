@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-09-19 Version 3.42</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-09-26 Version 3.43</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -111,6 +111,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-09-26 3.43	Ansible deployments: additional ocmp group for post-processing (firewall stop and ocmp start)"+
 	"\n2019-09-19 3.42	Target google cloud platform. Extend flavors setting to azure and google targets. Chef: accept licenses."+
 	"\n2019-08-12 3.4	Flavors section: name customization for OpenStack, cpu and memory customization for Kubernetes and VMware deployments"+
 	"\n\t\tSession import: step back, removing Json descriptor import, unused"+
@@ -442,6 +443,7 @@ var cloudNode = function(aName, aFQDN){
 	this.name = aName;
 	this.fqdn = aFQDN;
 	this.interfaces = new Array();
+	this.isOCMP = false;
 	this.isVIP = false;
 	this.hasVIP = false;
 	this.ipAddresses = undefined;
@@ -1620,7 +1622,7 @@ Nodes.build = function(target, engine){
 			nodeName + " " + nodeSipName + ": SIP network interface definition ", " requires both name and IP address on SIP network");
 		
 		// Select a Heat profile for this node, default to small, performance for OCMP, standard for SEE and SNF nodes and nodes without explicit role 
-		if(ocmpRole != "")theCloudNode.flavor = 'flavorPerformance';
+		if(ocmpRole != ""){theCloudNode.flavor = 'flavorPerformance'; theCloudNode.isOCMP=true;}
 		if(seeRole != "" && seeRole != "Wit" || sipLbRole == "Spx" || sipLbRole == "Pri" || sipLbRole == "Sec")theCloudNode.flavor = 'flavorStandard'; 
 		if(!isEms && !isOcmpEms && !isOcsnfEms && !isUspmEms && seeRole=="" && linuxHaRole=="" && httpLbRole=="" && sipLbRole=="" && pgsqlHaRole=="" && redisHaRole=="" && dbRole=="" && uspmRole=="" && ocmpRole=="")theCloudNode.flavor = 'flavorStandard'; 	
 		
@@ -7770,7 +7772,9 @@ function buildHeatTemplate(){
     heat+=n0+"        name: "+name;
     heat+=n0+"        fqdn: "+Nodes.cloudNodes[indexNode].fqdn
     heat+=n0+"        ipaddress: {get_attr: ["+name+"-"+mgmtName+"-floatingIP, floating_ip_address]}";
-    heat+=n0+"        groups: base"; if(indexNode == Nodes.cloudNodes.length - 1)heat+=",ems"
+    heat+=n0+"        groups: base";
+    if(Nodes.cloudNodes[indexNode].isOCMP)heat+=",ocmp"; 
+    if(indexNode == Nodes.cloudNodes.length - 1)heat+=",ems";
     });
     heat+=n0+"  public_vips:";
     heat+=n0+"    description: List of public virtual IPs as a name, fqdn and public ip address";
@@ -8830,9 +8834,11 @@ function buildAnsiblePlaybook(){
     
     // For each non VIP node: create the instance
     // The EMS is the last node in Nodes.cloudNodes: it must be part of the ems group in addition to the base group
-    var nodeGroup='base';
+    // OCMP nodes are part of the ocmp group, they may require specific post install processing
     nonVipNodes.forEach(function(aNode, indexNode){
+    var nodeGroup='base';
     var name=aNode.name;
+    if(aNode.isOCMP)nodeGroup+=',ocmp';
     if(name == emsNode.name)nodeGroup+=',ems';
     // Prevent IP addresses duplication for infrastructures missing dynamic allocation (vmware)
     var uniqueDevice = new Array();
@@ -9176,6 +9182,13 @@ function buildAnsiblePlaybook(){
 	cook+=n0+"  gather_facts: True";
 	cook+=n0+"  roles:";
 	cook+=n0+"  - role: collectInfo";
+	cook+=n0;
+	cook+=n0+"- name: post configure ocmp nodes";
+	cook+=n0+"  hosts: ocmp";
+	cook+=n0+"  become: True";
+	cook+=n0+"  gather_facts: True";
+	cook+=n0+"  roles:";
+	cook+=n0+"    - role: ocmp";
 	
     // Show to the user and save to ansible.yml
     userOutput(cook);

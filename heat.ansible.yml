@@ -142,3 +142,10 @@
   gather_facts: True
   roles:
     - role: collectInfo
+
+- name: post configure ocmp nodes
+  hosts: ocmp
+  become: True
+  gather_facts: True
+  roles:
+    - role: ocmp
