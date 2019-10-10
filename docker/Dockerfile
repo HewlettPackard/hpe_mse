@@ -35,7 +35,7 @@ RUN /usr/bin/rm --force /etc/yum.repos.d/CentOS-Media.repo
 
 # do not restrict locales in glibc-common via yum.conf: LC_CTYPE: cannot change locale (en_US): No such file or directory
 RUN sed -i "s/^override_install_langs=.*/override_install_langs=all/" /etc/yum.conf
-RUN /usr/bin/yum reinstall --assumeyes glibc-common
+RUN /usr/bin/yum reinstall --assumeyes glibc-common || echo glibc-common not available
 
 # Add installers scripts known in the path
 ADD ./$bits/*.sh $ISO_REPO
@@ -47,6 +47,11 @@ RUN echo /usr/sbin/service sshd start >> ~/.bash_profile
 RUN echo /usr/sbin/service firewalld start >> ~/.bash_profile
 # Disable ssh nologin for non root users (ubuntu known issue)
 RUN echo /usr/bin/rm --force /var/run/nologin >> ~/.bash_profile
+# Start deployment engines 
+RUN echo /usr/sbin/service nivr-nfv start  >> ~/.bash_profile
+RUN echo /usr/sbin/service uspm-nfv start  >> ~/.bash_profile
+RUN echo /usr/sbin/service ocmp-nfv start  >> ~/.bash_profile
+RUN echo /usr/sbin/service ocsnf-nfv start  >> ~/.bash_profile
 
 # Set FQDN hostname 
 RUN echo '[ "$(hostname)" == "$(hostname --fqdn)" ] || hostname $(hostname --fqdn)' >> ~/.bash_profile
@@ -76,9 +81,6 @@ WORKDIR /etc/ssh/
 ADD ./$keys/ssh_host_* ./
 RUN /usr/bin/chmod 0644 ssh_host_*_key.pub
 RUN /usr/bin/chmod 0600 ssh_host_*_key
-
-# Start deployment engines 
-RUN service nivr-nfv start && service uspm-nfv start && service ocmp-nfv start && service ocsnf-nfv start 
 
 # Ready to display logs
 WORKDIR /var/log

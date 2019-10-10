@@ -2,13 +2,8 @@
 - name: Enable ocroot account with hwroot password
   shell: echo "ocroot:hwroot" | chpasswd
 
-- name: Start then stop the firewall as the OCMP VNFC defers its configuration to the end user
-  service:
-    name: iptables
-    state: started
-- service:
-    name: iptables
-    state: stopped
+- name: Start then stop the firewall as the OCMP VNFC defers its configuration to the end user, ignoring errors
+  shell: systemctl start firewalld && systemctl stop firewalld || echo firewall stopped
 
 - name: Start ocmp base
   shell: /opt/OC/bin/ocmpStart

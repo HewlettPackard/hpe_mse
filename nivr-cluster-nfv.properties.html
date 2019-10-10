@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-09-26 Version 3.43</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-10-10 Version 3.44</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -111,7 +111,9 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
-	"\n2019-09-26 3.43	Ansible deployments: additional ocmp group for post-processing (firewall stop and ocmp start)"+
+	"\n2019-10-10 3.44	Ansible deployments: additional ocmp group for post-processing (firewall stop and ocmp start)"+
+	"\n\t\tHide webRTC check boxes if WebRTC section is empty"+
+	"\n\t\tAnsible playbooks for public clouds: resolve public IP addresses; azure: configure firewall for HTTP and SIP"+
 	"\n2019-09-19 3.42	Target google cloud platform. Extend flavors setting to azure and google targets. Chef: accept licenses."+
 	"\n2019-08-12 3.4	Flavors section: name customization for OpenStack, cpu and memory customization for Kubernetes and VMware deployments"+
 	"\n\t\tSession import: step back, removing Json descriptor import, unused"+
@@ -311,10 +313,10 @@ function compatibilityMatrix(){
 	new compatibleFeature(featureMatrix, "Diameter/TASAPPs",['SEE4', 'SEE5'], "TASAPPs experimental implementation as specific Diameter types, on SEE4 only");
 	new compatibleFeature(featureMatrix, "UCP",			['SEE4']);
 	new compatibleFeature(featureMatrix, "SMPP",			['SEE4', 'SEE5']);
-	new compatibleFeature(featureMatrix, "Datasource",		['SEE4'], "Common to JDBC and LDAP");
-	new compatibleFeature(featureMatrix, "LDAP",			['SEE4']);
+	new compatibleFeature(featureMatrix, "Datasource",		['SEE4', 'SEE5'], "Common to JDBC and LDAP");
+	new compatibleFeature(featureMatrix, "LDAP",			['SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "SOAP",			['SEE4', 'SEE5']);
-	new compatibleFeature(featureMatrix, "XMLRPC",			['SEE4']);
+	new compatibleFeature(featureMatrix, "XMLRPC",			['SEE4', 'SEE5']);
 	
 	var devopsMatrix = new Object;
 	devopsMatrix.matrix = w.document.createElement('table');
@@ -344,10 +346,11 @@ function compatibilityMatrix(){
 	new compatibleFeature(devopsMatrix, "Openstack",['Ansible'], "Deploy a full Heat stack or a set of instances on a single network. Tested on CentOS 6 and 7 images");
 	new compatibleFeature(devopsMatrix, "Azure",	['Chef', 'Ansible'], "Single network interface. Tested on CentOS 6.10 and 7 images");
 	new compatibleFeature(devopsMatrix, "Aws",		['Chef', 'Ansible'], "Single network interface. Tested on CentOS 6 and 7 images");
+	new compatibleFeature(devopsMatrix, "Google",	['Chef', 'Ansible'], "Single network interface. Tested on CentOS 7 images");
 	new compatibleFeature(devopsMatrix, "TOSCA",	[], "Experimental");
 	new compatibleFeature(devopsMatrix, "Static",	['Ansible'], "Deploy on pre-allocated VMs or bare metal configured with static IP addresses");
 	new compatibleFeature(devopsMatrix, "vmware",	['Ansible'], "Deploy on existing networks, with static IP addresses (no DHCP), either as an OVF appliance or as a set of instances by Ansible");
-	new compatibleFeature(devopsMatrix, "Kubernetes",[], "Experimental: deploy docker images on a kubernetes cluster; limited to a single network interface. Tested on CentOS 7 on Azure");
+	new compatibleFeature(devopsMatrix, "Kubernetes",[], "Experimental: deploy docker images on a kubernetes cluster; limited to a single network interface. Tested on CentOS 7 on Azure and Google Cloud Platform");
 	
 	return true;
 }
@@ -1190,6 +1193,85 @@ Networks.build = function(target, engine){
 if(Networks.isEmpty())Networks.add();
 
 // ===========================
+// WebRTC
+// ===========================
+var WebRTC = new vnfResource("WebRTC", [
+	{name:'Function', type:'choice', choices:[
+		'WEBRTC_SIP_PORT', 'WEBRTC_MEDIA_EXT_START', 'WEBRTC_MEDIA_EXT_END', 
+		'WEBRTC_SIPPROXY_PORT', 'WEBRTC_SIPREGISTRAR_PORT', 'WEBRTC_OCMP_TRANSCODER_PORT', 'WEBRTC_ICE'
+		]},
+	{name:'Value', type:'text'}
+	]
+	);
+var WebRTCDefault = new Array();
+var WebRTCComment = new Array();
+WebRTCDefault.WEBRTC_SIP_PORT="5062";
+WebRTCComment.WEBRTC_SIP_PORT="SIP port used on the WebRTC Back End";
+WebRTCDefault.WEBRTC_OCMP_TRANSCODER_PORT="5070";
+WebRTCComment.WEBRTC_OCMP_TRANSCODER_PORT="SIP port used with the transcoder OCMP";
+WebRTCDefault.WEBRTC_SIPPROXY_PORT="5077";
+WebRTCComment.WEBRTC_SIPPROXY_PORT="SIP port used for the SIP proxy function";
+WebRTCDefault.WEBRTC_SIPREGISTRAR_PORT="5077";
+WebRTCComment.WEBRTC_SIPREGISTRAR_PORT="SIP port used for the SIP registrar function";
+WebRTCComment.WEBRTC_ICE="ICE server for WebRTC";
+WebRTC.help = function(){
+	return "WebRTC settings:"+
+	"\nWEBRTC_SIP_PORT: SIP port used on the WebRTC Back End" +
+	"\nWEBRTC_MEDIA_EXT_START: WebRTC external media port range start" +
+	"\nWEBRTC_MEDIA_EXT_END: WebRTC external media port range end" +
+	"\nWEBRTC_SIPPROXY: SIP port used for the SIP proxy and registrar function" + 
+	"\nWEBRTC_OCMP_TRANSCODER_PORT: SIP port used with the transcoder OCMP" +
+	"\nWEBRTC_ICE: "+WebRTCComment.WEBRTC_ICE
+;
+}
+
+WebRTC.build = function(){
+		var nameIndexes = WebRTC.nameIndexes;
+		WebRTC.check = "";
+		var result = "\n";
+		var table = document.getElementById("WebRTC");
+		var rowCount = table.rows.length;
+		var webrtcExtStart = "";
+		var webrtcExtEnd = "";
+		result += "\n# ------------------------------- #";
+		result += "\n# WebRTC                           #";
+		result += "\n# ------------------------------- #";
+		for(var i=1; i < rowCount; i++){
+			var row = table.rows[i];
+			var propertyName=WebRTC.getAndSetSelection(row, nameIndexes, 'Function');
+			switch(propertyName){
+				case 'WEBRTC_MEDIA_EXT_START':
+					webrtcExtStart=WebRTC.getAndSetValue(row, nameIndexes, 'Value', '20000', 'WEBRTC_MEDIA_EXT_START');
+					break;
+				case 'WEBRTC_MEDIA_EXT_END':
+					webrtcExtEnd=WebRTC.getAndSetValue(row, nameIndexes, 'Value', '20100', 'WEBRTC_MEDIA_EXT_END');
+					break;
+				default:
+					result += "\n# "+WebRTCComment[propertyName];
+					result += "\n"+propertyName+'="'+WebRTC.getAndSetValue(row, nameIndexes, 'Value', WebRTCDefault[propertyName], WebRTCComment[propertyName])+'"';
+					break;
+			}
+		}
+		if(webrtcExtEnd == ""){
+			webrtcExtEnd = webrtcExtStart;
+		}else{
+			if(webrtcExtStart == "")
+				webrtcExtStart = webrtcExtEnd;
+		}
+		if(webrtcExtStart != ""){
+			if(webrtcExtEnd < webrtcExtStart)
+				WebRTC.Check += "WebRTC port range start should be less than range end";
+			result += "\n# WebRTC external media port range";
+			result += "\nWEBRTC_MEDIA_EXT_PORT_RANGE="+webrtcExtStart+","+webrtcExtEnd;
+		}
+					
+		// update visible Webrtc buttons in the nodes table
+		Nodes.hideUnused();
+		
+		return result;
+	};
+
+// ===========================
 // Nodes resource
 // ===========================
 var sipGrpPrefix='Grp'
@@ -1493,11 +1575,13 @@ Nodes.build = function(target, engine){
 		    // Node names will be known at instantiation time: 
 		    switch(engine){
 		      case 'chef': nodeName="<_%_= node['mse']['map']['"+shortName+"']['hostname'] _%_>"; break;
-		      case 'ansible': nodeName="_%_"+shortName+"_hostname_%_"; break;
+		      case 'ansible': nodeName="_%_"+shortName+"_hostname_%_"; break; 
 		      } 
 		  case 'azure': case 'kubernetes':
 		  	// IP addresses will be known at instantiation time: 
 			// Replace undefined values with place holders resolved later
+	      	// Prepare for public address translation 
+	      	if(nodePubIpAddr == "?")nodePubIpAddr="_%_"+shortName+"_pub_ipaddress_%_";
 			// Push the network interface number in the interfaces list for this node
 			if(nodeIpAddr == "?"){
 			  switch(engine){
@@ -2359,6 +2443,12 @@ Nodes.hideUnused = function(){
 			Nodes.display(fqdnColName, Networks.search('network', interface));
 			Nodes.display(ipAddrColName, Networks.search('network', interface));
 		}else Networks.check+=checkInterface;
+	});
+	
+	// Hides Webrtc columns if the webrtc table is empty
+	var displayWrtc=!WebRTC.isEmpty();
+	['WRTC BE', 'WRTC FE', 'WRTC Pxy', 'WRTC Trcdr'].forEach(function(wrtcRole){
+		Nodes.display(wrtcRole, displayWrtc);
 	});
 };
 
@@ -6975,82 +7065,6 @@ NativeApps.build = function (){
 	return result;
 };
 
-// ===========================
-// WebRTC
-// ===========================
-var WebRTC = new vnfResource("WebRTC", [
-	{name:'Function', type:'choice', choices:[
-		'WEBRTC_SIP_PORT', 'WEBRTC_MEDIA_EXT_START', 'WEBRTC_MEDIA_EXT_END', 
-		'WEBRTC_SIPPROXY_PORT', 'WEBRTC_SIPREGISTRAR_PORT', 'WEBRTC_OCMP_TRANSCODER_PORT', 'WEBRTC_ICE'
-		]},
-	{name:'Value', type:'text'}
-	]
-	);
-var WebRTCDefault = new Array();
-var WebRTCComment = new Array();
-WebRTCDefault.WEBRTC_SIP_PORT="5062";
-WebRTCComment.WEBRTC_SIP_PORT="SIP port used on the WebRTC Back End";
-WebRTCDefault.WEBRTC_OCMP_TRANSCODER_PORT="5070";
-WebRTCComment.WEBRTC_OCMP_TRANSCODER_PORT="SIP port used with the transcoder OCMP";
-WebRTCDefault.WEBRTC_SIPPROXY_PORT="5077";
-WebRTCComment.WEBRTC_SIPPROXY_PORT="SIP port used for the SIP proxy function";
-WebRTCDefault.WEBRTC_SIPREGISTRAR_PORT="5077";
-WebRTCComment.WEBRTC_SIPREGISTRAR_PORT="SIP port used for the SIP registrar function";
-WebRTCComment.WEBRTC_ICE="ICE server for WebRTC";
-WebRTC.help = function(){
-	return "WebRTC settings:"+
-	"\nWEBRTC_SIP_PORT: SIP port used on the WebRTC Back End" +
-	"\nWEBRTC_MEDIA_EXT_START: WebRTC external media port range start" +
-	"\nWEBRTC_MEDIA_EXT_END: WebRTC external media port range end" +
-	"\nWEBRTC_SIPPROXY: SIP port used for the SIP proxy and registrar function" + 
-	"\nWEBRTC_OCMP_TRANSCODER_PORT: SIP port used with the transcoder OCMP" +
-	"\nWEBRTC_ICE: "+WebRTCComment.WEBRTC_ICE
-;
-}
-
-WebRTC.build = function(){
-		var nameIndexes = WebRTC.nameIndexes;
-		WebRTC.check = "";
-		var result = "\n";
-		var table = document.getElementById("WebRTC");
-		var rowCount = table.rows.length;
-		var webrtcExtStart = "";
-		var webrtcExtEnd = "";
-		result += "\n# ------------------------------- #";
-		result += "\n# WebRTC                           #";
-		result += "\n# ------------------------------- #";
-		for(var i=1; i < rowCount; i++){
-			var row = table.rows[i];
-			var propertyName=WebRTC.getAndSetSelection(row, nameIndexes, 'Function');
-			switch(propertyName){
-				case 'WEBRTC_MEDIA_EXT_START':
-					webrtcExtStart=WebRTC.getAndSetValue(row, nameIndexes, 'Value', '20000', 'WEBRTC_MEDIA_EXT_START');
-					break;
-				case 'WEBRTC_MEDIA_EXT_END':
-					webrtcExtEnd=WebRTC.getAndSetValue(row, nameIndexes, 'Value', '20100', 'WEBRTC_MEDIA_EXT_END');
-					break;
-				default:
-					result += "\n# "+WebRTCComment[propertyName];
-					result += "\n"+propertyName+'="'+WebRTC.getAndSetValue(row, nameIndexes, 'Value', WebRTCDefault[propertyName], WebRTCComment[propertyName])+'"';
-					break;
-			}
-		}
-		if(webrtcExtEnd == ""){
-			webrtcExtEnd = webrtcExtStart;
-		}else{
-			if(webrtcExtStart == "")
-				webrtcExtStart = webrtcExtEnd;
-		}
-		if(webrtcExtStart != ""){
-			if(webrtcExtEnd < webrtcExtStart)
-				WebRTC.Check += "WebRTC port range start should be less than range end";
-			result += "\n# WebRTC external media port range";
-			result += "\nWEBRTC_MEDIA_EXT_PORT_RANGE="+webrtcExtStart+","+webrtcExtEnd;
-		}
-					
-		return result;
-	};
-
 // ==================
 // Licensing
 // ==================
@@ -7473,8 +7487,9 @@ function deploymentHelp(){userOutput(
 "\n\t\t- drop all RPM packages and installers in ./hpe_mse/docker/bits"+
 "\n\t\t- drop ssh keys (private, public, hosts) in ./hpe_mse/docker/keys"+
 "\n\t\t- build the docker image: 'cd hpe_mse/docker ; sudo docker build  -t ndsna/tas:latest .'"+
-"\n\t\t- publish the docker image to the repository: example on azure for pushing the image tas version v11 in the ndsna private repository:"+
-"\n\t\t  'sudo az login ; sudo az acr login --name ndsna ; sudo docker tag ndsna/tas ndsna.azurecr.io/tas:v11 ; sudo docker push ndsna.azurecr.io/tas:v11'"+
+"\n\t\t- publish the docker image to the repository: example for pushing the image tas version v11 in the ndsna private repository:"+
+"\n\t\t  on azure: 'sudo az login ; sudo az acr login --name ndsna ; sudo docker tag ndsna/tas ndsna.azurecr.io/tas:v11 ; sudo docker push ndsna.azurecr.io/tas:v11'"+
+"\n\t\t  on google: 'gcloud auth configure-docker ; docker tag ndsna/tas gcr.io/hpe-mse/tas:v11 ; docker push gcr.io/hpe-mse/tas:v11'"+
 "\n\t\t- define the topology in the assistant; include 'base*,hpe,updates' in the YUM_REPO_LIST definition"+
 "\n\t\t- select the kubernetes target and click 'Deploy'; run the resulting shell script in the devops console"+
 "\n\t\t- check and connect to the nodes and pods: kubectl get nodes -o wide ; kubectl get pods -o wide ; kubectl exec -it <pod name> -- bash"+
@@ -7863,15 +7878,18 @@ function buildKubernetesScript(){
     // The EMS is the last node in Nodes.cloudNodes: remove it to build the list of non EMS nodes,then filter the nodes playing a VIP role
     var nonEmsNodesNames = Nodes.cloudNodes.slice(0, Nodes.cloudNodes.length - 1).filter(function(e){return !e.isVIP;}).map(function(e){return e.name;});
     // Build the list of cpu and memory profiles for each node
+    // Build the list of ocmp nodes for post install processing
     var memoryList=new Array(); 
     var cpuList=new Array();
     var memoryMaxList=new Array(); 
     var cpuMaxList=new Array();
+    var ocmpNodes=new Array();
     nonVipNodes.forEach(function(e){
     	memoryList.push(Flavors['kubernetes'][e.flavor].memory);
     	cpuList.push(Flavors['kubernetes'][e.flavor].cpu);
     	memoryMaxList.push(Flavors['kubernetes'][e.flavor].memoryMax);
     	cpuMaxList.push(Flavors['kubernetes'][e.flavor].cpuMax);
+    	if(e.isOCMP)ocmpNodes.push(e.name);
     });
     
     kube+=n0+'# Use the script name as the specific directory to perform this deployment';
@@ -7989,6 +8007,12 @@ function buildKubernetesScript(){
 	kube+=n0;
 	kube+=n0+'echo "Deployment started: checking the consolidated status on the EMS node: kubectl exec $_theEMS -- service nivr-nfv consolidated-status"';
 	kube+=n0+'sleep 2m && until kubectl exec $_theEMS -- service nivr-nfv consolidated-status || (( $? > 127 )) ; do sleep 20s ; done';
+	// ocmp nodes post processing: stop firewall, start ocmp base and bre
+	ocmpNodes.forEach(function(e){
+	kube+=n0+'kubectl exec '+e+' -- service firewalld stop ';
+	kube+=n0+'kubectl exec '+e+' -- /opt/OC/bin/ocmpStart ';
+	kube+=n0+'kubectl exec '+e+' -- /usr/bin/ocmp-bre start';
+	});
 	kube+=n0+'echo "Done: to delete the stack, run: kubectl delete --kustomize ${_theStack}"';
 	
 	// Show to the user and save to nivr-cluster-nfv.yaml
@@ -8753,6 +8777,18 @@ function buildAnsiblePlaybook(){
 		cook+=n0+'          destination_port_range: 22';
 		cook+=n0+'          access: Allow';
 		cook+=n0+'          priority: 1001';
+		cook+=n0+'          direction: Inbound';
+		cook+=n0+'        - name: HTTP';
+		cook+=n0+'          protocol: Tcp';
+		cook+=n0+'          destination_port_range: 4000-11000';
+		cook+=n0+'          access: Allow';
+		cook+=n0+'          priority: 1002';
+		cook+=n0+'          direction: Inbound';
+		cook+=n0+'        - name: SIP';
+		cook+=n0+'          protocol: Udp';
+		cook+=n0+'          destination_port_range: 5000-5099';
+		cook+=n0+'          access: Allow';
+		cook+=n0+'          priority: 1003';
 		cook+=n0+'          direction: Inbound';
 		cook+=n0+'  - name: Create virtual network {{the_stack}}_network {{the_network}}.0/'+Networks.heatCidrLength;
 		cook+=n0+'    azure_rm_virtualnetwork:';
