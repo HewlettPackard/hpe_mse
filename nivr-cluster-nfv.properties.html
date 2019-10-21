@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><html lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
-    <title>MSE Descriptor</title>
+    <title>CMS Network Applications Descriptor</title>
 </head>
 <body >
 <input id="_uniqueInputId" value="1" type="hidden" placeholder="Hidden input recording the html id for dynamic delete buttons"/>
 <table border=0 width="100%">
 <td valign="top" align="left">
-<H1>MSE Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-10-10 Version 3.44</a></p>
+<H1>CMS Network Applications Descriptor</H1>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-10-10 Version 3.45</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -29,7 +29,7 @@
 <hr>
 <TABLE border=0 cellspacing="5">
 <tr>
-<td valign="top">Build the MSE Descriptor</td><td valign="top"><input class="buildButton" type="button" value="Build" onclick="buildVNFDescriptor()"></td>
+<td valign="top">Build the Descriptor</td><td valign="top"><input class="buildButton" type="button" value="Build" onclick="buildVNFDescriptor()"></td>
 </tr><tr>
 <td valign="top">Deploy on 
 <select id="deployer">
@@ -111,6 +111,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-10-16 3.45	OpenStack: default small flavor v2.m2 is enough; http load balancer consistency checking improved for SEE multi-simplex topology"+
 	"\n2019-10-10 3.44	Ansible deployments: additional ocmp group for post-processing (firewall stop and ocmp start)"+
 	"\n\t\tHide webRTC check boxes if WebRTC section is empty"+
 	"\n\t\tAnsible playbooks for public clouds: resolve public IP addresses; azure: configure firewall for HTTP and SIP"+
@@ -284,7 +285,7 @@ function compatibilityMatrix(){
 	new compatibleFeature(featureMatrix, "SEE cluster",		['SEE3.6', 'SEE3.7', 'SEE4','SEE5'], "No node+witness co-location on SEE5");
 	new compatibleFeature(featureMatrix, "Linux HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "USPM", 			['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
-	new compatibleFeature(featureMatrix, "HTTP LB", 		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
+	new compatibleFeature(featureMatrix, "HTTP LB", 		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5'], "keepalived engine starting with SEE5");
 	new compatibleFeature(featureMatrix, "SIP LB simplex", 	['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "SIP LB HA",		['SEE3.6', 'SEE3.7', 'SEE4', 'SEE5']);
 	new compatibleFeature(featureMatrix, "Simulap",			['SEE4', 'SEE5'], "No ISO image on RHEL7, yum installation only");
@@ -2011,6 +2012,8 @@ Nodes.build = function(target, engine){
 					if(nodeNames[n] != "")httpLbPrimaryNames[n][iVnfc] = nodeNames[n]; 
 					if(nodeIpAddresses[n] != "")httpLbPrimaryIpAddr[n][iVnfc] = nodeIpAddresses[n];
 				});
+				// Record a http LB on this VNF
+				if(httpLb[VNFCindex] == undefined)httpLb[VNFCindex] = new Array();
 				break;
 			case 'Sec': 
 				// An SEE simplex may act as a Secondary load balancer but on the composed VNF only: 
@@ -2020,6 +2023,8 @@ Nodes.build = function(target, engine){
 					if(nodeNames[n] != "")httpLbSecondaryNames[n][iVnfc] = nodeNames[n]; 
 					if(nodeIpAddresses[n] != "")httpLbSecondaryIpAddr[n][iVnfc] = nodeIpAddresses[n];
 				});
+				// Record a http LB on this VNF
+				if(httpLb[VNFCindex] == undefined)httpLb[VNFCindex] = new Array();
 				break;
 			case 'VIP':
 				{
@@ -2041,8 +2046,6 @@ Nodes.build = function(target, engine){
 						result += "\nLBMODE=nat";
 					}
 				}
-				// Record a http LB on this VNF
-				if(httpLb[VNFCindex] == undefined)httpLb[VNFCindex] = new Array();
 				break;
 			case 'BE':
 				// Additional foreign back end
@@ -2277,15 +2280,6 @@ Nodes.build = function(target, engine){
 	result += getNameIpAddr("SIMPLEX_SEE", "_APP_DEVICE", seeSimplexNames['APP'], seeSimplexIpAddr['APP']);
 	result += getNameIpAddr("SIMPLEX_SEE", "_SIP_DEVICE", seeSimplexNames['SIP'], seeSimplexIpAddr['SIP']);
 	
-	// Record an emulated http LB with the Simplex SEE on all VNFs unless the composed VNF has defined one, used for all SEE simplex
-	if(httpLb[0] == undefined){
-		httpLb[0] = new Array();
-		['MGMT', 'LBNAT'].forEach(function(n,i,t){
-				httpLbVipNames[n] = seeSimplexNames[n].slice(); 
-				httpLbVipIpAddr[n] = seeSimplexIpAddr[n].slice();
-			});
-	}
-				
 	result += "\n# SEE Primary      #";
 	result += getNameIpAddr("PRIMARY_SEE", "", seePrimaryNames['MGMT'], seePrimaryIpAddr['MGMT']);
 	result += getNameIpAddr("PRIMARY_SEE", "_APP_DEVICE", seePrimaryNames['APP'], seePrimaryIpAddr['APP']);
@@ -2332,19 +2326,38 @@ Nodes.build = function(target, engine){
 		var VNFdisplayName = e == "" ? "the composed VNF" : "VNFC "+e;
 		// For each concerned network, if a primary is defined on this VNFC, make sure secondary and VIP are defined as well, and the reverse
 		httpLbNetworks.forEach(function(n,iNetwork,tNetwork){
-			// Skip this check on SEE simplex VNFC, emulating the http load balancer
-			if(seeSimplexIpAddr[n][i] != undefined)return;
+			// on SEE simplex VNFC, expand the control to all VNFCs: the http load balancer is spread over VNFCs, defined at the composed VNF level 
+			if(seeSimplexIpAddr[n][i] != undefined){
+			Nodes.check += checkDependency(httpLbPrimaryIpAddr[n].join('').length != 0, [httpLbSecondaryIpAddr[n].join('').length != 0], "Nodes section: the composed VNF on interface "+n," is missing HTTP LB secondary role");
+			Nodes.check += checkDependency(httpLbPrimaryIpAddr[n].join('').length == 0, [httpLbSecondaryIpAddr[n].join('').length == 0 && httpLbBackEndIpAddr[n].join('').length == 0], "Nodes section: the composed VNF on interface "+n," is missing the HTTP LB primary role");
+			}
+			else {
 			Nodes.check += checkDependency(httpLbPrimaryIpAddr[n][i] != undefined && httpLbPrimaryIpAddr[n][i] != "", [httpLbSecondaryIpAddr[n][i] != undefined && httpLbSecondaryIpAddr[n][i] != ""], "Nodes section: " + VNFdisplayName + " on interface "+n," is missing HTTP LB secondary role");
-			Nodes.check += checkDependency(httpLbPrimaryIpAddr[n][i] == undefined || httpLbPrimaryIpAddr[n][i] == "", [(httpLbSecondaryIpAddr[n][i] == undefined || httpLbSecondaryIpAddr[n][i] == "") ], "Nodes section: " + VNFdisplayName + " on interface "+n," is missing the HTTP LB primary role");
+			Nodes.check += checkDependency(httpLbPrimaryIpAddr[n][i] == undefined || httpLbPrimaryIpAddr[n][i] == "", [(httpLbSecondaryIpAddr[n][i] == undefined || httpLbSecondaryIpAddr[n][i] == "") && (httpLbBackEndIpAddr[n][i] == undefined || httpLbBackEndIpAddr[n][i] == "") ], "Nodes section: " + VNFdisplayName + " on interface "+n," is missing the HTTP LB primary role");
+			}
 		});
 		// The VIP is defined between the MGMT and LBNAT interfaces only
 		['MGMT', 'LBNAT'].forEach(function(n,iNetwork,tNetwork){
-			// Skip this check on SEE simplex VNFC, emulating the http load balancer
-			if(seeSimplexIpAddr[n][i] != undefined)return;
+			if(seeSimplexIpAddr[n][i] != undefined){
+			Nodes.check += checkDependency(httpLbPrimaryIpAddr[n].join('').length != 0, [httpLbVipIpAddr[n].join('').length != 0], "Nodes section: the composed VNF on interface "+n," is missing HTTP LB Vip role");
+			Nodes.check += checkDependency(httpLbPrimaryIpAddr[n].join('').length == 0, [httpLbVipIpAddr[n].join('').length == 0], "Nodes section: the composed VNF on interface "+n," is missing the HTTP LB primary role");
+			}else{
 			Nodes.check += checkDependency(httpLbPrimaryIpAddr[n][i] != undefined && httpLbPrimaryIpAddr[n][i] != "", [httpLbVipIpAddr[n][i] != undefined && httpLbVipIpAddr[n][i] != ""], "Nodes section: " + VNFdisplayName + " on interface "+n," is missing HTTP LB Vip role");
 			Nodes.check += checkDependency(httpLbPrimaryIpAddr[n][i] == undefined || httpLbPrimaryIpAddr[n][i] == "", [(httpLbVipIpAddr[n][i] == undefined || httpLbVipIpAddr[n][i] == "")], "Nodes section: " + VNFdisplayName + " on interface "+n," is missing the HTTP LB primary role");
+			}
 		});
 	});
+	
+	// Record an emulated http LB with the Simplex SEE on all VNFs unless the composed VNF has defined one, used for all SEE simplex
+	if(httpLb[0] == undefined){
+		httpLb[0] = new Array();
+		['MGMT', 'LBNAT'].forEach(function(n,i,t){
+				httpLbVipNames[n] = seeSimplexNames[n].slice(); 
+				httpLbVipIpAddr[n] = seeSimplexIpAddr[n].slice();
+			});
+	}
+				
+	
 	httpLbNetworks.forEach(function(e,i,t){
 	fillArrays(httpLbPrimaryNames[e]);
 	fillArrays(httpLbPrimaryIpAddr[e]);
@@ -2571,7 +2584,7 @@ var Misc = new vnfResource("Misc", [
 		'DEFAULT_GATEWAY_IP_ADDR', 'SIP_DEFAULT_GATEWAY_IP_ADDR', 
 		'NIVR_OTHER_HOSTS', 'REDIS_SENTINEL_PORT_OFFSET', 'REDIS_DOWNAFTER', 'REDIS_PARALLEL_SYNCS', 'REDIS_FAILOVER_TIMEOUT',
 		'ORACLE_SERVICE', 'ORACLE_CONSOLE_PORT', 'ORACLE_PATH',
-		'YUM_REPO_LIST', 'HA_PING_IP_ADDR', 'MULTICAST_MTU', 'SEE_SWAGGER',
+		'YUM_REPO_LIST', 'HA_PING_IP_ADDR', 'MULTICAST_MTU', 'SEE_SWAGGER', 'SEE_IMPLICIT_CLUSTER',
 		'DOCKER_IMAGE', 'OVF_IMAGE', 'OVF_DISK_SIZE', 'NFVD_ADDR', 'NFVD_TENANT_NAME', 'NFVD_APPLICATION', 'NFVD_DATACENTER',
 		'NFVD_USERNAME', 'NFVD_PASSWORD', 'NFVD_STACK_NAME', 'NFVD_REST_ADDR', 'NFVD_SCALING_TEMPLATE',
 		'NIVR_SCALING_ROLE','VNF_RETRY_POLICY_MAX_TIMEOUT'
@@ -2594,6 +2607,7 @@ MiscDefault.VNF_CONFIG_DATA_FILE="/etc/opt/OC/hpoc-nivr-nfv/uspm-nfv-app.propert
 MiscDefault.APP_CONFIG_DATA_FILE="/etc/opt/OC/hpoc-nivr-nfv/appConfig.json";
 MiscDefault.MULTICAST_MTU="1200";
 MiscDefault.SEE_SWAGGER="false";
+MiscDefault.SEE_IMPLICIT_CLUSTER="false";
 MiscDefault.YUM_REPO_LIST="yum_repos";
 MiscDefault.NFVD_REST_ADDR="${NFVD_ADDR}:5000/v2.0";
 MiscDefault.DOCKER_IMAGE="ndsna.azurecr.io/tas:v11";
@@ -2605,68 +2619,70 @@ MiscDefault.REDIS_FAILOVER_TIMEOUT="60000";
 MiscDefault.REDIS_DOWNAFTER="5000";
 // Comments for direct simple misc properties with no default value
 var MiscComment = new Array();
-MiscComment.SNMP_TRAP_DESTINATION="node collecting SNMP traps emitted by all the VNF members, typically the VNF EMS";
-MiscComment.SNMP_TRAP_COMMUNITY="The SNMP Community name used for SNMP authentication";
-MiscComment.DEFAULT_GATEWAY_IP_ADDR="Default gateway IP address; set a question mark for OpenStack deployments";
-MiscComment.SEE_INSTANCES_MAX="Maximum number of instances deployed on an SEE";
-MiscComment.SIP_DEFAULT_GATEWAY_IP_ADDR="Default gateway IP address used on nodes connected to a public SIP/RTP network; set a question mark for OpenStack deployments";
-MiscComment.ORACLE_SERVICE="Oracle instance name(TNS_NAME)";
-MiscComment.ORACLE_PATH="Absolute path to the Oracle instance on the Oracle server; default: "+MiscDefault.ORACLE_PATH;
-MiscComment.ORACLE_CONSOLE_PORT="Port assigned to the Oracle console";
-MiscComment.YUM_REPO_LIST="list of YUM repositories used as an alternative to ISO images for products installation";
-MiscComment.DOCKER_IMAGE="Full name of the Docker container image used for kubernetes deployments";
-MiscComment.OVF_IMAGE="Path to the file containing the OVF image used for OVF appliance deployments";
-MiscComment.OVF_DISK_SIZE="Size of the disks used for OVF appliance deployments (Gb)";
-MiscComment.NFVD_ADDR="SNMP Traps destination outside the VNF";
-MiscComment.NFVD_TENANT_NAME="SNMP Traps attribute tenantId";
-MiscComment.NFVD_APPLICATION="SNMP Traps attribute applicationId";
-MiscComment.NFVD_DATACENTER="SNMP Traps attribute datacenterId";
-MiscComment.NFVD_USERNAME="Scaling: account used to send REST requests to the orchestrator NFVD_ADDR";
-MiscComment.NFVD_PASSWORD="Scaling: password used to send REST requests to the orchestrator NFVD_ADDR";
-MiscComment.NFVD_STACK_NAME="Scaling: the existing stack to join by the new node";
-MiscComment.NFVD_REST_ADDR="Scaling: the address listening to scaling REST requests";
-MiscComment.NFVD_SCALING_TEMPLATE="Scaling: the stack template used to instantiate a scaling node";
-MiscComment.VNF_CONFIG_DATA_FILE="USPM auxiliary descriptor: absolute path to the file on the target";
-MiscComment.APP_CONFIG_DATA_FILE="Applications Json auxiliary descriptor used by SEE lite services to carry additional configuration: absolute path to the file on the target";
-MiscComment.NIVR_OTHER_HOSTS="list of space separated pairs of IP address/fqdn to be added in /etc/hosts; Example: 192.168.11.56/repoOS.domain 93.184.220.20/lemonde.fr"
-MiscComment.REDIS_SENTINEL_PORT_OFFSET="The Sentinel associated port number offset compared to its related redis port number (default 20000)";
-MiscComment.REDIS_DOWNAFTER="Number of milliseconds the master (or any attached slave or sentinel) should be unreachable in order to consider it in S_DOWN state (default 5000).";
-MiscComment.REDIS_PARALLEL_SYNCS="How many slaves we can reconfigure to point to the new slave simultaneously during the failover (default 1)";
-MiscComment.REDIS_FAILOVER_TIMEOUT="Specifies the failover timeout in milliseconds. It is used in many ways, for instance: the maximum time a failover in progress waits for all the slaves to be reconfigured as slaves of the new master (default 60000).";
-MiscComment.MULTICAST_MTU="the maximum transmission unit (MTU) of UDP packets used for SEE cluster management. The value has to prevent fragmentation while accomodating the SEE requirements: minimum is 968 for SEE IMMS clustering. A value greater than 1500 requires end to end support of jumbo frames. Most infrastructures support up to 1500 bytes, but OpenStack introduces an overhead: 1200 is recommended on OpenStack.";
-MiscComment.SEE_SWAGGER="Boolean enabling Swagger on the SEE EMS server: Swagger is a Framework backed by a large ecosystem of tools that helps developers design, build, document, and consume RESTful Web services. Default is false; true to enable.";
-MiscComment.VNF_RETRY_POLICY_MAX_TIMEOUT="Max timeout applied to all actions in the VNF; default 900s";
+MiscComment.SNMP_TRAP_DESTINATION="SNMP_TRAP_DESTINATION: node collecting SNMP traps emitted by all the VNF members, typically the VNF EMS";
+MiscComment.SNMP_TRAP_COMMUNITY="SNMP_TRAP_COMMUNITY: The SNMP Community name used for SNMP authentication";
+MiscComment.DEFAULT_GATEWAY_IP_ADDR="DEFAULT_GATEWAY_IP_ADDR: Default gateway IP address; set a question mark for OpenStack deployments";
+MiscComment.SEE_INSTANCES_MAX="SEE_INSTANCES_MAX: Maximum number of instances deployed on an SEE";
+MiscComment.SIP_DEFAULT_GATEWAY_IP_ADDR="SIP_DEFAULT_GATEWAY_IP_ADDR: Default gateway IP address used on nodes connected to a public SIP/RTP network; set a question mark for OpenStack deployments";
+MiscComment.ORACLE_SERVICE="ORACLE_SERVICE: Oracle instance name(TNS_NAME)";
+MiscComment.ORACLE_PATH="ORACLE_PATH: Absolute path to the Oracle instance on the Oracle server; default: "+MiscDefault.ORACLE_PATH;
+MiscComment.ORACLE_CONSOLE_PORT="ORACLE_CONSOLE_PORT: Port assigned to the Oracle console";
+MiscComment.YUM_REPO_LIST="YUM_REPO_LIST: list of YUM repositories used as an alternative to ISO images for products installation";
+MiscComment.DOCKER_IMAGE="DOCKER_IMAGE: Full name of the Docker container image used for kubernetes deployments";
+MiscComment.OVF_IMAGE="OVF_IMAGE: Path to the file containing the OVF image used for OVF appliance deployments";
+MiscComment.OVF_DISK_SIZE="OVF_DISK_SIZE: Size of the disks used for OVF appliance deployments (Gb)";
+MiscComment.NFVD_ADDR="NFVD_ADDR: SNMP Traps destination outside the VNF";
+MiscComment.NFVD_TENANT_NAME="NFVD_TENANT_NAME: SNMP Traps attribute tenantId";
+MiscComment.NFVD_APPLICATION="NFVD_APPLICATION: SNMP Traps attribute applicationId";
+MiscComment.NFVD_DATACENTER="NFVD_DATACENTER: SNMP Traps attribute datacenterId";
+MiscComment.NFVD_USERNAME="NFVD_USERNAME: Scaling: account used to send REST requests to the orchestrator NFVD_ADDR";
+MiscComment.NFVD_PASSWORD="NFVD_PASSWORD: Scaling: password used to send REST requests to the orchestrator NFVD_ADDR";
+MiscComment.NFVD_STACK_NAME="NFVD_STACK_NAME: Scaling: the existing stack to join by the new node";
+MiscComment.NFVD_REST_ADDR="NFVD_REST_ADDR: Scaling: the address listening to scaling REST requests";
+MiscComment.NFVD_SCALING_TEMPLATE="NFVD_SCALING_TEMPLATE: Scaling: the stack template used to instantiate a scaling node";
+MiscComment.VNF_CONFIG_DATA_FILE="VNF_CONFIG_DATA_FILE: USPM auxiliary descriptor: absolute path to the file on the target";
+MiscComment.APP_CONFIG_DATA_FILE="APP_CONFIG_DATA_FILE: Applications Json auxiliary descriptor used by SEE lite services to carry additional configuration: absolute path to the file on the target";
+MiscComment.NIVR_OTHER_HOSTS="NIVR_OTHER_HOSTS: list of space separated pairs of IP address/fqdn to be added in /etc/hosts; Example: 192.168.11.56/repoOS.domain 93.184.220.20/lemonde.fr"
+MiscComment.REDIS_SENTINEL_PORT_OFFSET="REDIS_SENTINEL_PORT_OFFSET: The Sentinel associated port number offset compared to its related redis port number (default 20000)";
+MiscComment.REDIS_DOWNAFTER="REDIS_DOWNAFTER: Number of milliseconds the master (or any attached slave or sentinel) should be unreachable in order to consider it in S_DOWN state (default 5000).";
+MiscComment.REDIS_PARALLEL_SYNCS="REDIS_PARALLEL_SYNCS: How many slaves we can reconfigure to point to the new slave simultaneously during the failover (default 1)";
+MiscComment.REDIS_FAILOVER_TIMEOUT="REDIS_FAILOVER_TIMEOUT: Specifies the failover timeout in milliseconds. It is used in many ways, for instance: the maximum time a failover in progress waits for all the slaves to be reconfigured as slaves of the new master (default 60000).";
+MiscComment.MULTICAST_MTU="MULTICAST_MTU: the maximum transmission unit (MTU) of UDP packets used for SEE cluster management. The value has to prevent fragmentation while accomodating the SEE requirements: minimum is 968 for SEE IMMS clustering. A value greater than 1500 requires end to end support of jumbo frames. Most infrastructures support up to 1500 bytes, but OpenStack introduces an overhead: 1200 is recommended on OpenStack.";
+MiscComment.SEE_SWAGGER="SEE_SWAGGER: true|false, default: false. Boolean enabling Swagger on the SEE EMS server: Swagger is a Framework backed by a large ecosystem of tools that helps developers design, build, document, and consume RESTful Web services. Default is false; true to enable.";
+MiscComment.SEE_IMPLICIT_CLUSTER="SEE_IMPLICIT_CLUSTER: true|false, default: false. Boolean leveraging the implicit build of the SEE cluster (no cluster_node create/remove); useful on SEE4 to hide CR44565 bug (wrong emscli status) but breaks the CR41704 fix (clean scaling)"; 
+MiscComment.VNF_RETRY_POLICY_MAX_TIMEOUT="VNF_RETRY_POLICY_MAX_TIMEOUT: Max timeout applied to all actions in the VNF; default 900s";
 
 Misc.help = function(){
 	return "Miscellaneous settings" +
 	"\nTo import a previously saved session, use 'Import an existing session...' here below" +
 	"\n\nSNMP:"+
-	"\n\tSNMP_TRAP_DESTINATION: " +MiscComment.SNMP_TRAP_DESTINATION+
-	"\n\tSNMP_TRAP_COMMUNITY: " +MiscComment.SNMP_TRAP_COMMUNITY+
-	"\nSEE_INSTANCES_MAX: " +MiscComment.SEE_INSTANCES_MAX+
-	"\n\nNIVR_OTHER_HOSTS: " +MiscComment.NIVR_OTHER_HOSTS+
-	"\n\nREDIS_SENTINEL_PORT_OFFSET: " +MiscComment.REDIS_SENTINEL_PORT_OFFSET+
-	"\nREDIS_DOWNAFTER: " +MiscComment.REDIS_DOWNAFTER+
-	"\nREDIS_PARALLEL_SYNCS: " +MiscComment.REDIS_PARALLEL_SYNCS+
-	"\nREDIS_FAILOVER_TIMEOUT: " +MiscComment.REDIS_FAILOVER_TIMEOUT+
-	"\n\nVNF_CONFIG_DATA_FILE: " +MiscComment.VNF_CONFIG_DATA_FILE+
+	"\n\t" +MiscComment.SNMP_TRAP_DESTINATION+
+	"\n\t" +MiscComment.SNMP_TRAP_COMMUNITY+
+	"\n" +MiscComment.SEE_INSTANCES_MAX+
+	"\n\n" +MiscComment.NIVR_OTHER_HOSTS+
+	"\n\n" +MiscComment.REDIS_SENTINEL_PORT_OFFSET+
+	"\n" +MiscComment.REDIS_DOWNAFTER+
+	"\n" +MiscComment.REDIS_PARALLEL_SYNCS+
+	"\n" +MiscComment.REDIS_FAILOVER_TIMEOUT+
+	"\n\n" +MiscComment.VNF_CONFIG_DATA_FILE+
 	"\n\tTo load this file content, use 'Import USPM auxiliary descriptor...' here below"+
 	"\n\tIn this descriptor, IP addresses are available as place holders on all nodes and interfaces conforming to the naming scheme ~<name>_<network>~"+
 	"\n\tWhere name is the short node name and network identifies the network interface as one of mgmt app sip nat ha data m3ua1 m3ua2 pub"+
 	"\n\tExamples: ~see1_mgmt~ ~uspm1_data~ ~simulap_m3ua1~"+
-	"\n\nAPP_CONFIG_DATA_FILE: " +MiscComment.APP_CONFIG_DATA_FILE+
+	"\n\n" +MiscComment.APP_CONFIG_DATA_FILE+
 	"\n\tTo load this file content, use 'Import SEE lite applications auxiliary descriptor...' here below"+
 	"\n\nDefault gateways:" +
 	"\n\tNOTE: declaration is mandatory on OpenStack deployments using multiple network interfaces to enable remote access; use a question mark ? to let the infrastructure set the appropriate address." +
 	"\n\tDEFAULT_GATEWAY_IP_ADDR: Default gateway IP address: useful for topologies using multiple interfaces to set the gateway on the interface offering a public access" +
 	"\n\tSIP_DEFAULT_GATEWAY_IP_ADDR: Default gateway IP address used on nodes connected to a public SIP/RTP network: useful to enable SIP calls from an external public network" +
 	"\n\nSEE:"+
-	"\n\tMULTICAST_MTU: " +MiscComment.MULTICAST_MTU+
-	"\n\tSEE_SWAGGER: " +MiscComment.SEE_SWAGGER+
+	"\n\t" +MiscComment.MULTICAST_MTU+
+	"\n\t" +MiscComment.SEE_SWAGGER+
+	"\n\t" +MiscComment.SEE_IMPLICIT_CLUSTER+
 	"\n\nDatabase for MSE applications" +
-	"\nORACLE_SERVICE: " +MiscComment.ORACLE_SERVICE+
-	"\nORACLE_PATH: " +MiscComment.ORACLE_PATH+
-	"\nORACLE_CONSOLE_PORT: " +MiscComment.ORACLE_CONSOLE_PORT+
+	"\n" +MiscComment.ORACLE_SERVICE+
+	"\n" +MiscComment.ORACLE_PATH+
+	"\n" +MiscComment.ORACLE_CONSOLE_PORT+
 	"\n\nHA_PING_IP_ADDR: Reference IP address for LB HA" +
 	"\nNFVD_ADDR, NFVD_TENANT_NAME, NFVD_APPLICATION, NFVD_DATACENTER:"+
 	"\n\tif SNMP_TRAP_DESTINATION is the EMS, SNMP traps are bounced to NFV_ADDR address,"+
@@ -2680,12 +2696,12 @@ Misc.help = function(){
 	"\n\t- NODE_SEE: additional node in the SEE cluster"+
 	"\n\t- NODE_OCMP: additional node in the OCMP cluster"+
 	"\n\tOtherwise, a node not getting an explicit role will idle"+
-	"\n\nYUM_REPO_LIST: "+MiscComment.YUM_REPO_LIST+
-	"\nVNF_RETRY_POLICY_MAX_TIMEOUT: "+MiscComment.VNF_RETRY_POLICY_MAX_TIMEOUT+
+	"\n\n"+MiscComment.YUM_REPO_LIST+
+	"\n"+MiscComment.VNF_RETRY_POLICY_MAX_TIMEOUT+
 	"\n"+
-	"\nDOCKER_IMAGE: "+MiscComment.DOCKER_IMAGE+
-	"\nOVF_IMAGE: "+MiscComment.OVF_IMAGE+
-	"\nOVF_DISK_SIZE: "+MiscComment.OVF_DISK_SIZE;
+	"\n"+MiscComment.DOCKER_IMAGE+
+	"\n"+MiscComment.OVF_IMAGE+
+	"\n"+MiscComment.OVF_DISK_SIZE;
 	
 }
 
@@ -2845,7 +2861,7 @@ Flavors['vmware']['flavorPerformance'] = {name: '', cpu: "4", memory: "12288", c
 // OpenStack profiles default values
 Flavors['openstack'] = new Array();
 Flavors['openstack']['flavorStandard'] = {name: 'v2.m8', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
-Flavors['openstack']['flavorSmall'] = {name: 'v2.m4', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
+Flavors['openstack']['flavorSmall'] = {name: 'v2.m2', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
 Flavors['openstack']['flavorPerformance'] = {name: 'v4.m8', cpu: "", memory: "", cpuMax: "", memoryMax: ""};
 // Google profiles default values
 Flavors['google'] = new Array();
@@ -7158,7 +7174,7 @@ function buildVNFDescriptor(target, engine){
 	
 	var desc = "# -------------------------------------------------------------";
 	desc += "\n# "+quickDescription.value;
-	desc += "\n# MSE Descriptor generated by the builder "+document.getElementById("vnfDescriptorWizardVersion").innerHTML;
+	desc += "\n# CMS Network Applications Descriptor generated by the builder "+document.getElementById("vnfDescriptorWizardVersion").innerHTML;
 	desc += "\n# Build date: "+Date();
 	desc += "\n# PRE REQUISISTES ON THE NODE RUNNING THE MSE AUTOMATED DEPLOYER";
 	desc += "\n# 1. The management network is up and running";
