@@ -71,14 +71,6 @@
     dest: "/etc/yum.repos.d"
   when: yumReposDef is defined
 
-- name: Install createrepo for labdrops management
-  yum:
-    name: createrepo
-  register: result
-  until: result is success
-  retries: 3
-  delay: 10
-
 - name: Create patches directories 
   with_dict: "{{patched_files}}"
   loop_control:
@@ -109,8 +101,15 @@
     url: "{{patchUrl}}{{_patch.key}}"
     dest: "{{_patch.value}}"
     force: yes
-
   when: cachePatch is not defined
+
+- name: Install createrepo for labdrops management
+  yum:
+    name: createrepo
+  register: result
+  until: result is success
+  retries: 3
+  delay: 4
 
 - name: Get the engine ISO image {{engineIso}} from cache {{cacheIso}}
   copy:
@@ -125,6 +124,10 @@
     dest: "{{isoRepo}}"
   notify: refresh MSE instance
   when: cacheIso is not defined and engineIso is defined and engineIso!=""
+  register: result
+  until: result is success
+  retries: 30
+  delay: 4
 
 - name: Get the product ISO images from cache {{cacheIso}}
   with_items: "{{mseProduct}}"
@@ -146,6 +149,10 @@
     url: "{{isoUrl}}{{_isoImage}}"
     dest: "{{isoRepo}}"
   when: cacheIso is not defined
+  register: result
+  until: result is success
+  retries: 30
+  delay: 4
 
 - name: Remove unused ISO images if they are defined with a relative path to MSE_ISO_URL {{isoUrl}}
   shell: ls {{isoRepo}}*.iso | grep -v -e {{ engineIso }} -e {{' -e '.join((mseProduct )) }} | xargs rm -f
@@ -172,6 +179,10 @@
     dest: "{{isoRepo}}"
   notify: refresh MSE instance
   when: cacheIso is not defined
+  register: result
+  until: result is success
+  retries: 30
+  delay: 4
 
 - name: Set the engine ISO image as a new variable _engineIso.stdout
   shell: |
@@ -336,6 +347,10 @@
     dest: "/root/.ssh/"
     mode: 0600
   when: cacheSshKeys is not defined
+  register: result
+  until: result is success
+  retries: 30
+  delay: 4
 - name: root id_rsa from cache {{cacheSshKeys}}
   copy:
     src: "{{cacheSshKeys}}id_rsa"
@@ -348,6 +363,10 @@
     dest: "/root/.ssh/"
     mode: 0600
   when: cacheSshKeys is not defined
+  register: result
+  until: result is success
+  retries: 30
+  delay: 4
 - name: root authorized_keys
   copy:
     remote_src: yes
@@ -368,6 +387,10 @@
     owner: 'ocadmin'
     mode: 0600
   when: cacheSshKeys is not defined
+  register: result
+  until: result is success
+  retries: 30
+  delay: 4
 - name: ocadmin id_rsa from cache {{cacheSshKeys}}
   copy:
     src: "{{cacheSshKeys}}id_rsa"
@@ -382,6 +405,10 @@
     owner: 'ocadmin'
     mode: 0600
   when: cacheSshKeys is not defined
+  register: result
+  until: result is success
+  retries: 30
+  delay: 4
 - name: ocadmin authorized_keys
   copy:
     remote_src: yes
@@ -409,6 +436,10 @@
     dest: "/etc/ssh/"
     mode: 0640
   when: cacheSshKeys is not defined
+  register: result
+  until: result is success
+  retries: 30
+  delay: 4
 - name: ssh_host private keys rsa from cache {{cacheSshKeys}}
   with_items: ['rsa']
   loop_control:
@@ -429,6 +460,10 @@
     dest: "/etc/ssh/"
     mode: 0600
   when: cacheSshKeys is not defined
+  register: result
+  until: result is success
+  retries: 30
+  delay: 4
 - name: ssh_host public keys ecdsa ed25519 rsa from cache {{cacheSshKeys}}
   with_items: ['ecdsa','ed25519','rsa']
   loop_control:
@@ -449,6 +484,10 @@
     dest: "/etc/ssh/"
     mode: 0644
   when: cacheSshKeys is not defined
+  register: result
+  until: result is success
+  retries: 30
+  delay: 4
 - name: Restart service sshd
   service:
     name: sshd
