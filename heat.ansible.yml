@@ -3,10 +3,10 @@
   gather_facts: false
 
   tasks:
-  - name: bring the Heat stack {{the_stack | default('mse_stack') }} to the state {{the_state | default('present') }} with 5 retries max
+  - name: bring the Heat stack {{the_stack | default('tas') }} to the state {{the_state | default('present') }} with 5 retries max
     os_stack:
       state: "{{the_state | default('present') }}"
-      name: "{{the_stack | default('mse_stack') }}"
+      name: "{{the_stack | default('tas') }}"
       template: "{{the_template | default('nivr-cluster-nfv.yaml') }}"
       parameters:
         NetworkRoot: "{{the_network | default('192.168.111') }}"
