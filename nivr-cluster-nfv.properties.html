@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>CMS Network Applications Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-10-10 Version 3.45</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-11-12 Version 3.46</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -111,6 +111,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-11-12 3.46	SEE lite service: support for a dedicated SIP provider; kubernetes: expose http and SEE lite SIP provider ports; OCCP SNTS demo removed, obsolete."+
 	"\n2019-10-16 3.45	OpenStack: default small flavor v2.m2 is enough; http load balancer consistency checking improved for SEE multi-simplex topology"+
 	"\n2019-10-10 3.44	Ansible deployments: additional ocmp group for post-processing (firewall stop and ocmp start)"+
 	"\n\t\tHide webRTC check boxes if WebRTC section is empty"+
@@ -459,6 +460,16 @@ var cloudNode = function(aName, aFQDN){
 var VNFCnames = new Array();
 VNFCnames.push("");
 
+// Class implementing a port opened as a value, a protocol and a description
+var vnfPort = function(aPort, aProtocol, aDescription){
+	this.port = aPort;
+	this.protocol = 'UDP';
+	if(aProtocol != "")this.protocol = aProtocol;
+	this.description = aDescription;
+}
+// List of exposed ports in the whole VNF
+var vnfPorts = new Array();
+
 // List of http load balancers, one per VNFC, used to store the list of balanced SEE applications and manage uniqueness of instance Ids
 var httpLb = new Array();
 function httpLbCheckAndGetSeeInstanceIds(anApplication, aVNFCindex, aListOfIDs){
@@ -480,6 +491,8 @@ function httpLbCheckAndGetSeeInstanceIds(anApplication, aVNFCindex, aListOfIDs){
 			} else {
 				// mark the application as the owner
 				httpLb[aVNFCindex].application[eInstanceId] = anApplication; 
+				// Push the related ports as exposed
+				vnfPorts.push(new vnfPort(8080+100*(eInstanceId-1), 'TCP', anApplication));
 			}
 			// Same on the composed VNF, only for checking, not for reserving
 			if(aVNFCindex != 0 && httpLb[0] != undefined && httpLb[0].application != undefined && httpLb[0].application[eInstanceId] != undefined && httpLb[0].application[eInstanceId] != anApplication){
@@ -3249,9 +3262,12 @@ var SEEliteService = new vnfResource("SEEliteService", [
 	{name:'VNFC', type:'text', value:''},
 	{name:'Instance Id', type:'text'}, 
 	{name:'Name', type:'text', width:'90px'}, 
-	{name:'Base', type:'text', width:'400px'},
-	{name:'Type', type:'text', width:'90px'},
-	{name:'Json config', type:'text', width:'90px'}
+	{name:'Base', type:'text', width:'200px'},
+	{name:'Type', type:'text', width:'120px'},
+	{name:'Json config', type:'text', width:'90px'},
+	{name:'sipAddress', type:'text', width:'90px'},
+	{name:'sipTransport', type:'choice', choices:['', 'UDP', 'TCP', 'UDP+TCP', 'TLS', 'SCTP'], width:'90px'},
+	{name:'sipPort', type:'text', width:'90px'}
 	]
 	);
 	
@@ -3260,14 +3276,15 @@ SEEliteService.help = function(){
 	"\nName: name of the SEE lite service. Note that smscGui and smscApi are reserved name for SMSC side SEElite services" +
 	"\nInstance Id: the SEE instance Ids assigned to this SEE lite service, one per SEE node, as a list of comma separated integers, defaulting to the first in the list, hyphen to not intantiate, defaulting to 1"+
 	"\nService definition: a SEE Lite service is defined by a base and a type" +
-	"\n\Base: (file  path) the full path to the ear delivering the lite service" +
-	"\n\tType: application type to use for this service" +
+	"\nBase: (file  path) the full path to the ear delivering the lite service" +
+	"\nType: application type to use for this service" +
 	"\n\tIf only Base is defined, the service is started without application type on the specified ear file" +
 	"\n\tIf only Type is defined, the service is started using this type, which must be present on the platform as the file /etc/opt/OC/imsc/ctrl/imscapp-<type>.properties" +
 	"\n\tIf both Base and Type are defined, an new application type is created using the Messaging Framework application type builder msgpf-imsapp, and used to start this service." +
 	"\nJson config: name of the Json section in the APP_CONFIG_DATA_FILE applying to this application" +
-	"\n\tIf this section is defined in the APP_CONFIG_DATA_FILE at the first level, a subset file restricted to this section is made available to the application on the local file system as /etc/opt/OC/hpoc-nivr-nfv/<section>.json."+
-	"\n\tIf this application is a Messaging Framework application as defined in the APPLICATION property of Messaging Framework section, this file content is automatically provisioned to Messaging Framework"
+	"\n\tIf this section is defined in the APP_CONFIG_DATA_FILE at the first level, it is made available on the local file system as /etc/opt/OC/hpoc-nivr-nfv/<section>.json."+
+	"\n\tIf this application is defined in the APPLICATION property of Messaging Framework, this section is automatically provisioned to Messaging Framework"+
+	"\nsipAddress, sipTransport, sipPort: optional SIP provider to be created and assigned to this SEE Lite service"
 }
 	
 SEEliteService.build = function(target){
@@ -3285,6 +3302,9 @@ SEEliteService.build = function(target){
 	var types = new Array(nbVNFC);
 	var configs = new Array(nbVNFC);
 	var instanceIds = new Array(nbVNFC);
+	var sipAddresses = new Array(nbVNFC);
+	var sipTransports = new Array(nbVNFC);
+	var sipPorts = new Array(nbVNFC);
 	
 	result += '\n# -------------------- #';
 	result += '\n# SEE lite services    #';
@@ -3293,10 +3313,13 @@ SEEliteService.build = function(target){
 		var row = table.rows[i];
 		var VNFCName = SEEliteService.getAndSetValue(row, nameIndexes, 'VNFC');
 		var name=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'Name', 'Service-'+i);
-		var base=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'Base', '/tmp/SEEliteService-'+i+'.ear');
 		var type=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'Type');
+		var base=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'Base', type=='ScifSNTSTutorial' ? '' : '/tmp/SEEliteService-'+i+'.ear');
 		var config=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'Json config');
 		var instanceId=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'Instance Id');
+		var sipAddress=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'sipAddress', type=='ScifSNTSTutorial' ? '0.0.0.0' : '');
+		var sipTransport=SEEliteService.getAndSetSelection(table.rows[i], nameIndexes, 'sipTransport');
+		var sipPort=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'sipPort', type=='ScifSNTSTutorial' ? '5060' : '');
 		
 		var VNFCindex = VNFCnames.indexOf(VNFCName);
 		var VNFdisplayName = VNFCName != "" ? "the VNFC " + VNFCName : "the composed VNF";
@@ -3331,6 +3354,19 @@ SEEliteService.build = function(target){
 			if(instanceIds[VNFCindex] == undefined)instanceIds[VNFCindex] = new Array();
 			instanceIds[VNFCindex][nameIndex]=instanceId;
 		}
+		if(sipAddress != ""){
+			if(sipAddresses[VNFCindex] == undefined)sipAddresses[VNFCindex] = new Array();
+			sipAddresses[VNFCindex][nameIndex]=sipAddress;
+		}
+		if(sipTransport != ""){
+			if(sipTransports[VNFCindex] == undefined)sipTransports[VNFCindex] = new Array();
+			sipTransports[VNFCindex][nameIndex]=sipTransport;
+		}
+		if(sipPort != ""){
+			if(sipPorts[VNFCindex] == undefined)sipPorts[VNFCindex] = new Array();
+			sipPorts[VNFCindex][nameIndex]=sipPort;
+			vnfPorts.push(new vnfPort(sipPort, '', name));	// Use the default protocol, UDP: specific like UDP+TCP would be rejected...
+		}
 	}
 	
 	VNFCnames.forEach(function(e,i){
@@ -3339,12 +3375,18 @@ SEEliteService.build = function(target){
 		fillArrays(configs[i]);
 		fillArrays(bases[i]);
 		fillArrays(instanceIds[i]);
+		fillArrays(sipAddresses[i]);
+		fillArrays(sipTransports[i]);
+		fillArrays(sipPorts[i]);
 		result += ifVNFCopen(e,i);
 		result += "\nSEE_LITE_SERVICE_COMPONENT_NAME=( "+names[i].join(" ")+" )";
 		if(bases.length > 0)result += "\nSEE_LITE_SERVICE_APPLICATION_BASE=( "+bases[i].join(" ")+" )";
 		if(types.length > 0)result += "\nSEE_LITE_SERVICE_APPLICATION_TYPE=( "+types[i].join(" ")+" )";
 		if(configs.length > 0)result += "\nSEE_LITE_DATA_SECTION=( "+configs[i].join(" ")+" )";
 		if(instanceIds[i] != undefined)result += "\nSEE_LITE_SERVICE_INSTANCE_ID=( "+instanceIds[i].join(" ")+" )";
+		if(sipAddresses.length > 0)result += "\nSEE_LITE_SIP_ADDRESS=( "+sipAddresses[i].join(" ")+" )";
+		if(sipTransports.length > 0)result += "\nSEE_LITE_SIP_TRANSPORT=( "+sipTransports[i].join(" ")+" )";
+		if(sipPorts.length > 0)result += "\nSEE_LITE_SIP_PORT=( "+sipPorts[i].join(" ")+" )";
 		result += ifVNFCclose(e,i);
 	});
 
@@ -4559,7 +4601,7 @@ Diameter.help = function(){
 	"\nName: service component name; MrfAdDRFOCC is required and reserved for Diameter RF provider type" +
 	"\nType: provider type: RO SH RF; up to 2 different RO/SH providers can be instantiated on the same service to offer one RO_SH service"+
 	"\n\tTASAPPs types (experimental): NAF TpReg BSF XDM MMTel require the TASAPPs ISO image in /var/opt/OC/iso"+
-	"\nInstanceId: SEE instances on which this resource has to be deployed, as a list of comma separated IDs, one per SEE node, default to 1" +
+	"\nInstance Id: the SEE instance Ids on which this resource has to be deployed, one per SEE node, as a list of comma separated integers, defaulting to the first in the list, hyphen to not intantiate, defaulting to 1"+
 	"\nServers: Diameter providers" +
 	"\n\tAddresses: list of comma separated listening IP addresses or hostnames, one per SEE node; default to the SEE node FQDN, dash '-' to *NOT* instantiate on this node" +
 	"\n\tPorts: list of comma separated Diameter listening ports, one per SEE node; default to 3870" +
@@ -6963,8 +7005,7 @@ var NativeApps = new vnfResource("NativeApps", [
 	{name:'NIVR_DB_TYPE', type:'text', width:'90px'},
 	{name:'EBRS TENANTMP', type:'text', width:'90px'},
 	{name:'NIVR', type:'text', width:'90px'},
-	{name:'CaaS IVR', type:'text', width:'90px'}, 
-	{name:'OCCP', type:'text', width:'90px'}
+	{name:'CaaS IVR', type:'text', width:'90px'}
 	
 	]
 	);
@@ -6975,8 +7016,7 @@ NativeApps.help = function(){
 	"- EBRS TENANTMP: (optional) multi-tenant access control database type for the reports interface of the EBRS \n"+
 	"\tThe EBRS will use for tenant access control a database of such type picked in the Nodes section instead of the NIVR_DB_TYPE instantiated in this VNFC \n"+  
 	"- NIVR:  MCM, TPDM and Reporting System (disabled on pgsql database): yes | no, default: no \n" +
-	"- CaaS IVR (also known as SMB apps): yes | no, default: no \n" +
-	"- OCCP:  basic translation number (SNTS): yes | no, default: no \n";
+	"- CaaS IVR (also known as SMB apps): yes | no, default: no\n";
 };
 
 NativeApps.build = function (){
@@ -6995,7 +7035,6 @@ NativeApps.build = function (){
 	var ebrsDBs = new Array(nbVNFC);
 	var activateNivrs= new Array(nbVNFC);
 	var activateCassivrs = new Array(nbVNFC);
-	var activateOCCPs= new Array(nbVNFC);
 	
 	result += "\n# ------------------------------- #";
 	result += "\n# Activable Native Applications   #";
@@ -7020,7 +7059,6 @@ NativeApps.build = function (){
 		var ebrsDbType = NativeApps.getAndSetValue(row, nameIndexes, 'EBRS TENANTMP');
 		var activateNivr = NativeApps.getAndSetValue(row, nameIndexes, 'NIVR', 'yes');
 		var activateCassivr = NativeApps.getAndSetValue(row, nameIndexes, 'CaaS IVR', 'no');
-		var activateOCCP = NativeApps.getAndSetValue(row, nameIndexes, 'OCCP', 'no');
 		NativeApps.check += checkDependency(activateCassivr == 'yes', [activateNivr == 'yes'], "NativeApps section: ", "CaaS IVR activation requires NIVR one" );
 		
 		localVNFCnames[VNFCindex] = VNFCName;
@@ -7046,7 +7084,6 @@ NativeApps.build = function (){
 	
 		activateNivrs[VNFCindex] = activateNivr;
 		activateCassivrs[VNFCindex] = activateCassivr;
-		activateOCCPs[VNFCindex] = activateOCCP;
 
 		// Native applications are candidate to http load balancing with hard coded instance Id 1: check conflict on instance ids with other candidates
 		if(activateNivr == 'yes')NativeApps.check += httpLbCheckAndGetSeeInstanceIds("Native applications MCM/TPDM", VNFCindex, "1");
@@ -7057,7 +7094,6 @@ NativeApps.build = function (){
 		// Force the default policy explicitly
 		result +="\nACTIVATE_APPLI_NIVR=no";
 		result +="\nACTIVATE_APPLI_CAASIVR=no";
-		result +="\nACTIVATE_OCCP_SNTS=no";
 	} 
 	VNFCnames.forEach(function(e,i){
 		if(localVNFCnames[i] != undefined)
@@ -7069,7 +7105,6 @@ NativeApps.build = function (){
 			if(ebrsDBs[i] != undefined && ebrsDBs[i] != '')result += "\nEBRS_TENANTMP="+ebrsDBs[i];
 			result += "\nACTIVATE_APPLI_NIVR="+activateNivrs[i];
 			result += "\nACTIVATE_APPLI_CAASIVR="+activateCassivrs[i];
-			result += "\nACTIVATE_OCCP_SNTS="+activateOCCPs[i];
 			result += ifVNFCclose(e,i);
 		}
 	});
@@ -7171,6 +7206,8 @@ function buildVNFDescriptor(target, engine){
 	
 	consistency.init();
 	var warnings = "";
+	vnfPorts = new Array();
+	httpLb = new Array();
 	
 	var desc = "# -------------------------------------------------------------";
 	desc += "\n# "+quickDescription.value;
@@ -7303,7 +7340,6 @@ function buildVNFDescriptor(target, engine){
 	desc += "\n# SEE > 3: NIVR native applications supported only without WebRTC ; no Reporting System";
 	desc += "\nACTIVATE_APPLI_NIVR=$(if [[ $WEBRTC_SIGNALING_IP_ADDR == '' ]] ; then echo $ACTIVATE_APPLI_NIVR ; else echo no ; fi )";
 	desc += "\nACTIVATE_APPLI_CAASIVR=no";
-	desc += "\nACTIVATE_OCCP_SNTS=no";
 	desc += "\nRS_DB_TYPE='-'"
 	desc += "\nfi";
 	desc += "\n";
@@ -7973,7 +8009,16 @@ function buildKubernetesScript(){
 	kube+=n0+'  containers:';
 	kube+=n0+'  - name: ${_podsList[$_iPod]}';
 	kube+=n0+'    image: ${DOCKER_IMAGE}';
-	kube+=n0+'    resources:';
+	if(vnfPorts.length > 0){
+   	kube+=n0+'    ports:';
+   	vnfPorts.forEach(function(e){
+   	//  [spec.containers[0].ports[0].name: must be no more than 15 characters, must contain only alpha-numeric characters (a-z, 0-9), and hyphens (-)]
+   	kube+=n0+'      - name: '+e.description.replace(/[^A-Za-z0-9]/g,"").substring(0, 15).toLowerCase();
+	kube+=n0+'        containerPort: '+e.port;
+	kube+=n0+'        protocol: '+e.protocol;
+   	});
+	}
+    kube+=n0+'    resources:';
 	kube+=n0+'      requests:';
 	kube+=n0+'        memory: ${_memoryList[$_iPod]}';
 	kube+=n0+'        cpu: ${_cpuList[$_iPod]}';
