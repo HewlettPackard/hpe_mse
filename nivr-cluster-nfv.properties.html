@@ -7533,7 +7533,9 @@ function deploymentHelp(){userOutput(
 "\n\t- Kubernetes: builds a shell script to be invoked on the kubernetes console"+
 "\n\t\t- install and start docker and kubernetes on a Linux devops console: sudo yum install docker kubernetes ; sudo systemctl start docker"+
 "\n\t\t- configure kubernetes cli for the infrastructure"+
-"\n\t\t  eg for microsoft azure: az aks install-cli ; az aks get-credentials --resource-group <resource name> --name <cluster name> --subscription <subscription id>"+
+"\n\t\t  eg for microsoft azure: "+
+"\n\t\t   az aks install-cli ; az aks get-credentials --resource-group <resource group> --name <cluster name> --subscription <subscription id>"+
+"\n\t\t   az aks update -n <AKS cluster name> --resource-group <resource group> --attach-acr <container registry> --subscription <subscription id> "+
 "\n\t\t  eg for google cloud platform: gcloud container clusters get-credentials gke --zone europe-west3-b --project hpe-mse"+
 "\n\t\t- clone the hpe_mse project from github: 'git clone https://github.com/HewlettPackard/hpe_mse.git'"+
 "\n\t\t- drop all RPM packages and installers in ./hpe_mse/docker/bits"+
