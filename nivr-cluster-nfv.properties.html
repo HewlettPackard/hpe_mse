@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>CMS Network Applications Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-11-12 Version 3.46</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-11-21 Version 3.47</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -111,6 +111,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-11-21 3.47	Misc section: SEE_JAVA_MAX_HEAP sets the maximum size of the Java heap for all SEE processes. Kubernetes on Azure: help to connect the container registry to the kubernetes cluster"+
 	"\n2019-11-12 3.46	SEE lite service: support for a dedicated SIP provider; kubernetes: expose http and SEE lite SIP provider ports; OCCP SNTS demo removed, obsolete."+
 	"\n2019-10-16 3.45	OpenStack: default small flavor v2.m2 is enough; http load balancer consistency checking improved for SEE multi-simplex topology"+
 	"\n2019-10-10 3.44	Ansible deployments: additional ocmp group for post-processing (firewall stop and ocmp start)"+
@@ -2592,7 +2593,7 @@ var importedDescriptor = new userLoadedFile("importedDescriptor", "Import an exi
 
 var Misc = new vnfResource("Misc", [
 	{name:'Property', width:'400px', type:'choice', choices:[ 
-		'SNMP_TRAP_DESTINATION', 'SNMP_TRAP_COMMUNITY', 'SEE_INSTANCES_MAX', 
+		'SNMP_TRAP_DESTINATION', 'SNMP_TRAP_COMMUNITY', 'SEE_INSTANCES_MAX', 'SEE_JAVA_MAX_HEAP', 
 		'VNF_CONFIG_DATA_FILE', 'APP_CONFIG_DATA_FILE', 
 		'DEFAULT_GATEWAY_IP_ADDR', 'SIP_DEFAULT_GATEWAY_IP_ADDR', 
 		'NIVR_OTHER_HOSTS', 'REDIS_SENTINEL_PORT_OFFSET', 'REDIS_DOWNAFTER', 'REDIS_PARALLEL_SYNCS', 'REDIS_FAILOVER_TIMEOUT',
@@ -2636,6 +2637,7 @@ MiscComment.SNMP_TRAP_DESTINATION="SNMP_TRAP_DESTINATION: node collecting SNMP t
 MiscComment.SNMP_TRAP_COMMUNITY="SNMP_TRAP_COMMUNITY: The SNMP Community name used for SNMP authentication";
 MiscComment.DEFAULT_GATEWAY_IP_ADDR="DEFAULT_GATEWAY_IP_ADDR: Default gateway IP address; set a question mark for OpenStack deployments";
 MiscComment.SEE_INSTANCES_MAX="SEE_INSTANCES_MAX: Maximum number of instances deployed on an SEE";
+MiscComment.SEE_JAVA_MAX_HEAP="SEE_JAVA_MAX_HEAP: Maximum size of the Java heap for all SEE processes, expressed in Mbytes; default 3000; 2000 is recommended for kubernetes target.";
 MiscComment.SIP_DEFAULT_GATEWAY_IP_ADDR="SIP_DEFAULT_GATEWAY_IP_ADDR: Default gateway IP address used on nodes connected to a public SIP/RTP network; set a question mark for OpenStack deployments";
 MiscComment.ORACLE_SERVICE="ORACLE_SERVICE: Oracle instance name(TNS_NAME)";
 MiscComment.ORACLE_PATH="ORACLE_PATH: Absolute path to the Oracle instance on the Oracle server; default: "+MiscDefault.ORACLE_PATH;
@@ -2672,6 +2674,7 @@ Misc.help = function(){
 	"\n\t" +MiscComment.SNMP_TRAP_DESTINATION+
 	"\n\t" +MiscComment.SNMP_TRAP_COMMUNITY+
 	"\n" +MiscComment.SEE_INSTANCES_MAX+
+	"\n" +MiscComment.SEE_JAVA_MAX_HEAP+
 	"\n\n" +MiscComment.NIVR_OTHER_HOSTS+
 	"\n\n" +MiscComment.REDIS_SENTINEL_PORT_OFFSET+
 	"\n" +MiscComment.REDIS_DOWNAFTER+
@@ -2775,6 +2778,16 @@ Misc.build = function(target){
 				}
 				result += "\n# "+MiscComment[propertyName];
 				result += "\n"+propertyName+"="+seeInstancesMax;
+				break;
+			case 'SEE_JAVA_MAX_HEAP':
+				var candidate=Misc.getAndSetValue(row, nameIndexes, 'Value', "3000", MiscComment.SEE_JAVA_MAX_HEAP);
+				var seeMaxJavaHeap = Number(candidate);
+				if(isNaN(seeMaxJavaHeap)){
+					Misc.check += "\nMisc section: Illegal value for SEE_JAVA_MAX_HEAP: "+candidate+"; expecting integer";
+					break;
+				} 
+				result += "\n# "+MiscComment[propertyName];
+				result += "\n"+propertyName+"="+seeMaxJavaHeap;
 				break;
 			case 'DEFAULT_GATEWAY_IP_ADDR':
 				var defaultValue='';
