@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>CMS Network Applications Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-11-21 Version 3.47</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-12-05 Version 3.48</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -111,6 +111,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-12-05 3.48	SEElite section: offer to name the SIP provider, support service_component and sip_provider parameters through the APP_CONFIG_DATA_FILE json file."+
 	"\n2019-11-21 3.47	Misc section: SEE_JAVA_MAX_HEAP sets the maximum size of the Java heap for all SEE processes. Kubernetes on Azure: help to connect the container registry to the kubernetes cluster"+
 	"\n2019-11-12 3.46	SEE lite service: support for a dedicated SIP provider; kubernetes: expose http and SEE lite SIP provider ports; OCCP SNTS demo removed, obsolete."+
 	"\n2019-10-16 3.45	OpenStack: default small flavor v2.m2 is enough; http load balancer consistency checking improved for SEE multi-simplex topology"+
@@ -1094,7 +1095,7 @@ var Networks = new vnfResource("Networks", [
 	
 Networks.help = function(){
 	return "Network interfaces names and associated masks and resources" + 
-	"\nMGMT is mandatory: all nodes part of the MSE VNF should be connected to the MGMT interface"+
+	"\nMGMT is mandatory: all nodes part of the VNF should be connected to the MGMT interface"+
 	"\n\tThe hostname command should return the fully qualified domain name on this network, hostname -i the IPv4 address on this same network"+
 	"\nAPP: optional application network, typically used by OCMP nodes to collect Ccxml/Vxml scripts through an http load balancer"+
 	"\nSIP: optional SIP network used for SIP traffic by OCMP, SEE and OCSNF nodes"+
@@ -1344,7 +1345,7 @@ Nodes.help = function(){
 	"\n\tonce defined, a VNFC can be associated to resources restricted to this specific SEE cluster"+
 	"\nReFrsh GRP: up to 9 groups of nodes can be defined by an Id, in order to schedule an on line VFN refresh :"+
 	"\n\tall nodes belonging to a same group are refreshed concurrently, groups are refreshed by ascending Id order "+
-	"\nMSE EMS: Element Manager for the whole MSE VNF"+
+	"\nMSE EMS: Element Manager for the whole VNF"+
 	"\nOCMP EMS: Element Manager for the OCMP VNFC, defaults to MSE EMS"+
 	"\nOCSNF EMS: Element Manager for the OCSNF/LinuxHA VNFC, defaults to MSE EMS"+	
 	"\nUSPM EMS: Element Manager for the USPM VNFC, defaults to MSE EMS"+
@@ -3278,9 +3279,11 @@ var SEEliteService = new vnfResource("SEEliteService", [
 	{name:'Base', type:'text', width:'200px'},
 	{name:'Type', type:'text', width:'120px'},
 	{name:'Json config', type:'text', width:'90px'},
+	{name:'sipProvider', type:'text', width:'90px'},
 	{name:'sipAddress', type:'text', width:'90px'},
 	{name:'sipTransport', type:'choice', choices:['', 'UDP', 'TCP', 'UDP+TCP', 'TLS', 'SCTP'], width:'90px'},
-	{name:'sipPort', type:'text', width:'90px'}
+	{name:'sipPort', type:'text', width:'90px'},
+	{name:'sipConfig', type:'text', width:'90px'}
 	]
 	);
 	
@@ -3297,7 +3300,110 @@ SEEliteService.help = function(){
 	"\nJson config: name of the Json section in the APP_CONFIG_DATA_FILE applying to this application" +
 	"\n\tIf this section is defined in the APP_CONFIG_DATA_FILE at the first level, it is made available on the local file system as /etc/opt/OC/hpoc-nivr-nfv/<section>.json."+
 	"\n\tIf this application is defined in the APPLICATION property of Messaging Framework, this section is automatically provisioned to Messaging Framework"+
-	"\nsipAddress, sipTransport, sipPort: optional SIP provider to be created and assigned to this SEE Lite service"
+	"\n(optional) SIP provider to be created and assigned to this SEE Lite service" +
+	"\n\tsipProvider: the name of this sip provider" +
+	"\n\tsipAddress: the IP address listen to by this SIP provider; use the ~<name>_<network>~ naming scheme to resolve dynamically allocated addresses" +
+	"\n\tsipTransport: transport protocol" +
+	"\n\tsipPort: sip port listen to by this SIP provider" +
+	"\n\tsipConfig: name of the Json section in the APP_CONFIG_DATA_FILE applying to this SIP provider" +
+	"\n" +
+	"\nExample: tutorial: Simple Orchestration PPAVPN SIP scxml Application" +
+	"\n\tName: orch-ppavpn" +
+	"\n\tInstance Id: 1,- to instantiate this service on the SEE primary only" +
+	"\n\tBase: /opt/OC/share/hpoc-nivr-nfv/tutorial/lib/simple-orch-ppavpn-ear-1.0.ear" +
+	"\n\t\tThis ear is delivered by the hpoc-nivr-nfv package as part of the tutorial" +
+	"\n\tJson config: tutorial.component" +
+	"\n\t\tThis config refers to the section used to define the SEE service parameter bank from the APP_CONFIG_DATA_FILE defined in the Misc section" +
+	"\n\tsipProvider: SIPNL-SIP-PROVIDER" +
+	"\n\tsipAddress: ~see1_mgmt~ resolved to the SEE primary IP address" +
+	"\n\tsipTransport: UDP" +
+	"\n\tsipPort: 5060" +
+	"\n\tsipConfig: tutorial.sip" +
+	"\n\t\tThis config refers to the section used to define the SIP provider parameter bank from the APP_CONFIG_DATA_FILE defined in the Misc section" +
+	"\n\t" +
+	"\n\tThe Misc section has to define the APP_CONFIG_DATA_FILE with this Json configuration, available in /opt/OC/share/hpoc-nivr-nfv/tutorial/bin/tutorial.json" +
+	'\n{'+		
+	'\n  "tutorial": {'+		
+	'\n    "component": {'+		
+	'\n      "application": {'+		
+	'\n        "Sip": {'+		
+	'\n          "PROVIDER_NAME": "SIPNL-SIP-PROVIDER"'+		
+	'\n        },'+		
+	'\n        "NgIn": {'+		
+	'\n          "Net": {'+		
+	'\n            "Cs": {'+		
+	'\n              "INITIAL_SESSION_TIMEOUT_SECONDS": "20"'+		
+	'\n            },'+		
+	'\n            "Sip": {'+		
+	'\n              "INITIAL_SESSION_TIMEOUT_SECONDS": "3600",'+		
+	'\n              "SIP_PROVIDER_NAME": "SIPNL-SIP-PROVIDER"'+		
+	'\n            }'+		
+	'\n          },'+		
+	'\n          "Orch": {'+		
+	'\n            "Scxml": {'+		
+	'\n              "CALL_PROVIDER_TECHNO": "SIP",'+		
+	'\n              "CACHE_SIZE": "1024",'+		
+	'\n              "JAVAC_CLASSPATH": "/opt/OC/share/java/hpoc-see-core/see-core-api.jar:/opt/OC/share/java/hpoc-scif-api/scif-api.jar:/opt/OC/share/java/hpoc-scif-api/scif-impl.jar:/opt/OC/share/java/hpoc-scif-pf-utilities/scifPlatformUtilities-api.jar:/opt/OC/share/java/hpoc-scif-pf-utilities/scifPlatformUtilities-impl.jar:/opt/OC/share/java/hpoc-scifScxml/scifScxml-impl.jar:/usr/share/java/slf4j/slf4j-api.jar:/usr/share/java/slf4j/slf4j-jcl.jar",'+		
+	'\n              "CALL_PROVIDER_NAME": "SIPNL-SIP-PROVIDER",'+		
+	'\n              "WORKDIR": "/var/tmp/ScxmlWorkDir",'+		
+	'\n              "NET_URL_CLASS": "com.hp.opencall.ngin.scxml.scif.ConstantUrlBuilder",'+		
+	'\n              "NET_URL_ARG": "file:////opt/OC/share/hpoc-nivr-nfv/tutorial/bin/orchPPAVPN.scxml"'+		
+	'\n            }'+		
+	'\n          }'+		
+	'\n        },'+		
+	'\n        "PPA_SESSION_TIME_OUT": "1000",'+		
+	'\n        "SIP_CALL_PROVIDER_TECHNO": "SCXML"'+		
+	'\n      },'+		
+	'\n      "service": {'+		
+	'\n        "timer": {'+		
+	'\n          "min": {'+		
+	'\n            "spare": {'+		
+	'\n              "threads": "16"'+		
+	'\n            }'+		
+	'\n          },'+		
+	'\n          "queue": {'+		
+	'\n            "max": {'+		
+	'\n              "events": "50000"'+		
+	'\n            },'+		
+	'\n            "medium": {'+		
+	'\n              "limit": {'+		
+	'\n                "percentage": "10"'+		
+	'\n              }'+		
+	'\n            },'+		
+	'\n            "low": {'+		
+	'\n              "limit": {'+		
+	'\n                "percentage": "5"'+		
+	'\n              }'+		
+	'\n            }'+		
+	'\n          },'+		
+	'\n          "max": {'+		
+	'\n            "threads": "16"'+		
+	'\n          }'+		
+	'\n        }'+		
+	'\n      }'+		
+	'\n    },'+		
+	'\n    "sip": {'+		
+	'\n      "connector": {'+		
+	'\n        "max": {'+		
+	'\n          "threads": "32"'+		
+	'\n        },'+		
+	'\n        "queue": {'+		
+	'\n          "medium": {'+		
+	'\n            "percentage": "10"'+		
+	'\n          },'+		
+	'\n          "max": {'+		
+	'\n            "events": "50000"'+		
+	'\n          },'+		
+	'\n          "low": {'+		
+	'\n            "limit": {'+		
+	'\n              "percentage": "5"'+		
+	'\n            }'+		
+	'\n          }'+		
+	'\n        }'+		
+	'\n      }'+		
+	'\n    }'+		
+	'\n  }'+		
+	'\n}'
 }
 	
 SEEliteService.build = function(target){
@@ -3315,9 +3421,11 @@ SEEliteService.build = function(target){
 	var types = new Array(nbVNFC);
 	var configs = new Array(nbVNFC);
 	var instanceIds = new Array(nbVNFC);
+	var sipProviders = new Array(nbVNFC);
 	var sipAddresses = new Array(nbVNFC);
 	var sipTransports = new Array(nbVNFC);
 	var sipPorts = new Array(nbVNFC);
+	var sipConfigs = new Array(nbVNFC);
 	
 	result += '\n# -------------------- #';
 	result += '\n# SEE lite services    #';
@@ -3330,9 +3438,11 @@ SEEliteService.build = function(target){
 		var base=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'Base', type=='ScifSNTSTutorial' ? '' : '/tmp/SEEliteService-'+i+'.ear');
 		var config=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'Json config');
 		var instanceId=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'Instance Id');
+		var sipProvider=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'sipProvider');
 		var sipAddress=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'sipAddress', type=='ScifSNTSTutorial' ? '0.0.0.0' : '');
 		var sipTransport=SEEliteService.getAndSetSelection(table.rows[i], nameIndexes, 'sipTransport');
 		var sipPort=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'sipPort', type=='ScifSNTSTutorial' ? '5060' : '');
+		var sipConfig=SEEliteService.getAndSetValue(table.rows[i], nameIndexes, 'sipConfig');
 		
 		var VNFCindex = VNFCnames.indexOf(VNFCName);
 		var VNFdisplayName = VNFCName != "" ? "the VNFC " + VNFCName : "the composed VNF";
@@ -3367,6 +3477,10 @@ SEEliteService.build = function(target){
 			if(instanceIds[VNFCindex] == undefined)instanceIds[VNFCindex] = new Array();
 			instanceIds[VNFCindex][nameIndex]=instanceId;
 		}
+		if(sipProvider != ""){
+			if(sipProviders[VNFCindex] == undefined)sipProviders[VNFCindex] = new Array();
+			sipProviders[VNFCindex][nameIndex]=sipProvider;
+		}
 		if(sipAddress != ""){
 			if(sipAddresses[VNFCindex] == undefined)sipAddresses[VNFCindex] = new Array();
 			sipAddresses[VNFCindex][nameIndex]=sipAddress;
@@ -3379,6 +3493,10 @@ SEEliteService.build = function(target){
 			if(sipPorts[VNFCindex] == undefined)sipPorts[VNFCindex] = new Array();
 			sipPorts[VNFCindex][nameIndex]=sipPort;
 			vnfPorts.push(new vnfPort(sipPort, '', name));	// Use the default protocol, UDP: specific like UDP+TCP would be rejected...
+		}
+		if(sipConfig != ""){
+			if(sipConfigs[VNFCindex] == undefined)sipConfigs[VNFCindex] = new Array();
+			sipConfigs[VNFCindex][nameIndex]=sipConfig;
 		}
 	}
 	
@@ -3397,9 +3515,11 @@ SEEliteService.build = function(target){
 		if(types.length > 0)result += "\nSEE_LITE_SERVICE_APPLICATION_TYPE=( "+types[i].join(" ")+" )";
 		if(configs.length > 0)result += "\nSEE_LITE_DATA_SECTION=( "+configs[i].join(" ")+" )";
 		if(instanceIds[i] != undefined)result += "\nSEE_LITE_SERVICE_INSTANCE_ID=( "+instanceIds[i].join(" ")+" )";
+		if(sipProviders.length > 0)result += "\nSEE_LITE_SIP_PROVIDER_NAME=( "+sipProviders[i].join(" ")+" )";
 		if(sipAddresses.length > 0)result += "\nSEE_LITE_SIP_ADDRESS=( "+sipAddresses[i].join(" ")+" )";
 		if(sipTransports.length > 0)result += "\nSEE_LITE_SIP_TRANSPORT=( "+sipTransports[i].join(" ")+" )";
 		if(sipPorts.length > 0)result += "\nSEE_LITE_SIP_PORT=( "+sipPorts[i].join(" ")+" )";
+		if(sipConfigs.length > 0)result += "\nSEE_LITE_SIP_CONFIG=( "+sipConfigs[i].join(" ")+" )";
 		result += ifVNFCclose(e,i);
 	});
 
@@ -4772,7 +4892,8 @@ var UcpSmpp = new vnfResource("UcpSmpp", [
 	);
 	
 UcpSmpp.help = function(){
-	return "UCP and SMPP resources"+
+	return "UCP and SMPP resources for Messaging Framework application"+
+	"\nRefer to Messaging Framework Configuration and Operations Guide §SMPP and UCP Network Layers provisioning"+
 	"\nName: provider's name" +
 	"\nService name: the name of the SEE service associated to this provider; default to the messaging framework one" +
 	"\nAddress: selected network CIDR to listen to, eg 192.168.69.0/24; default to any interface 0.0.0.0" +
@@ -7215,7 +7336,7 @@ var endOfDescriptor="# +++ EOF +++ # Do not delete this line";
 function buildVNFDescriptor(target, engine){
 	var quickDescription = document.getElementById("quickDescription");
 	quickDescription.setAttribute("value", quickDescription.value);
-	document.title = "MSE VNF "+ quickDescription.value;
+	document.title = "NetApps "+ quickDescription.value;
 	
 	consistency.init();
 	var warnings = "";
@@ -7560,7 +7681,9 @@ function deploymentHelp(){userOutput(
 "\n\t\t- define the topology in the assistant; include 'base*,hpe,updates' in the YUM_REPO_LIST definition"+
 "\n\t\t- select the kubernetes target and click 'Deploy'; run the resulting shell script in the devops console"+
 "\n\t\t- check and connect to the nodes and pods: kubectl get nodes -o wide ; kubectl get pods -o wide ; kubectl exec -it <pod name> -- bash"+
-"\nAnsible deployment of a Heat stack:"+
+"\n\t\t- To delete the stack: kubectl delete --kustomize <stack name>"+
+"\n\t\t  where <stack name> is the script name without the .sh extension."+
+"\n\nAnsible deployment of a Heat stack:"+
 "\n\t- prepare the Ansible console as per the DevOps Help section"+
 "\n\t- select the Heat output format in the drop down list besides the Deploy button, then click Deploy"+
 "\n\t- drop the generated Heat stack template to the Ansible console as nivr-cluster-nfv.yaml or other name"+
@@ -8063,6 +8186,8 @@ function buildKubernetesScript(){
 	kube+=n0+'if ! test -n "${_ip}" ; then echo "IP address undefined on pod $_pod" && exit 1 ; fi';
 	kube+=n0+'echo "Pod ${_pod} IP address is ${_ip}"';
 	kube+=n0+'sed -i "s/_%_${_pod}_ipaddress_%_/${_ip}/" ${_nivr_properties}';
+	// Support also the generic templating based on tilda on the management unique network
+	kube+=n0+'sed -i "s/~${_pod}_mgmt~/${_ip}/" ${_nivr_properties}';
 	kube+=n0+'done';
 
 	if(uspmAuxDescInput.isDefined()){
