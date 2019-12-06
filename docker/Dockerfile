@@ -40,7 +40,7 @@ RUN /usr/bin/yum reinstall --assumeyes glibc-common || echo glibc-common not ava
 # Add installers scripts known in the path
 ADD ./$bits/*.sh $ISO_REPO
 RUN /usr/bin/chmod a+x $ISO_REPO/*.sh
-RUN echo PATH=$PATH:$ISO_REPO >> ~/.bash_profile
+RUN echo PATH=$PATH:/opt/OC/bin:$ISO_REPO >> ~/.bash_profile
 RUN echo export PATH >> ~/.bash_profile
 # Start mandatory services
 RUN echo /usr/sbin/service sshd start >> ~/.bash_profile
