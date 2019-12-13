@@ -8,7 +8,7 @@
 <table border=0 width="100%">
 <td valign="top" align="left">
 <H1>CMS Network Applications Descriptor</H1>
-<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-12-05 Version 3.48</a></p>
+<p><a id="vnfDescriptorWizardVersion" href="#endOfUserArea" title="Click to view version history" style="color: #01a982; text-decoration: underline;" onclick="versionHistory()">2019-12-13 Version 3.49</a></p>
 <p><a id="compatibilityMatrix" href="#" title="Click to view the MSE automated deployer compatibility matrix" style="color: #01a982; text-decoration: underline;" onclick="compatibilityMatrix()">Compatibility Matrix</a></p>
 <p>
 <label for="quickDescription">Description :</label>
@@ -111,6 +111,7 @@ document.getElementById("HPElogo").src="data:image/png;base64,"+HPElogo;
 // Display version history in the user output area
 function versionHistory(){
 	userOutput("Version history:"+
+	"\n2019-12-13 3.49	Propagate customized OpenStack flavors to Heat templates"+
 	"\n2019-12-05 3.48	SEElite section: offer to name the SIP provider, support service_component and sip_provider parameters through the APP_CONFIG_DATA_FILE json file."+
 	"\n2019-11-21 3.47	Misc section: SEE_JAVA_MAX_HEAP sets the maximum size of the Java heap for all SEE processes. Kubernetes on Azure: help to connect the container registry to the kubernetes cluster"+
 	"\n2019-11-12 3.46	SEE lite service: support for a dedicated SIP provider; kubernetes: expose http and SEE lite SIP provider ports; OCCP SNTS demo removed, obsolete."+
@@ -7707,6 +7708,13 @@ function buildHeatTemplate(){
 	// Check if Heat volume are to be used and from which source (image or volume)
 	var useHeatVolumes = document.getElementById("useHeatVolumes").value;
 	
+	// Build the descriptor for Heat (or get the errors) and do not publish
+	// Required soon enough to get Heat specific variables properly setup
+    var desc = buildVNFDescriptor('Heat');
+    
+    // if the enf of descriptor is not found, show the error and quit
+    if(desc.indexOf(endOfDescriptor) == -1)return; 
+
 	var n0="\n";
 	var quickDescription = document.getElementById("quickDescription");
 	var heat="heat_template_version: 2013-05-23"
@@ -7724,7 +7732,7 @@ function buildHeatTemplate(){
     	case 'from image':	heat+=n0+"    description: The name of the image used to instantiate MSE volumes"; break;
     	case 'from master':	heat+=n0+"    description: The id of the master volume used to instantiate MSE volumes"; break;
     }
-    heat+=n0+"    default: MSE243.qcow2";
+    heat+=n0+"    default: tas.qcow2";
 	heat+=n0+"  ExternalNetwork:";
     heat+=n0+"    type: string";
     heat+=n0+"    description: The name of the external public network used to connect floating IPs";
@@ -7759,13 +7767,6 @@ function buildHeatTemplate(){
 	heat+=n0;
 	heat+=n0+"resources:";
 	
-	// Build the descriptor for Heat (or get the errors) and do not publish
-	// Required soon enough to get Heat specific variables properly setup
-    var desc = buildVNFDescriptor('Heat');
-    
-    // if the enf of descriptor is not found, show the error and quit
-    if(desc.indexOf(endOfDescriptor) == -1)return; 
-
 	// Create networks from Networks.heatNetworks array: 
 	// The networks are to be created in the interface number order to ensure that ethX is actually connected to interface X
 	// One common router
